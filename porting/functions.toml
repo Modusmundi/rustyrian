@@ -2623,7 +2623,7 @@ c = "mainint.c::JE_getCost"
 c_sha = "2e4250ff7ad7"
 rust = "rustyrian_core::mainint::je_get_cost"
 status = "verified"
-verify = ["diff:mainint::item_costs_and_scores_match_c"]
+verify = ["diff:mainint::item_costs_and_scores_match_c", "diff:mainint::out_of_range_items_cost_nothing"]
 notes = ""
 
 [[fn]]
@@ -2639,7 +2639,7 @@ c = "mainint.c::JE_totalScore"
 c_sha = "fbb2aa0dbfff"
 rust = "rustyrian_core::mainint::je_total_score"
 status = "verified"
-verify = ["diff:mainint::item_costs_and_scores_match_c", "diff:mainint::adjust_difficulty_matches_c"]
+verify = ["diff:mainint::item_costs_and_scores_match_c", "diff:mainint::adjust_difficulty_matches_c", "diff:mainint::out_of_range_items_cost_nothing"]
 notes = ""
 
 [[fn]]
@@ -2647,7 +2647,7 @@ c = "mainint.c::JE_getValue"
 c_sha = "df8ba8b94d3e"
 rust = "rustyrian_core::mainint::je_get_value"
 status = "verified"
-verify = ["diff:mainint::item_costs_and_scores_match_c"]
+verify = ["diff:mainint::item_costs_and_scores_match_c", "diff:mainint::out_of_range_items_cost_nothing"]
 notes = ""
 
 [[fn]]
@@ -2815,7 +2815,7 @@ c = "mainint.c::JE_inGameDisplays"
 c_sha = "d24204845622"
 rust = "rustyrian_core::mainint::je_in_game_displays"
 status = "verified"
-verify = ["diff:mainint::hud_drawing_matches_c"]
+verify = ["diff:mainint::hud_drawing_matches_c", "diff:mainint::in_game_displays_special_graphic_zero_draws_nothing"]
 notes = ""
 
 [[fn]]

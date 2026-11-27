@@ -705,9 +705,16 @@ pub fn weapon_upgrade_cost(base_cost: i64, power: u32) -> i64 {
     base_cost.wrapping_mul(i64::from(temp))
 }
 
+/// `cost` of item `n` of `table`. Item numbers from saves and demos outside
+/// the table read a zeroed entry (D-UB-MAININT-ITEMS; C reads past it).
+fn cost_of<T>(table: &[T], n: usize, cost: impl Fn(&T) -> u16) -> i64 {
+    table.get(n).map_or(0, |e| i64::from(cost(e)))
+}
+
 #[doc(alias = "JE_getCost")]
 pub fn je_get_cost(g: &mut Game, item_type: u8, item_num: u16) -> u64 {
     let n = usize::from(item_num);
+    let e = &g.episodes;
     let mut cost: i64 = 0;
 
     match item_type {
@@ -715,11 +722,11 @@ pub fn je_get_cost(g: &mut Game, item_type: u8, item_num: u16) -> u64 {
             cost = if item_num > 90 {
                 100
             } else {
-                i64::from(g.episodes.ships[n].cost)
+                cost_of(&e.ships[..], n, |s| s.cost)
             };
         }
         3 | 4 => {
-            cost = i64::from(g.episodes.weapon_port[n].cost);
+            cost = cost_of(&e.weapon_port[..], n, |w| w.cost);
 
             let port = usize::from(item_type - 3);
             let item_power = (i32::from(g.player.player[0].items.weapon[port].power) - 1) as u32;
@@ -727,9 +734,9 @@ pub fn je_get_cost(g: &mut Game, item_type: u8, item_num: u16) -> u64 {
             g.mainint.downgrade_cost = weapon_upgrade_cost(cost, item_power) as u16;
             g.mainint.upgrade_cost = weapon_upgrade_cost(cost, item_power.wrapping_add(1)) as u16;
         }
-        5 => cost = i64::from(g.episodes.shields[n].cost),
-        6 => cost = i64::from(g.episodes.power_sys[n].cost),
-        7 | 8 => cost = i64::from(g.episodes.options[n].cost),
+        5 => cost = cost_of(&e.shields[..], n, |s| s.cost),
+        6 => cost = cost_of(&e.power_sys[..], n, |p| p.cost),
+        7 | 8 => cost = cost_of(&e.options[..], n, |o| o.cost),
         _ => {}
     }
 
@@ -1076,12 +1083,13 @@ pub fn je_total_score(g: &mut Game, this_player: usize) -> u64 {
 #[doc(alias = "JE_getValue")]
 pub fn je_get_value(g: &mut Game, item_type: u8, item_num: u16) -> i32 {
     let n = usize::from(item_num);
+    let e = &g.episodes;
     let mut value: i64 = 0;
 
     match item_type {
-        2 => value = i64::from(g.episodes.ships[n].cost),
+        2 => value = cost_of(&e.ships[..], n, |s| s.cost),
         3 | 4 => {
-            let base_value = i64::from(g.episodes.weapon_port[n].cost);
+            let base_value = cost_of(&e.weapon_port[..], n, |w| w.cost);
 
             // if two-player, use first player's front and second player's rear weapon
             let port = usize::from(item_type - 3);
@@ -1095,9 +1103,9 @@ pub fn je_get_value(g: &mut Game, item_type: u8, item_num: u16) -> i32 {
                 i += 1;
             }
         }
-        5 => value = i64::from(g.episodes.shields[n].cost),
-        6 => value = i64::from(g.episodes.power_sys[n].cost),
-        7 | 8 => value = i64::from(g.episodes.options[n].cost),
+        5 => value = cost_of(&e.shields[..], n, |s| s.cost),
+        6 => value = cost_of(&e.power_sys[..], n, |p| p.cost),
+        7 | 8 => value = cost_of(&e.options[..], n, |o| o.cost),
         _ => {}
     }
 

@@ -40,10 +40,26 @@ use rustyrian_oracle::bindings as b;
 use std::cell::RefCell;
 use std::ffi::c_int;
 
+/// Equal platform calls, then equal C and Rust states of the named modules
+/// (only what the test touches; loading the whole game per case is slow).
+macro_rules! same {
+    ($rig:expr; $($m:ident),* $(,)?) => {{
+        assert_eq!($rig.c_calls(), $rig.rust_calls(), "platform calls differ");
+        $(prop_assert_eq!(
+            &rustyrian_oracle::diff::load::<rustyrian_core::$m::State>(),
+            &$rig.g.$m,
+            "{}",
+            stringify!($m)
+        );)*
+    }};
+}
+
 /// Runs `test` for each generated case on one fixture rig (each case stores
-/// its state into both engines first). Storing and comparing the whole game
-/// costs about 0.1 s a case, so these run a quarter of the configured cases
-/// (64 by default, 2500 at `PROPTEST_CASES=10000`).
+/// the whole game into both engines first).
+///
+/// Hard cap of 16 cases (not scaled by `PROPTEST_CASES`): every case stores
+/// the whole game into C and loads the touched modules back, about 0.1 s a
+/// case.
 fn run_on_rig<S: Strategy>(
     strategy: S,
     frame: u64,
@@ -53,8 +69,10 @@ fn run_on_rig<S: Strategy>(
 {
     let rig = RefCell::new(Rig::from_fixture("ots 1\n", frame));
     let base = rig.borrow().g.snapshot();
-    let mut config = RunnerConfig::default();
-    config.cases = (config.cases / 4).max(16);
+    let config = RunnerConfig {
+        cases: 16,
+        ..RunnerConfig::default()
+    };
     let mut runner = TestRunner::new(config);
     runner
         .run(&strategy, |v| {
@@ -229,7 +247,7 @@ fn item_costs_and_scores_match_c() {
                     prop_assert_eq!(c, mi::je_total_score(&mut rig.g, p));
                 }
             }
-            rig.check();
+            same!(rig; mainint, player);
             Ok(())
         },
     );
@@ -249,7 +267,7 @@ fn adjust_difficulty_matches_c() {
             // SAFETY: plain C call.
             unsafe { b::adjust_difficulty() };
             mi::adjust_difficulty(&mut rig.g);
-            rig.check();
+            same!(rig; config, player);
             Ok(())
         },
     );
@@ -299,7 +317,7 @@ fn sort_high_scores_match_c() {
             } else {
                 mi::je_sort(&mut rig.g);
             }
-            rig.check();
+            same!(rig; config, varz);
             Ok(())
         },
     );
@@ -314,7 +332,7 @@ fn gamma_check_matches_c() {
         // SAFETY: plain C call.
         let c = unsafe { b::JE_gammaCheck() };
         prop_assert_eq!(c, mi::je_gamma_check(&mut rig.g));
-        rig.check();
+        same!(rig; keyboard, config, palette);
         Ok(())
     });
 }
@@ -357,7 +375,7 @@ fn sf_codes_match_c() {
                 prop_assert_eq!(codes, rig.g.varz.sf_current_code);
                 prop_assert_eq!(executed, rig.g.varz.sf_executed);
             }
-            rig.check();
+            same!(rig; varz, mainint, player);
             Ok(())
         },
     );
@@ -371,7 +389,7 @@ fn init_player_data_matches_c() {
         // SAFETY: plain C call.
         unsafe { b::JE_initPlayerData() };
         mi::je_init_player_data(&mut rig.g);
-        rig.check();
+        same!(rig; player, config, mtrand, episodes);
         Ok(())
     });
 }
@@ -389,7 +407,7 @@ fn get_name_matches_c() {
             .to_bytes()
             .to_vec();
         prop_assert_eq!(c, mi::je_get_name(&rig.g, pnum));
-        rig.check();
+        same!(rig; network, helptext);
         Ok(())
     });
 }
@@ -480,7 +498,7 @@ fn hud_drawing_matches_c() {
             mi::je_draw_text_window(&mut rig.g, text.as_bytes());
             let seg = seg.unwrap_or(ScreenId::VgaScreenSeg);
             mi::je_draw_cube(&mut rig.g, seg, cx % 280, cy % 170, filter, bright);
-            rig.check();
+            same!(rig; video, varz, mainint, sprite);
             Ok(())
         },
     );
@@ -526,13 +544,37 @@ fn input(keys: &[(u32, &str)], clicks: &[(u32, i32, i32, u8)], extra: &[(u32, &s
 }
 
 /// Runs a screen on both engines from fixture 500 after `setup`, then
-/// checks calls, state, files and frames.
+/// checks calls, state, files and frames; the screen must present.
 fn screen_run<T: PartialEq + std::fmt::Debug>(
     script: &str,
     setup: impl FnOnce(&mut rustyrian_core::Game),
     c: impl FnOnce() -> T,
     r: impl FnOnce(&mut rustyrian_core::Game) -> rustyrian_core::game::Flow<T>,
 ) -> Result<T, i32> {
+    let (out, frames) = screen_run_frames(script, setup, c, r);
+    assert!(frames > 0, "the screen presented nothing");
+    out
+}
+
+/// [`screen_run`] for the paths that present nothing (no high score, a
+/// load, no menu request, a fatal file error): asserts that.
+fn screen_run_quiet<T: PartialEq + std::fmt::Debug>(
+    script: &str,
+    setup: impl FnOnce(&mut rustyrian_core::Game),
+    c: impl FnOnce() -> T,
+    r: impl FnOnce(&mut rustyrian_core::Game) -> rustyrian_core::game::Flow<T>,
+) -> Result<T, i32> {
+    let (out, frames) = screen_run_frames(script, setup, c, r);
+    assert_eq!(frames, 0, "expected no presented frames");
+    out
+}
+
+fn screen_run_frames<T: PartialEq + std::fmt::Debug>(
+    script: &str,
+    setup: impl FnOnce(&mut rustyrian_core::Game),
+    c: impl FnOnce() -> T,
+    r: impl FnOnce(&mut rustyrian_core::Game) -> rustyrian_core::game::Flow<T>,
+) -> (Result<T, i32>, usize) {
     let mut rig = Rig::from_fixture(script, 500);
     setup(&mut rig.g);
     rig.store();
@@ -544,8 +586,8 @@ fn screen_run<T: PartialEq + std::fmt::Debug>(
         rig.check_halted();
         mainint_support::forget_freed_c();
     }
-    rig.check_frames();
-    out
+    // The rig's `init_video` presents one frame before the screen runs.
+    (out, rig.check_frames() - 1)
 }
 
 #[test]
@@ -907,7 +949,7 @@ fn in_game_setup_quit_and_escape_match_c() {
 
     // No menu request: only the relative mouse mode toggles.
     let s = input(&[], &[], &[]);
-    let out = screen_run(
+    let out = screen_run_quiet(
         &s,
         |g| g.network.your_in_game_menu_request = false,
         // SAFETY: plain C call on the test thread.
@@ -989,7 +1031,7 @@ fn pause_game_matches_c() {
             &[],
             &[],
         );
-        let out = screen_run(
+        let (out, frames) = screen_run_frames(
             &s,
             |g| g.config.super_pause = super_pause,
             // SAFETY: plain C call on the test thread.
@@ -997,6 +1039,8 @@ fn pause_game_matches_c() {
             mi::je_pause_game,
         );
         assert_eq!(out, Ok(()));
+        // Super pause shows no "paused" text and presents nothing.
+        assert_eq!(frames > 0, !super_pause);
     }
     // A mouse click unpauses.
     let s = input(&[], &[(1500, 100, 100, 1)], &[]);
@@ -1204,7 +1248,7 @@ fn high_score_check_matches_c() {
             f.high_score1 = i32::MAX;
         }
     };
-    let out = screen_run(
+    let out = screen_run_quiet(
         &s,
         setup,
         // SAFETY: plain C call on the test thread.
@@ -1239,7 +1283,7 @@ fn high_score_check_long_name_matches_c() {
 fn operation_load_matches_c() {
     for (slot, save) in [(1u8, true), (2, false)] {
         let s = input(&[], &[], &[]);
-        let out = screen_run(
+        let out = screen_run_quiet(
             &s,
             |g| {
                 with_saves(g);
@@ -1253,7 +1297,7 @@ fn operation_load_matches_c() {
             |g| mi::je_operation(g, slot),
         );
         // Loading presents nothing; the empty slot neither.
-        let _ = out;
+        assert_eq!(out, Ok(()));
     }
 }
 
@@ -1327,7 +1371,7 @@ fn out_char_glow_matches_c() {
         };
         let text = "Glow ~text~ #1, with spaces!";
         let ctext = std::ffi::CString::new(text).unwrap();
-        let out = screen_run(
+        let (out, frames) = screen_run_frames(
             &s,
             |g| {
                 g.nortsong.frame_count_max = max;
@@ -1341,6 +1385,8 @@ fn out_char_glow_matches_c() {
             |g| mi::je_out_char_glow(g, 20, 100, text.as_bytes()),
         );
         assert_eq!(out, Ok(()));
+        // A pressed Escape stops the glow before its first frame.
+        assert_eq!(frames > 0, !esc);
     }
 }
 
@@ -1422,7 +1468,7 @@ fn play_credits_matches_c() {
 }
 
 #[test]
-#[ignore = "about 160 s: the whole credits roll on both engines; run with --run-ignored"]
+#[ignore = "160 s: full credits roll; run by coverage and nightly"]
 fn play_credits_to_the_end_matches_c() {
     // The whole roll: the song fades near the end and the last frame repeats
     // (restarting the closing song) until a key.
@@ -1452,7 +1498,7 @@ fn play_credits_missing_file_halts_like_c() {
     )
     .unwrap();
     let s = input(&[], &[], &[]);
-    let out = screen_run(
+    let out = screen_run_quiet(
         &s,
         |g| {
             let dir = std::os::unix::ffi::OsStrExt::as_bytes(empty.as_os_str()).to_vec();
@@ -1721,7 +1767,7 @@ fn play_credits_truncated_file_halts_like_c() {
     let cdt = std::fs::read(data.join("tyrian.cdt")).unwrap();
     std::fs::write(dir.join("tyrian.cdt"), &cdt[..cdt.len() / 3]).unwrap();
     let s = input(&[], &[], &[]);
-    let out = screen_run(
+    let out = screen_run_quiet(
         &s,
         |g| {
             let d = std::os::unix::ffi::OsStrExt::as_bytes(dir.as_os_str()).to_vec();
@@ -1791,4 +1837,55 @@ fn screens_load_the_shop_sheet_when_missing_match_c() {
         ),
         Ok(())
     );
+}
+
+/// D-UB-MAININT-ITEMS: item numbers outside their table (damaged saves or
+/// demos) read a zeroed entry instead of past the table.
+#[test]
+fn out_of_range_items_cost_nothing() {
+    let mut rig = Rig::from_fixture("ots 1\n", 500);
+    let g = &mut rig.g;
+    assert!(g.episodes.ships[1].cost > 0, "fixture has item data");
+    for t in 2..=8u8 {
+        assert_eq!(mi::je_get_value(g, t, 900), 0, "type {t}");
+    }
+    assert_eq!(mi::je_get_cost(g, 2, 50), 0);
+    assert_eq!(mi::je_get_cost(g, 2, 91), 100);
+    for t in 3..=8u8 {
+        assert_eq!(mi::je_get_cost(g, t, 900), 0, "type {t}");
+    }
+    let p = &mut g.player.player[0];
+    p.cash = 1234;
+    p.items.ship = 200;
+    p.items.weapon[0].id = 250;
+    p.items.weapon[1].id = 250;
+    p.items.shield = 250;
+    p.items.generator = 250;
+    p.items.sidekick = [250, 250];
+    assert_eq!(mi::je_total_score(g, 0), 1234);
+}
+
+/// D-UB-SPRITE-1: a special whose 2x2 graphic is 0 (sprite index 0, which C
+/// reads before `spriteSheet10`) draws nothing and does not panic.
+#[test]
+fn in_game_displays_special_graphic_zero_draws_nothing() {
+    let mut rig = Rig::from_fixture("ots 1\n", 500);
+    let g = &mut rig.g;
+    let special = (1..g.episodes.special.len())
+        .find(|&i| g.episodes.special[i].itemgraphic == 0)
+        .unwrap_or_else(|| {
+            g.episodes.special[1].itemgraphic = 0;
+            1
+        });
+    g.player.player[0].items.special = 0;
+    let base = g.snapshot();
+    mi::je_in_game_displays(g);
+    let without = g.video.vga().pixels.clone();
+    g.restore(base);
+    g.player.player[0].items.special = special as u8;
+    mi::je_in_game_displays(g);
+    // The special only moves the lives display down (y 35 instead of 15);
+    // with no lives display (single player) the screens are equal.
+    assert!(!g.config.one_player_action && !g.config.two_player_mode);
+    assert_eq!(g.video.vga().pixels, without);
 }
