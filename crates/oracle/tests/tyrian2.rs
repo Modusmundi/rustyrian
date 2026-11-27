@@ -2499,12 +2499,14 @@ fn level_with_events(events: &[(u8, i16, i16, i8)]) -> Vec<u8> {
 }
 
 /// The level-loop features levels switch on through events: every smoothie
-/// (with a fast processor), the level timer running out, random
-/// explosions, a return jump, filters, the background layer orders, and the
-/// debug overlay; under wild and super-wild modes.
+/// (with fast and slow processors, and the flipped and headlight views),
+/// the level timer running out, random explosions, a return jump, layer
+/// orders, forced events with the background stopped, the debug overlay
+/// and transparent explosions; under wild and super-wild modes.
 #[test]
 fn je_main_runs_level_features() {
-    let events = [
+    type Event = (u8, i16, i16, i8);
+    let all_smoothies: Vec<Event> = vec![
         (64, 1, 1, 0),
         (64, 2, 1, 0),
         (64, 3, 1, 0),
@@ -2512,19 +2514,38 @@ fn je_main_runs_level_features() {
         (64, 5, 1, 0),
         (64, 6, 1, 0),
         (64, 9, 1, 0),
-        (67, 1, 400, 6),
+    ];
+    let rest: Vec<Event> = vec![
+        (67, 1, 400, 2),
         (68, 1, 0, 0),
-        // A return needs an earlier jump (upstream reads `eventRec[-1]` when
-        // it returns to location 0, D-UB-TYRIAN2-4): jump to 1 first.
-        (54, 1, 0, 0),
-        (76, 0, 0, 0),
         (43, 0, 0, 0),
         (42, 0, 0, 0),
         (73, 1, 0, 0),
         (29, 0, 0, 0),
+        // A return needs an earlier jump (upstream reads `eventRec[-1]` when
+        // it returns to location 0, D-UB-TYRIAN2-4): jump to 1 first.
+        (54, 1, 0, 0),
+        (76, 0, 0, 0),
     ];
     let script = play_script(9_000, &[]);
-    for (i, processor) in [4u8, 2].into_iter().enumerate() {
+    let runs: Vec<(Vec<Event>, u8, bool)> = vec![
+        ([all_smoothies.clone(), rest.clone()].concat(), 4, true),
+        ([all_smoothies.clone(), rest.clone()].concat(), 2, false),
+        // The lava smoothie with its second variant, and one view each.
+        (
+            [vec![(64, 1, 1, 5), (64, 9, 1, 0)], rest.clone()].concat(),
+            3,
+            false,
+        ),
+        (
+            [vec![(64, 6, 1, 0), (64, 2, 1, 3)], rest.clone()].concat(),
+            3,
+            true,
+        ),
+        // The background stopped, events forced on.
+        (vec![(2, 0, 0, 0), (53, 0, 0, 0), (4, 2, 0, 0)], 4, false),
+    ];
+    for (i, (events, processor, super_wild)) in runs.into_iter().enumerate() {
         let (r, frames, _) = run_main_on_level(
             &format!("main-features-{i}"),
             level_with_events(&events),
@@ -2532,26 +2553,76 @@ fn je_main_runs_level_features() {
             |g| {
                 g.config.processor_type = processor;
                 g.config.wild = true;
-                g.config.super_wild = i == 0;
+                g.config.super_wild = super_wild;
+                g.config.explosion_transparent = i % 2 == 0;
                 g.varz.debug = true;
             },
         );
-        assert_eq!(r, Err(0));
-        assert!(frames > 200, "{frames} frames");
+        assert_eq!(r, Err(0), "run {i}");
+        assert!(frames > 200, "run {i}: {frames} frames");
     }
-    // The other background-2 orders, transparent.
-    let layers = [(43, 2, 0, 0), (48, 0, 0, 0), (21, 0, 0, 0), (65, 0, 0, 0)];
+    // The other background-2 orders, transparent or not.
+    let layers = [(43, 2, 0, 0), (21, 0, 0, 0), (65, 0, 0, 0)];
     let (r, _, _) = run_main_on_level("main-layers", level_with_events(&layers), &script, |g| {
         g.config.wild = true;
     });
     assert_eq!(r, Err(0));
-    let layers = [(43, 3, 0, 0), (22, 0, 0, 0), (72, 1, 0, 0)];
+    let layers = [
+        (43, 2, 0, 0),
+        (48, 0, 0, 0),
+        (43, 3, 0, 0),
+        (22, 0, 0, 0),
+        (72, 1, 0, 0),
+    ];
     let (r, _, _) = run_main_on_level("main-layers-3", level_with_events(&layers), &script, |_| {});
     assert_eq!(r, Err(0));
 }
 
+/// A level that ends at once (backgrounds stopped, ready to end, no
+/// enemies): the end-of-frame checks, the level's end in episode 4 with
+/// fast play, a recorded demo, and galaga mode, on to the next section.
+#[test]
+fn je_main_ends_quiet_levels() {
+    let events = [(4, 1, 0, 0), (36, 0, 0, 0)];
+    let mut s = String::from("ots 1\n");
+    for t in (3_000..40_000).step_by(1_500) {
+        s.push_str(&format!(
+            "@{t} key-down RETURN\n@{} key-up RETURN\n",
+            t + 45
+        ));
+    }
+    s.push_str("@45000 quit\n");
+    type Setup = fn(&mut Game);
+    let setups: [Setup; 3] = [
+        |g| g.config.fast_play = 1,
+        |g| {
+            // The fixture is mid-demo: close its demo file first.
+            rustyrian_core::file::file_close(&mut g.demo.demo_file);
+            g.demo.record_demo = true;
+        },
+        |g| {
+            g.config.galaga_mode = true;
+            g.config.two_player_mode = true;
+        },
+    ];
+    for (i, setup) in setups.into_iter().enumerate() {
+        let (r, _, section) = run_main_on_level(
+            &format!("main-quiet-{i}"),
+            level_with_events(&events),
+            &s,
+            |g| {
+                g.config.initial_difficulty = 1;
+                g.config.difficulty_level = 1;
+                setup(g);
+            },
+        );
+        assert_eq!(r, Err(0), "setup {i}");
+        assert_eq!(section, 2, "setup {i}: the level ended");
+    }
+}
+
 /// Galaga mode (the `]g[` bonus game): no shields, the second ship, extra
-/// lives from cash.
+/// lives and then cash from a large score.
 #[test]
 fn je_main_plays_galaga() {
     let sections = [
@@ -2562,10 +2633,23 @@ fn je_main_plays_galaga() {
     let mut rig = load_map_rig(&play_script(10_000, &[]), &data, 1);
     rig.g.config.main_level = 1;
     rig.g.config.two_player_mode = true;
-    rig.g.player.player[0].cash = 9_990;
+    rig.g.player.player[0].cash = 1_000_000;
     let (r, frames) = run_main(rig);
     assert_eq!(r, Err(0));
     assert!(frames > 300, "{frames} frames");
+}
+
+/// Episode 4's levels play one difficulty step easier; a level whose random
+/// enemies include the sound-making enemy 2.
+#[test]
+fn je_main_plays_episode_4_and_random_enemy_2() {
+    let script = play_script(6_000, &[]);
+    let (r, _) = run_main_case("main-ep4", 4, 1, &script, |g| {
+        g.config.difficulty_level = 1;
+    });
+    assert_eq!(r, Err(0));
+    let (r, _) = run_main_case("main-enemy2", 1, 17, &script, |_| {});
+    assert_eq!(r, Err(0));
 }
 
 /// No input near the level's boss: the player dies, the game-over text
