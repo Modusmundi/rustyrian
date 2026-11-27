@@ -60,6 +60,12 @@ pub fn atexit_len() -> usize {
     ATEXIT.with(|a| a.borrow().len())
 }
 
+/// Replaces the handlers C registered with `atexit`, so mirrored state
+/// (fixtures captured mid-run) can be stored.
+pub fn set_atexit(handlers: Vec<unsafe extern "C" fn()>) {
+    ATEXIT.with(|a| *a.borrow_mut() = handlers);
+}
+
 pub(crate) fn crand_next() -> i32 {
     CRAND.with(|c| crand::rand(&mut c.borrow_mut()))
 }

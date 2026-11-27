@@ -16,7 +16,6 @@ use rustyrian_harness::{
 };
 use rustyrian_sdl::SdlPlatform;
 use std::io::Write;
-use std::os::unix::ffi::OsStrExt;
 
 /// Whether any instrumentation flag asks for the instrumented platform.
 fn instrumented(o: &Options) -> bool {
@@ -121,7 +120,7 @@ fn main() {
 
     // D-PRODUCT-2: `--userdir DIR` is the user directory itself.
     if let Some(dir) = &o.userdir {
-        let bytes = dir.as_os_str().as_bytes().to_vec();
+        let bytes = dir.as_os_str().as_encoded_bytes().to_vec();
         g.file.user_dir_path_len = bytes.len();
         g.file.user_dir_path = Some(bytes);
     }

@@ -7,8 +7,8 @@
 //! global at a fresh copy from the upstream allocator.
 //!
 //! `atexit` mirrors the handlers C registered through the `atexit` shim
-//! (upstream registers only `SDL_Quit`). They cannot be registered from Rust,
-//! so storing checks that both sides already agree.
+//! (upstream registers only `SDL_Quit`, i.e. the `ot_shim_SDL_Quit` adapter);
+//! storing replaces the shim's registry with the same handlers.
 
 use super::video::{c_heap_free, c_heap_from};
 use super::{Mirror, global, global_mut};
@@ -59,10 +59,13 @@ impl Mirror for State {
                 global_mut(&raw mut b::opentyrian_version),
             );
         }
-        assert_eq!(
-            self.atexit.len(),
-            session::atexit_len(),
-            "atexit registrations cannot be stored into C; both sides must already agree"
-        );
+        let handlers = self
+            .atexit
+            .iter()
+            .map(|h| match h {
+                AtExit::SdlQuit => crate::shim::ot_shim_SDL_Quit as unsafe extern "C" fn(),
+            })
+            .collect();
+        session::set_atexit(handlers);
     }
 }
