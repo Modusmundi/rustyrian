@@ -19,9 +19,10 @@ serde.workspace = true
 serde_json.workspace = true
 postcard.workspace = true
 xxhash-rust.workspace = true
+# `diff::capped_runner` for the differential tests.
+proptest.workspace = true
 
 [dev-dependencies]
-proptest.workspace = true
 pretty_assertions.workspace = true
 png.workspace = true
 
