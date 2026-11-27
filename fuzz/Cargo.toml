@@ -35,5 +35,12 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "net_session"
+path = "fuzz_targets/net_session.rs"
+test = false
+doc = false
+bench = false
+
 [lib]
 path = "src/lib.rs"

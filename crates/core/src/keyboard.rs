@@ -6,6 +6,9 @@
 
 use crate::Game;
 use crate::game::{Flow, Halt};
+use crate::joystick::push_joysticks_as_keyboard;
+use crate::network::network_keep_alive;
+use crate::nortsong::get_frame_count_ticks;
 use crate::platform::Event;
 use crate::video::{
     VGA_HEIGHT, VGA_WIDTH, map_window_point_to_screen, scale_window_distance_to_screen,
@@ -474,4 +477,89 @@ pub fn has_input(g: &mut Game, flags: InputFlags) -> bool {
 #[doc(alias = "getInput")]
 pub fn get_input(g: &mut Game) -> bool {
     keyboard_get_input(g, None) || mouse_get_input(g, INPUT_NO_MOTION, None)
+}
+
+/// One poll of the wait loops: network keep-alive, joystick-as-keyboard input
+/// and OS events.
+fn poll_once(g: &mut Game) -> Flow {
+    network_keep_alive(g)?;
+
+    push_joysticks_as_keyboard(g);
+    handle_sdl_events(g)
+}
+
+#[doc(alias = "waitUntilHasInput")]
+pub fn wait_until_has_input(g: &mut Game, flags: InputFlags) -> Flow {
+    loop {
+        poll_once(g)?;
+
+        if has_input(g, flags) {
+            return Ok(());
+        }
+
+        g.platform.delay(SDL_POLL_INTERVAL);
+    }
+}
+
+#[doc(alias = "waitUntilGetInput")]
+pub fn wait_until_get_input(g: &mut Game) -> Flow {
+    loop {
+        poll_once(g)?;
+
+        if get_input(g) {
+            return Ok(());
+        }
+
+        g.platform.delay(SDL_POLL_INTERVAL);
+    }
+}
+
+#[doc(alias = "waitUntilElapsed")]
+pub fn wait_until_elapsed(g: &mut Game) -> Flow {
+    loop {
+        poll_once(g)?;
+
+        let delay = get_frame_count_ticks(g);
+        if delay == 0 {
+            return Ok(());
+        }
+
+        g.platform.delay(delay.min(SDL_POLL_INTERVAL));
+    }
+}
+
+#[doc(alias = "waitUntilHasInputOrElapsed")]
+pub fn wait_until_has_input_or_elapsed(g: &mut Game) -> Flow<bool> {
+    loop {
+        poll_once(g)?;
+
+        if has_input(g, INPUT_NO_MOTION) {
+            return Ok(true);
+        }
+
+        let delay = get_frame_count_ticks(g);
+        if delay == 0 {
+            return Ok(false);
+        }
+
+        g.platform.delay(delay.min(SDL_POLL_INTERVAL));
+    }
+}
+
+#[doc(alias = "waitUntilGetInputOrElapsed")]
+pub fn wait_until_get_input_or_elapsed(g: &mut Game) -> Flow<bool> {
+    loop {
+        poll_once(g)?;
+
+        if get_input(g) {
+            return Ok(true);
+        }
+
+        let delay = get_frame_count_ticks(g);
+        if delay == 0 {
+            return Ok(false);
+        }
+
+        g.platform.delay(delay.min(SDL_POLL_INTERVAL));
+    }
 }

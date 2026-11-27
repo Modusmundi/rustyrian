@@ -12,7 +12,10 @@
 //! - `BKwrapN`/`BKwrapNto` (`JE_byte **` into `megaDataN.mainmap`) → the
 //!   element index into the flattened `mainmap` (`row * columns + column`).
 
+use crate::Game;
+use crate::game::{Flow, Halt};
 use crate::lvlmast::PORT_NUM;
+use crate::{config, joystick, loudness, sprite, video};
 use serde::{Deserialize, Serialize};
 
 pub const SA: usize = 7;
@@ -722,4 +725,38 @@ impl Default for State {
             ship_gr2ptr: None,
         }
     }
+}
+
+/// Shuts the subsystems down, writes the configuration and the saves, and
+/// exits with `code` (5 becomes 0).
+#[doc(alias = "JE_tyrianHalt")]
+pub fn je_tyrian_halt(g: &mut Game, code: u8) -> Flow {
+    loudness::deinit_audio(g);
+    video::deinit_video(g);
+    joystick::deinit_joysticks(g);
+
+    sprite::free_main_shape_tables(g);
+
+    sprite::free_sprite2s(&mut g.sprite.shop_sprite_sheet);
+    sprite::free_sprite2s(&mut g.sprite.explosion_sprite_sheet);
+    sprite::free_sprite2s(&mut g.sprite.destruct_sprite_sheet);
+
+    g.nortsong.sound_samples.fill(None);
+
+    config::save_configuration(g);
+    config::save_saves(g);
+
+    let code = if code == 5 { 0 } else { code };
+
+    if g.config.trent_win {
+        g.platform.log("");
+        g.platform.log("Sleep well, Trent, you deserve the rest.");
+        g.platform
+            .log("You now have permission to borrow my ship on your next mission.");
+        g.platform.log("");
+    }
+
+    Err(Halt {
+        code: i32::from(code),
+    })
 }

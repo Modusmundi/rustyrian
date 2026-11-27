@@ -34,9 +34,9 @@ notes = ""
 c = "animlib.c::playAnim"
 c_sha = "dfde81e9444b"
 rust = "rustyrian_core::animlib::play_anim"
-status = "todo"
-verify = []
-notes = "blocked: calls video.c::JE_clr256/JE_showVGA, nortsong.c::setFrameCount, keyboard.c::waitUntilGetInputOrElapsed (not verified on main)"
+status = "verified"
+verify = ["diff:waits::play_anim_matches", "diff:waits::play_anim_damaged_files_match"]
+notes = ""
 
 [[fn]]
 c = "arg_parse.c::parse_args"
@@ -1850,9 +1850,9 @@ notes = ""
 c = "fonthand.c::JE_outTextGlow"
 c_sha = "11bd44c5447b"
 rust = "rustyrian_core::fonthand::je_out_text_glow"
-status = "todo"
-verify = []
-notes = "blocked: calls nortsong.c::setFrameCount, video.c::JE_showVGA, keyboard.c::waitUntilGetInputOrElapsed (not verified on main)"
+status = "verified"
+verify = ["diff:waits::je_out_text_glow_matches"]
+notes = ""
 
 [[fn]]
 c = "game_menu.c::playeritem_map"
@@ -2251,9 +2251,9 @@ notes = ""
 c = "joystick.c::detect_joystick_assignment"
 c_sha = "598d2f0778dd"
 rust = "rustyrian_core::joystick::detect_joystick_assignment"
-status = "todo"
-verify = []
-notes = "blocked: calls nortsong.c::setFrameCount, nortsong.c::delayUntilElapsed, network.c::network_check (not verified on main)"
+status = "verified"
+verify = ["diff:waits::detect_joystick_assignment_matches", "diff:waits::detect_joystick_assignment_ignores_releases"]
+notes = ""
 
 [[fn]]
 c = "joystick.c::joystick_assignment_cmp"
@@ -2373,41 +2373,41 @@ notes = ""
 c = "keyboard.c::waitUntilHasInput"
 c_sha = "84642df9d8a7"
 rust = "rustyrian_core::keyboard::wait_until_has_input"
-status = "todo"
-verify = []
-notes = "blocked: calls network.c::network_check (not verified on main)"
+status = "verified"
+verify = ["diff:waits::wait_loops_match"]
+notes = ""
 
 [[fn]]
 c = "keyboard.c::waitUntilGetInput"
 c_sha = "5644b8ea6ad7"
 rust = "rustyrian_core::keyboard::wait_until_get_input"
-status = "todo"
-verify = []
-notes = "blocked: calls network.c::network_check (not verified on main)"
+status = "verified"
+verify = ["diff:waits::wait_loops_match", "diff:network::network_tyrian_halt_matches"]
+notes = ""
 
 [[fn]]
 c = "keyboard.c::waitUntilElapsed"
 c_sha = "e90222542789"
 rust = "rustyrian_core::keyboard::wait_until_elapsed"
-status = "todo"
-verify = []
-notes = "blocked: calls network.c::network_check, nortsong.c::getFrameCountTicks (not verified on main)"
+status = "verified"
+verify = ["diff:waits::wait_loops_match", "diff:waits::fades_match", "diff:network::network_connect_matches"]
+notes = ""
 
 [[fn]]
 c = "keyboard.c::waitUntilHasInputOrElapsed"
 c_sha = "b75f2957c21b"
 rust = "rustyrian_core::keyboard::wait_until_has_input_or_elapsed"
-status = "todo"
-verify = []
-notes = "blocked: calls network.c::network_check, nortsong.c::getFrameCountTicks (not verified on main)"
+status = "verified"
+verify = ["diff:waits::wait_loops_match"]
+notes = ""
 
 [[fn]]
 c = "keyboard.c::waitUntilGetInputOrElapsed"
 c_sha = "ed2bf1df4819"
 rust = "rustyrian_core::keyboard::wait_until_get_input_or_elapsed"
-status = "todo"
-verify = []
-notes = "blocked: calls network.c::network_check, nortsong.c::getFrameCountTicks (not verified on main)"
+status = "verified"
+verify = ["diff:waits::wait_loops_match", "diff:waits::je_out_text_glow_matches"]
+notes = ""
 
 [[fn]]
 c = "lds_play.c::lds_load"
@@ -3414,9 +3414,9 @@ notes = ""
 c = "network.c::network_check"
 c_sha = "e5e81b3dd246"
 rust = "rustyrian_core::network::network_check"
-status = "todo"
-verify = []
-notes = "blocked: network_tyrian_halt (network.c, itself blocked)"
+status = "verified"
+verify = ["diff:network::network_check_sequences_match", "diff:network::network_check_halts_match", "diff:network::net_session"]
+notes = ""
 
 [[fn]]
 c = "network.c::network_update"
@@ -3447,17 +3447,16 @@ c = "network.c::network_state_send"
 c_sha = "63868c728fe7"
 rust = "rustyrian_core::network::network_state_send"
 status = "verified"
-verify = ["diff:network::network_state_send_matches"]
-waived_lines = [{ line = 457, reason = "second send failing after the first succeeded in the same call: the fake platform injects one-shot failures per SDL name and the first send consumes it" }, { line = 458, reason = "as line 457" }]
+verify = ["diff:network::network_state_send_matches", "diff:network::network_state_send_xor_failure_matches"]
 notes = ""
 
 [[fn]]
 c = "network.c::network_state_update"
 c_sha = "7e30aed7855d"
 rust = "rustyrian_core::network::network_state_update"
-status = "todo"
-verify = []
-notes = "blocked: network_check (network.c, blocked via network_tyrian_halt)"
+status = "verified"
+verify = ["diff:network::network_state_update_matches", "diff:network::net_session"]
+notes = ""
 
 [[fn]]
 c = "network.c::network_state_is_reset"
@@ -3479,17 +3478,17 @@ notes = ""
 c = "network.c::network_connect"
 c_sha = "dd79f3876457"
 rust = "rustyrian_core::network::network_connect"
-status = "todo"
-verify = []
-notes = "blocked: keyboard.c::keyboardGetInput, keyboard.c::waitUntilElapsed, nortsong.c::setFrameCount, network_tyrian_halt"
+status = "verified"
+verify = ["diff:network::network_connect_matches", "diff:network::short_connect_packets_are_dropped"]
+notes = ""
 
 [[fn]]
 c = "network.c::network_tyrian_halt"
 c_sha = "ab7eb2b59f4e"
 rust = "rustyrian_core::network::network_tyrian_halt"
-status = "todo"
-verify = []
-notes = "blocked: palette.c::fade_black, palette.c::fade_palette, picload.c::JE_loadPic, fonthand.c::JE_dString, fonthand.c::JE_fontCenter, video.c::JE_showVGA, keyboard.c::waitUntilElapsed, keyboard.c::waitUntilGetInput, nortsong.c::setFrameCount, varz.c::JE_tyrianHalt"
+status = "verified"
+verify = ["diff:network::network_tyrian_halt_matches", "diff:network::network_check_halts_match"]
+notes = ""
 
 [[fn]]
 c = "network.c::network_init"
@@ -3920,33 +3919,33 @@ notes = ""
 c = "palette.c::fade_palette"
 c_sha = "689f8eb01272"
 rust = "rustyrian_core::palette::fade_palette"
-status = "todo"
-verify = []
-notes = "blocked: calls nortsong.c::setFrameCount/waitUntilElapsed, video.c::JE_showVGA, keyboard.c::keyboardClearInput, mouse.c::mouseClearInput (not verified on main)"
+status = "verified"
+verify = ["diff:waits::fades_match", "diff:network::network_tyrian_halt_matches"]
+notes = ""
 
 [[fn]]
 c = "palette.c::fade_solid"
 c_sha = "86b6e5f4bf14"
 rust = "rustyrian_core::palette::fade_solid"
-status = "todo"
-verify = []
-notes = "blocked: calls nortsong.c::setFrameCount/waitUntilElapsed, video.c::JE_showVGA, keyboard.c::keyboardClearInput, mouse.c::mouseClearInput (not verified on main)"
+status = "verified"
+verify = ["diff:waits::fades_match"]
+notes = ""
 
 [[fn]]
 c = "palette.c::fade_black"
 c_sha = "f9640314e57d"
 rust = "rustyrian_core::palette::fade_black"
-status = "todo"
-verify = []
-notes = "blocked: calls palette.c::fade_solid (blocked)"
+status = "verified"
+verify = ["diff:waits::fades_match", "diff:network::network_tyrian_halt_matches"]
+notes = ""
 
 [[fn]]
 c = "palette.c::fade_white"
 c_sha = "336191a4665f"
 rust = "rustyrian_core::palette::fade_white"
-status = "todo"
-verify = []
-notes = "blocked: calls palette.c::fade_solid (blocked)"
+status = "verified"
+verify = ["diff:waits::fades_match"]
+notes = ""
 
 [[fn]]
 c = "palette.c::rgb_to_yuv"
@@ -4297,9 +4296,10 @@ notes = ""
 c = "starlib.c::starLibMain"
 c_sha = "c2e0525812df"
 rust = "rustyrian_core::starlib::star_lib_main"
-status = "todo"
-verify = []
-notes = "blocked on keyboard.c::handleSdlEvents, keyboard.c::keyboardGetInput, keyboard.c::waitUntilGetInput, joystick.c::push_joysticks_as_keyboard (not verified on main)"
+status = "verified"
+verify = ["diff:waits::star_lib_main_matches", "diff:waits::star_lib_main_every_key_matches", "diff:waits::star_lib_main_rare_change_matches"]
+waived_lines = [{ line = 128, reason = "unreachable: grayB is cleared at the top of starLibMain, so the gray shade branch never runs" }]
+notes = ""
 
 [[fn]]
 c = "starlib.c::JE_wackyCol"
@@ -4569,8 +4569,8 @@ notes = ""
 c = "varz.c::JE_tyrianHalt"
 c_sha = "d376e8da4339"
 rust = "rustyrian_core::varz::je_tyrian_halt"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:network::je_tyrian_halt_matches"]
 notes = ""
 
 [[fn]]

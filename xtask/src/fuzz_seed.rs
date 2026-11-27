@@ -8,6 +8,7 @@ use std::path::Path;
 const SEEDS: &[(&str, &[&str])] = &[
     ("cfg_text", &[]),
     ("helptext", &["tyrian.hdt"]),
+    ("net_session", &[]),
     ("save", &[]),
     ("demo", &["demo.1", "demo.2", "demo.3", "demo.4", "demo.5"]),
     (

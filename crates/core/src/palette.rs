@@ -6,8 +6,11 @@
 
 use crate::file;
 use crate::game::{EXIT_FAILURE, Flow, Game, Halt};
+use crate::keyboard::{keyboard_clear_input, mouse_clear_input, wait_until_elapsed};
 use crate::logging::log_fatal;
+use crate::nortsong::set_frame_count;
 use crate::sdl::map_rgb;
+use crate::video::je_show_vga;
 use serde::{Deserialize, Serialize};
 
 /// `SDL_Color`.
@@ -198,6 +201,92 @@ pub fn step_fade_palette(
 
         update_color(g, i);
     }
+}
+
+/// Fades `palette[first_color..=last_color]` towards `colors` over `steps`
+/// frames, then discards the input received meanwhile.
+pub fn fade_palette(
+    g: &mut Game,
+    colors: &Palette,
+    mut steps: i32,
+    first_color: u32,
+    last_color: u32,
+) -> Flow {
+    debug_assert!(steps > 0);
+
+    let mut diff = g.palette.fade_palette_diff;
+    init_step_fade_palette(g, &mut diff, colors, first_color, last_color);
+    g.palette.fade_palette_diff = diff;
+
+    while steps > 0 {
+        set_frame_count(g, 1);
+
+        let mut diff = g.palette.fade_palette_diff;
+        step_fade_palette(g, &mut diff, steps, first_color, last_color);
+        g.palette.fade_palette_diff = diff;
+
+        je_show_vga(g);
+
+        wait_until_elapsed(g)?;
+        steps -= 1;
+    }
+
+    keyboard_clear_input(g);
+    mouse_clear_input(g);
+    Ok(())
+}
+
+/// Fades `palette[first_color..=last_color]` towards the single `color` over
+/// `steps` frames, then discards the input received meanwhile.
+pub fn fade_solid(
+    g: &mut Game,
+    color: Color,
+    mut steps: i32,
+    first_color: u32,
+    last_color: u32,
+) -> Flow {
+    debug_assert!(steps > 0);
+
+    let mut diff = g.palette.fade_solid_diff;
+    init_step_fade_solid(g, &mut diff, color, first_color, last_color);
+    g.palette.fade_solid_diff = diff;
+
+    while steps > 0 {
+        set_frame_count(g, 1);
+
+        let mut diff = g.palette.fade_solid_diff;
+        step_fade_palette(g, &mut diff, steps, first_color, last_color);
+        g.palette.fade_solid_diff = diff;
+
+        je_show_vga(g);
+
+        wait_until_elapsed(g)?;
+        steps -= 1;
+    }
+
+    keyboard_clear_input(g);
+    mouse_clear_input(g);
+    Ok(())
+}
+
+pub fn fade_black(g: &mut Game, steps: i32) -> Flow {
+    let black = Color {
+        r: 0,
+        g: 0,
+        b: 0,
+        a: 0,
+    };
+    fade_solid(g, black, steps, 0, 255)
+}
+
+pub fn fade_white(g: &mut Game, steps: i32) -> Flow {
+    let white = Color {
+        r: 255,
+        g: 255,
+        b: 255,
+        a: 0,
+    };
+    fade_solid(g, white, steps, 0, 255)
 }
 
 pub fn rgb_to_yuv(r: i32, g: i32, b: i32) -> u32 {

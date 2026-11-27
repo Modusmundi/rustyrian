@@ -17,6 +17,9 @@ use rustyrian_oracle::mirror::Mirror;
 use rustyrian_oracle::mirror::network::{packet_from_c, packet_to_c};
 use rustyrian_oracle::session;
 
+mod net_support;
+use net_support::{Rig, store_net, taps};
+
 #[test]
 fn initial_state_matches_c() {
     let _d = Diff::new();
@@ -534,4 +537,707 @@ fn network_send_reaches_loopback_peer() {
     net::network_prepare(&mut n.g, net::PACKET_DETAILS);
     assert!(net::network_send(&mut n.g, 6));
     n.check();
+}
+
+// ---------------------------------------------------------------------------
+// network_check, network_state_update, network_connect, network_tyrian_halt
+// ---------------------------------------------------------------------------
+
+/// A packet: header (`type`, `sync`) then `body`.
+fn pkt(type_: u16, sync: u16, body: &[u8]) -> Vec<u8> {
+    let mut v = type_.to_be_bytes().to_vec();
+    v.extend_from_slice(&sync.to_be_bytes());
+    v.extend_from_slice(body);
+    v
+}
+
+/// A CONNECT packet as `network_connect` sends it.
+fn connect_pkt(
+    sync: u16,
+    version: u16,
+    delay: u16,
+    episodes: u16,
+    player: u16,
+    name: &[u8],
+) -> Vec<u8> {
+    let mut body = Vec::new();
+    for v in [version, delay, episodes, player] {
+        body.extend_from_slice(&v.to_be_bytes());
+    }
+    body.extend_from_slice(name);
+    body.push(0);
+    pkt(net::PACKET_CONNECT, sync, &body)
+}
+
+/// A printable name of up to 20 bytes from `seed`.
+fn name_of(seed: &[u8]) -> Vec<u8> {
+    seed.iter().take(20).map(|b| b'A' + b % 26).collect()
+}
+
+/// One inbound datagram for the `network_check` tests.
+#[derive(Clone, Debug)]
+enum Inbound {
+    /// A well-formed packet of the given type (`sync` relative to the
+    /// counter it is checked against).
+    Typed(u16, i16),
+    /// Shorter than a header.
+    Short(usize),
+    /// From an address no channel is bound to.
+    Stranger,
+    Unknown(u16),
+}
+
+const TYPES: [u16; 13] = [
+    net::PACKET_ACKNOWLEDGE,
+    net::PACKET_KEEP_ALIVE,
+    net::PACKET_CONNECT,
+    net::PACKET_DETAILS,
+    net::PACKET_WAITING,
+    net::PACKET_BUSY,
+    net::PACKET_GAME_QUIT,
+    net::PACKET_GAME_PAUSE,
+    net::PACKET_GAME_MENU,
+    net::PACKET_QUIT,
+    net::PACKET_STATE_RESEND,
+    net::PACKET_STATE,
+    net::PACKET_STATE_XOR,
+];
+
+fn any_inbound() -> impl Strategy<Value = Inbound> {
+    prop_oneof![
+        8 => (prop::sample::select(TYPES.to_vec()), -4i16..20).prop_map(|(t, o)| Inbound::Typed(t, o)),
+        1 => (0usize..4).prop_map(Inbound::Short),
+        1 => Just(Inbound::Stranger),
+        1 => (0x50u16..0x60).prop_map(Inbound::Unknown),
+    ]
+}
+
+/// The bytes of `inbound` for the engines' current state.
+fn inbound_bytes(s: &State, inbound: &Inbound, body: &[u8]) -> Vec<u8> {
+    match *inbound {
+        Inbound::Typed(t, off) => {
+            let base = match t {
+                net::PACKET_ACKNOWLEDGE => s.queue_out_sync,
+                net::PACKET_STATE | net::PACKET_STATE_XOR => s.last_state_in_sync.wrapping_sub(1),
+                net::PACKET_STATE_RESEND => s.last_state_out_sync,
+                _ => s.queue_in_sync,
+            };
+            let sync = if t == net::PACKET_STATE_RESEND {
+                base.wrapping_sub(off as u16)
+            } else {
+                base.wrapping_add(off as u16)
+            };
+            match t {
+                net::PACKET_CONNECT => connect_pkt(
+                    sync,
+                    net::NET_VERSION,
+                    s.network_delay as u16,
+                    u16::from(body[0]),
+                    2,
+                    &name_of(&body[1..1 + usize::from(body[2] % 21)]),
+                ),
+                net::PACKET_DETAILS => pkt(t, sync, &body[..4]),
+                net::PACKET_STATE | net::PACKET_STATE_XOR => pkt(t, sync, &body[..24]),
+                _ => pkt(t, sync, &[]),
+            }
+        }
+        Inbound::Short(n) => body[..n].to_vec(),
+        Inbound::Stranger => pkt(net::PACKET_KEEP_ALIVE, 0, &[]),
+        Inbound::Unknown(t) => pkt(t, 0, &body[..2]),
+    }
+}
+
+/// A queue whose first `k` slots hold copies of `p`.
+fn filled(k: usize, p: &UdpPacket) -> PacketQueue {
+    let mut q = PacketQueue::default();
+    for slot in q.iter_mut().take(k) {
+        *slot = Some(p.clone());
+    }
+    q
+}
+
+/// A sent state packet (28 bytes) with `sync`.
+fn state_packet(sync: u16, fill: u8) -> UdpPacket {
+    let mut data = vec![fill; NET_PACKET_SIZE as usize];
+    data[..4].copy_from_slice(&pkt(net::PACKET_STATE, sync, &[]));
+    UdpPacket {
+        data,
+        len: 28,
+        maxlen: NET_PACKET_SIZE,
+        ..UdpPacket::default()
+    }
+}
+
+proptest! {
+    /// Well-formed packet sequences through `network_check`, without the
+    /// paths that end the game.
+    #[test]
+    fn network_check_sequences_match(
+        ms in 0u32..60_000,
+        connected: bool,
+        quit: bool,
+        initialized in prop::bool::weighted(0.95),
+        keep_alive_due: bool,
+        retry_due: bool,
+        (queue_out_sync, pending) in (any::<u16>(), 0usize..6),
+        queue_in_sync: u16,
+        last_state_in_sync: u16,
+        (last_state_out_sync, state_out) in (any::<u16>(), 0usize..16),
+        inbound in prop::collection::vec((any_inbound(), prop::collection::vec(any::<u8>(), 28)), 0..24),
+        fail in prop_oneof![
+            Just(None),
+            (0u32..4).prop_map(|k| Some(("SDLNet_UDP_Recv", k))),
+            (0u32..4).prop_map(|k| Some(("SDLNet_UDP_Send", k))),
+        ],
+    ) {
+        let mut rig = Rig::new("ots 1\n");
+        rig.net();
+        rig.both(|p| p.delay(ms));
+        let mut s = rig.g.network.clone();
+        s.net_initialized = initialized;
+        s.connected = connected;
+        s.quit = quit;
+        s.last_in_tick = ms;
+        s.last_state_in_tick = ms;
+        s.network_check_keep_alive_tick = if keep_alive_due { ms.wrapping_sub(5000) } else { ms };
+        s.last_out_tick = if retry_due { ms.wrapping_sub(1000) } else { ms };
+        s.queue_out_sync = queue_out_sync;
+        s.last_ack_sync = queue_out_sync.wrapping_sub(1);
+        s.last_out_sync = queue_out_sync.wrapping_add(pending as u16);
+        s.packet_out = filled(pending, &state_packet(queue_out_sync, 7));
+        s.queue_in_sync = queue_in_sync;
+        s.last_state_in_sync = last_state_in_sync;
+        s.last_state_out_sync = last_state_out_sync;
+        s.packet_state_out = filled(state_out, &state_packet(last_state_out_sync, 9));
+        store_net(&mut rig, s);
+        rig.clear();
+        for (i, body) in &inbound {
+            // QUIT ends the game unless already quitting.
+            if matches!(i, Inbound::Typed(net::PACKET_QUIT, _)) && !quit {
+                continue;
+            }
+            let bytes = inbound_bytes(&rig.g.network, i, body);
+            match i {
+                Inbound::Stranger => rig.push_from(IpAddress { host: 0x0200_007f, port: 9 }, &bytes),
+                _ => rig.push(&bytes),
+            }
+        }
+        if let Some((name, k)) = fail {
+            rig.c_fake.fail_after(name, k);
+            rig.r_fake.fail_after(name, k);
+        }
+        for _ in 0..inbound.len() + 2 {
+            // SAFETY: plain C call (inside the guard).
+            let r = rig.run(|| unsafe { b::network_check() }, net::network_check);
+            prop_assert!(r.is_ok());
+        }
+        rig.check();
+    }
+}
+
+/// The script for runs that end the game: RETURN taps for the final wait.
+fn halt_script() -> String {
+    taps(1000, 120_000)
+}
+
+/// A rig with video, shape tables and an initialized, connected network.
+fn connected_rig(script: &str) -> Rig {
+    let mut rig = Rig::new(script);
+    rig.video();
+    rig.net();
+    let mut s = rig.g.network.clone();
+    s.connected = true;
+    s.is_network_game = true;
+    store_net(&mut rig, s);
+    rig
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig { cases: 8, ..ProptestConfig::default() })]
+
+    /// The two paths of `network_check` that end the game: the connection
+    /// timing out and the opponent quitting.
+    #[test]
+    fn network_check_halts_match(quit_packet: bool, pending in 0usize..3, sync_ok: bool) {
+        let mut rig = connected_rig(&halt_script());
+        rig.both(|p| p.delay(20_000));
+        let mut s = rig.g.network.clone();
+        let now = 20_000;
+        let (last_in, last_state_in) = if quit_packet { (now, now) } else { (now - 17_000, now - 16_500) };
+        s.last_in_tick = last_in;
+        s.last_state_in_tick = last_state_in;
+        s.network_check_keep_alive_tick = now;
+        s.last_out_tick = now;
+        s.queue_out_sync = 5;
+        s.last_ack_sync = if sync_ok { 4 } else { 3 };
+        s.last_out_sync = 5 + pending as u16;
+        s.packet_out = filled(pending, &state_packet(5, 1));
+        store_net(&mut rig, s);
+        rig.clear();
+        if quit_packet {
+            rig.push(&pkt(net::PACKET_QUIT, 0, &[]));
+        }
+        // SAFETY: plain C call (inside the guard).
+        let r = rig.run(|| unsafe { b::network_check() }, net::network_check);
+        prop_assert_eq!(r, Err(0));
+        rig.check_halted();
+    }
+
+    /// `network_tyrian_halt` for every message, with and without waiting for
+    /// the opponent's acknowledgments.
+    #[test]
+    fn network_tyrian_halt_matches(err in 0u32..9, attempt_sync: bool, sync_ok: bool, alive: bool) {
+        let mut rig = connected_rig(&halt_script());
+        rig.both(|p| p.delay(20_000));
+        let mut s = rig.g.network.clone();
+        let tick = if alive { 20_000 } else { 1000 };
+        s.last_in_tick = tick;
+        s.last_state_in_tick = tick;
+        s.network_check_keep_alive_tick = 20_000;
+        s.last_out_tick = 20_000;
+        s.queue_out_sync = 1;
+        s.last_ack_sync = if sync_ok { 0 } else { 1 };
+        store_net(&mut rig, s);
+        rig.clear();
+        let r = rig.run(
+            // SAFETY: plain C call (inside the guard).
+            || unsafe { b::network_tyrian_halt(err, attempt_sync) },
+            |g| net::network_tyrian_halt(g, err, attempt_sync),
+        );
+        prop_assert_eq!(r, Err(0));
+        rig.check_halted();
+    }
+
+    /// `JE_tyrianHalt`: teardown, saved configuration and saves, exit code.
+    #[test]
+    fn je_tyrian_halt_matches(code: u8, trent_win: bool, difficulty in 0i8..10) {
+        let mut rig = Rig::new("ots 1\n");
+        rig.g.config.trent_win = trent_win;
+        rig.g.config.difficulty_level = difficulty;
+        rig.store();
+        rig.video();
+        let r = rig.run(
+            // SAFETY: plain C call (inside the guard).
+            || unsafe { b::JE_tyrianHalt(code) },
+            |g| rustyrian_core::varz::je_tyrian_halt(g, code),
+        );
+        prop_assert_eq!(r, Err(if code == 5 { 0 } else { i32::from(code) }));
+        rig.check_halted();
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig { cases: 48, ..ProptestConfig::default() })]
+
+    /// `network_state_update` waiting for, receiving or rebuilding the next
+    /// state packet (or timing out).
+    #[test]
+    fn network_state_update_matches(
+        delay in 1i32..=4,
+        reset: bool,
+        lsis in 1u16..2000,
+        prefill_in in 0usize..6,
+        prefill_xor in prop::collection::vec(prop::option::of(any::<bool>()), 6),
+        deliveries in prop::collection::vec((prop::bool::weighted(0.7), -1i16..6, any::<u8>()), 0..8),
+        stale_resend: bool,
+    ) {
+        let mut rig = connected_rig(&halt_script());
+        rig.both(|p| p.delay(30_000));
+        let now = 30_000u32;
+        let mut s = rig.g.network.clone();
+        s.network_delay = delay;
+        s.last_state_out_sync = if reset { (delay - 1) as u16 } else { delay as u16 + 3 };
+        s.last_state_in_sync = lsis;
+        s.last_in_tick = now - 15_000;
+        s.last_state_in_tick = now - 1000;
+        s.network_check_keep_alive_tick = now;
+        s.last_out_tick = now;
+        s.network_state_update_resend_tick = if stale_resend { now - 1000 } else { now };
+        // Slot i of the inbound queues holds the state `lsis - 1 + i`.
+        for i in 1..=prefill_in {
+            s.packet_state_in[i] = Some(state_packet(lsis.wrapping_add(i as u16 - 1), i as u8 * 3));
+        }
+        for (i, x) in prefill_xor.iter().enumerate() {
+            if let Some(is_xor) = x {
+                let mut p = state_packet(lsis.wrapping_add(i as u16), 0x55);
+                if *is_xor {
+                    p.data[..2].copy_from_slice(&net::PACKET_STATE_XOR.to_be_bytes());
+                }
+                s.packet_state_in_xor[i + 1] = Some(p);
+            }
+        }
+        store_net(&mut rig, s);
+        rig.clear();
+        for (state, off, fill) in &deliveries {
+            let t = if *state { net::PACKET_STATE } else { net::PACKET_STATE_XOR };
+            rig.push(&pkt(t, lsis.wrapping_add(*off as u16), &[*fill; 24]));
+        }
+        // SAFETY: plain C call (inside the guard).
+        let r = rig.run(|| unsafe { b::network_state_update() }, net::network_state_update);
+        match r {
+            Ok(_) => rig.check(),
+            Err(code) => {
+                prop_assert_eq!(code, 0);
+                rig.check_halted();
+            }
+        }
+    }
+}
+
+/// What the opponent sends during `network_connect`.
+#[derive(Clone, Debug)]
+enum Peer {
+    Connect,
+    BadVersion,
+    BadDelay,
+    SamePlayer,
+    Ack(u16),
+    KeepAlive,
+}
+
+fn any_peer() -> impl Strategy<Value = Peer> {
+    prop_oneof![
+        6 => Just(Peer::Connect),
+        1 => Just(Peer::BadVersion),
+        1 => Just(Peer::BadDelay),
+        1 => Just(Peer::SamePlayer),
+        4 => (0u16..3).prop_map(Peer::Ack),
+        1 => Just(Peer::KeepAlive),
+    ]
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig { cases: 64, ..ProptestConfig::default() })]
+
+    /// `network_connect` against opponent packet sequences: success, every
+    /// mismatch, duplicate CONNECTs, lost acknowledgments (resend) and ESC.
+    #[test]
+    fn network_connect_matches(
+        peer in prop::collection::vec(any_peer(), 0..6),
+        esc_at in 500u32..4000,
+        sync: u16,
+        delay in 1i32..=4,
+        player in 1u32..=2,
+        name_seed in prop::collection::vec(any::<u8>(), 0..30),
+        opponent_seed in prop::collection::vec(any::<u8>(), 0..21),
+        avail: [bool; 5],
+        episodes: u16,
+        host in prop::sample::select(vec!["127.0.0.1", "10.0.0.7", "256.1.1.1"]),
+        retry_fails: bool,
+    ) {
+        let script = format!(
+            "ots 1\n@{esc_at} key-down ESCAPE\n@{} key-up ESCAPE\n{}",
+            esc_at + 45,
+            taps(esc_at + 2000, 120_000).trim_start_matches("ots 1\n"),
+        );
+        let mut rig = Rig::new(&script);
+        rig.video();
+        rig.net();
+        let mut s = rig.g.network.clone();
+        s.is_network_game = true;
+        s.network_delay = delay;
+        s.this_player_num = player;
+        s.network_opponent_host = Some(host.as_bytes().to_vec());
+        let mut own = name_of(&name_seed);
+        own.extend(name_seed.iter().skip(20).map(|b| b'a' + b % 26));
+        s.network_player_name = Some(own);
+        store_net(&mut rig, s);
+        rig.g.episodes.episode_avail = avail;
+        rig.store();
+        rig.clear();
+        let other = (3 - player) as u16;
+        let name = name_of(&opponent_seed);
+        for p in &peer {
+            let bytes = match *p {
+                Peer::Connect => connect_pkt(sync, net::NET_VERSION, delay as u16, episodes, other, &name),
+                Peer::BadVersion => connect_pkt(sync, 1, delay as u16, episodes, other, &name),
+                Peer::BadDelay => connect_pkt(sync, net::NET_VERSION, delay as u16 + 1, episodes, other, &name),
+                Peer::SamePlayer => connect_pkt(sync, net::NET_VERSION, delay as u16, episodes, player as u16, &name),
+                Peer::Ack(n) => pkt(net::PACKET_ACKNOWLEDGE, n, &[]),
+                Peer::KeepAlive => pkt(net::PACKET_KEEP_ALIVE, 0, &[]),
+            };
+            rig.push(&bytes);
+        }
+        if retry_fails {
+            // Every send after our first CONNECT fails, so the resend in
+            // `network_check` never refreshes `last_out_tick` and the
+            // handshake restarts after NET_RETRY.
+            for k in 1..3000 {
+                rig.c_fake.fail_after("SDLNet_UDP_Send", k);
+                rig.r_fake.fail_after("SDLNet_UDP_Send", k);
+            }
+        } else {
+            // While our CONNECT is unacknowledged `network_check` keeps
+            // resending it, which postpones the handshake's own retry forever
+            // (upstream waits for the opponent); acknowledge it eventually.
+            rig.push(&pkt(net::PACKET_ACKNOWLEDGE, 0, &[]));
+            rig.push(&pkt(net::PACKET_ACKNOWLEDGE, 1, &[]));
+        }
+        // SAFETY: plain C call (inside the guard).
+        let r = rig.run(|| unsafe { b::network_connect() }, net::network_connect);
+        match r {
+            Ok(v) => {
+                prop_assert_eq!(v, 0);
+                rig.check();
+            }
+            Err(code) => {
+                prop_assert_eq!(code, 0);
+                rig.check_halted();
+            }
+        }
+    }
+}
+
+/// `network_state_send` when the state packet goes out but the xor packet
+/// sent right after it fails.
+#[test]
+fn network_state_send_xor_failure_matches() {
+    for delay in 2..=4i32 {
+        let mut rig = Rig::new("ots 1\n");
+        rig.net();
+        let mut s = rig.g.network.clone();
+        s.network_delay = delay;
+        s.last_state_out_sync = (delay - 1) as u16;
+        for i in 0..delay as usize {
+            s.packet_state_out[i] = Some(state_packet(i as u16, i as u8 + 1));
+        }
+        store_net(&mut rig, s);
+        rig.clear();
+        rig.c_fake.fail_after("SDLNet_UDP_Send", 1);
+        rig.r_fake.fail_after("SDLNet_UDP_Send", 1);
+        let r = rig.run(
+            // SAFETY: plain C call (inside the guard).
+            || unsafe { b::network_state_send() },
+            |g| Ok(net::network_state_send(g)),
+        );
+        assert_eq!(r, Ok(-1));
+        rig.check();
+    }
+}
+
+/// D-SEC-2: CONNECT packets shorter than 12 bytes are dropped (Rust only).
+#[test]
+fn short_connect_packets_are_dropped() {
+    for len in 4..12 {
+        let mut rig = Rig::new("ots 1\n");
+        rig.net();
+        let before = rig.g.network.clone();
+        let bytes = connect_pkt(3, net::NET_VERSION, 2, 1, 2, b"");
+        rig.push(&bytes[..len]);
+        assert_eq!(net::network_check(&mut rig.g), Ok(0), "len {len}");
+        assert_eq!(rig.g.network.packet_in, before.packet_in);
+        assert_eq!(rig.g.network.queue_in_sync, before.queue_in_sync);
+        assert!(rig.r_fake.take_sent().is_empty(), "no acknowledgment");
+    }
+}
+
+/// D-SEC-2: every packet type shorter than the fields read for it is dropped
+/// without effect; at its minimum length it is accepted (Rust only).
+#[test]
+fn packets_shorter_than_their_type_are_dropped() {
+    for (t, min) in [
+        (net::PACKET_CONNECT, 12),
+        (net::PACKET_DETAILS, 8),
+        (net::PACKET_STATE, 28),
+        (net::PACKET_STATE_XOR, 28),
+    ] {
+        for len in 4..min {
+            let mut rig = Rig::new("ots 1\n");
+            rig.net();
+            let mut before = rig.g.network.clone();
+            rig.push(&pkt(t, 0, &vec![1; len - 4]));
+            assert_eq!(
+                net::network_check(&mut rig.g),
+                Ok(0),
+                "type {t:#x} len {len}"
+            );
+            // Only the receive buffer changed.
+            before.packet_temp = rig.g.network.packet_temp.clone();
+            assert_eq!(rig.g.network, before, "type {t:#x} len {len}");
+            assert!(rig.r_fake.take_sent().is_empty());
+        }
+        let mut rig = Rig::new("ots 1\n");
+        rig.net();
+        rig.push(&pkt(t, 0, &vec![1; min - 4]));
+        assert_eq!(
+            net::network_check(&mut rig.g),
+            Ok(1),
+            "type {t:#x} at minimum"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// net_session: two state machines against a scripted opponent
+// ---------------------------------------------------------------------------
+
+/// Address the opponent's channel 0 is bound to (the engines under test).
+const US: IpAddress = IpAddress {
+    host: 0x0100_007f,
+    port: 0x3505,
+};
+
+/// Writes `payload` into C's `packet_state_out[0]` after the header.
+fn c_write_state_payload(payload: &[u8]) {
+    let q = c_queue(b::ot_sv_network_packet_state_out);
+    // SAFETY: `network_state_prepare` allocated `packet_state_out[0]` with
+    // 256 data bytes; `payload` is 24 bytes.
+    unsafe {
+        let p = *q;
+        std::ptr::copy_nonoverlapping(payload.as_ptr(), (*p).data.add(4), payload.len());
+    }
+}
+
+/// One frame of the session: the opponent's and our state payloads, whether
+/// one of the opponent's packets is lost, whether each side also sends an
+/// acknowledged packet, and whether the opponent's packets arrive reversed.
+#[derive(Clone, Debug)]
+struct Frame {
+    theirs: Vec<u8>,
+    ours: Vec<u8>,
+    lose: bool,
+    they_send: Option<u16>,
+    we_send: Option<u16>,
+    swap: bool,
+}
+
+fn any_frame() -> impl Strategy<Value = Frame> {
+    let reliable = prop::sample::select(vec![
+        net::PACKET_GAME_PAUSE,
+        net::PACKET_WAITING,
+        net::PACKET_BUSY,
+        net::PACKET_GAME_MENU,
+    ]);
+    (
+        prop::collection::vec(any::<u8>(), 24),
+        prop::collection::vec(any::<u8>(), 24),
+        prop::bool::weighted(0.2),
+        prop::option::weighted(0.2, reliable.clone()),
+        prop::option::weighted(0.2, reliable),
+        any::<bool>(),
+    )
+        .prop_map(|(theirs, ours, lose, they_send, we_send, swap)| Frame {
+            theirs,
+            ours,
+            lose,
+            they_send,
+            we_send,
+            swap,
+        })
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig { cases: 48, ..ProptestConfig::default() })]
+
+    /// M3 exit test: an opponent (a third, Rust engine) and both engines under
+    /// test exchange state, xor and acknowledged packets over the loopback
+    /// network for whole sessions, with lost and reordered packets; the
+    /// engines' states, platform calls and sent datagrams stay equal.
+    #[test]
+    fn net_session(delay in 1i32..=4, frames in prop::collection::vec(any_frame(), 4..40)) {
+        let mut rig = connected_rig(&halt_script());
+        let (peer_platform, _peer_log, peer_fake) = rustyrian_harness::test_session_with_handle();
+        let mut peer = Game::new(Box::new(peer_platform));
+        prop_assert_eq!(net::network_init(&mut peer), 0);
+        let peer_socket = peer.network.socket.expect("socket");
+        peer.platform.net_udp_bind(peer_socket, 0, &US);
+
+        let mut s = rig.g.network.clone();
+        s.network_delay = delay;
+        store_net(&mut rig, s);
+        peer.network.network_delay = delay;
+        peer.network.connected = true;
+        peer.network.is_network_game = true;
+        // SAFETY: plain C call.
+        unsafe { b::network_state_reset() };
+        net::network_state_reset(&mut rig.g);
+        net::network_state_reset(&mut peer);
+        rig.check_io();
+
+        // At most one of the opponent's state packets is lost per xor group.
+        let d = delay as u16;
+        let mut lost_group = None;
+        for f in &frames {
+            // The opponent's frame.
+            net::network_state_prepare(&mut peer);
+            peer.network.packet_state_out[0].as_mut().expect("prepared").data[4..28]
+                .copy_from_slice(&f.theirs);
+            let state_sync = peer.network.last_state_out_sync;
+            prop_assert_eq!(net::network_state_send(&mut peer), 0);
+            if let Some(t) = f.they_send {
+                net::network_prepare(&mut peer, t);
+                prop_assert!(net::network_send(&mut peer, 4));
+            }
+            let mut theirs = peer_fake.take_sent();
+            let group = state_sync / d;
+            if d > 1 && f.lose && lost_group != Some(group) && !theirs.is_empty() {
+                lost_group = Some(group);
+                theirs.remove(0);
+            }
+            if f.swap {
+                theirs.reverse();
+            }
+            for dg in &theirs {
+                rig.push(&dg.data);
+            }
+
+            // Our frame, on both engines.
+            rig.run(
+                // SAFETY: plain C call (inside the guard).
+                || unsafe { b::network_state_prepare() },
+                |g| {
+                    net::network_state_prepare(g);
+                    Ok(())
+                },
+            )
+            .expect("no exit");
+            c_write_state_payload(&f.ours);
+            rig.g.network.packet_state_out[0].as_mut().expect("prepared").data[4..28]
+                .copy_from_slice(&f.ours);
+            prop_assert_eq!(
+                // SAFETY: plain C call (inside the guard).
+                rig.run(|| unsafe { b::network_state_send() }, |g| Ok(net::network_state_send(g))),
+                Ok(0)
+            );
+            if let Some(t) = f.we_send {
+                rig.run(
+                    // SAFETY: plain C calls (inside the guard).
+                    || unsafe {
+                        b::network_prepare(t);
+                        b::network_send(4)
+                    },
+                    |g| {
+                        net::network_prepare(g, t);
+                        Ok(net::network_send(g, 4))
+                    },
+                )
+                .expect("no exit");
+            }
+            // SAFETY: plain C call (inside the guard).
+            let r = rig.run(|| unsafe { b::network_state_update() }, net::network_state_update);
+            prop_assert!(r.is_ok());
+            // Drain what is left of the inbox.
+            // SAFETY: plain C call (inside the guard).
+            while rig.run(|| unsafe { b::network_check() }, net::network_check).expect("no exit") == 1 {}
+            // SAFETY: plain C call (inside the guard).
+            rig.run(|| unsafe { b::network_update() }, |g| Ok(net::network_update(g)))
+                .expect("no exit");
+            rig.both(|p| p.delay(14));
+            let ours = rig.check_io();
+            prop_assert_eq!(&diff::load::<State>(), &rig.g.network);
+
+            // The opponent receives our packets and runs its frame.
+            for dg in ours {
+                peer_fake.push_datagram(rustyrian_harness::fake::Datagram {
+                    socket: peer_socket,
+                    address: US,
+                    data: dg.data,
+                });
+            }
+            while net::network_check(&mut peer).expect("no exit") == 1 {}
+            prop_assert!(net::network_state_update(&mut peer).is_ok());
+            peer.platform.delay(14);
+        }
+        rig.check();
+    }
 }

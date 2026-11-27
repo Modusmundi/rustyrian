@@ -5,7 +5,10 @@
 //! Port of upstream `starlib.c` / `starlib.h`.
 
 use crate::Game;
-use crate::mtrand::mt_rand;
+use crate::game::Flow;
+use crate::joystick::push_joysticks_as_keyboard;
+use crate::keyboard::{KeyboardInput, handle_sdl_events, keyboard_get_input, wait_until_get_input};
+use crate::mtrand::{mt_rand, mt_rand_1};
 use libm::{cosf, sinf};
 use serde::{Deserialize, Serialize};
 
@@ -236,4 +239,179 @@ pub fn je_new_star(g: &mut Game) {
             _ => {}
         }
     }
+}
+
+// Key modifiers and scancodes read by `starLibMain` (SDL2 values).
+const KMOD_SHIFT: u32 = 0x0003;
+const KMOD_CTRL: u32 = 0x00c0;
+const KMOD_ALT: u32 = 0x0300;
+const KMOD_GUI: u32 = 0x0c00;
+const SC_C: u32 = 6;
+const SC_P: u32 = 19;
+const SC_S: u32 = 22;
+const SC_X: u32 = 27;
+const SC_1: u32 = 30;
+const SC_0: u32 = 39;
+const SC_ESCAPE: u32 = 41;
+const SC_MINUS: u32 = 45;
+const SC_EQUALS: u32 = 46;
+const SC_LEFTBRACKET: u32 = 47;
+const SC_RIGHTBRACKET: u32 = 48;
+const SC_GRAVE: u32 = 53;
+
+/// `KEY_COMBO(mod, scancode)`: the scancode with the pressed modifier groups
+/// in the upper 16 bits.
+fn key_combo(m: u32, scancode: u32) -> u32 {
+    let mut mods = 0;
+    for group in [KMOD_SHIFT, KMOD_CTRL, KMOD_ALT, KMOD_GUI] {
+        if m & group != 0 {
+            mods |= group;
+        }
+    }
+    scancode | (mods << 16)
+}
+
+/// One frame of the star field: erases and redraws every star on `VGAScreen`,
+/// then handles one key. Returns whether a key was read into
+/// `keyboard_input`.
+#[doc(alias = "starLibMain")]
+pub fn star_lib_main(g: &mut Game, keyboard_input: &mut KeyboardInput) -> Flow<bool> {
+    je_wacky_col(g);
+
+    g.starlib.gray_b = false;
+
+    g.starlib.starlib_speed = g
+        .starlib
+        .starlib_speed
+        .wrapping_add(i16::from(g.starlib.speed_change));
+
+    for s in 0..STARLIB_MAX_STARS {
+        let star = g.starlib.star[s];
+
+        // Erase the star's previous position.
+        let off = i32::from(star.last_x) + i32::from(star.last_y) * 320;
+        if (640..320 * 200 - 640).contains(&off) {
+            let surf = &mut g.video.vga_mut().pixels;
+            let o = off as usize;
+            for p in [
+                o,
+                o - 1,
+                o + 1,
+                o - 2,
+                o + 2,
+                o - 320,
+                o + 320,
+                o - 640,
+                o + 640,
+            ] {
+                surf[p] = 0;
+            }
+        }
+
+        // Move it.
+        let mut temp_z = star.sp_z;
+        g.starlib.temp_x = i32::from(star.sp_x) / i32::from(temp_z) + 160;
+        g.starlib.temp_y = i32::from(star.sp_y) / i32::from(temp_z) + 100;
+        temp_z = temp_z.wrapping_sub(g.starlib.starlib_speed);
+
+        let (temp_x, temp_y) = (g.starlib.temp_x, g.starlib.temp_y);
+        if temp_z <= 0 || temp_y == 0 || temp_y > 198 || !(1..=318).contains(&temp_x) {
+            // Out of range: replace it.
+            g.starlib.star[s].sp_z = 500;
+
+            je_new_star(g);
+
+            g.starlib.star[s].sp_x = g.starlib.temp_x as i16;
+            g.starlib.star[s].sp_y = g.starlib.temp_y as i16;
+        } else {
+            let st = &mut g.starlib.star[s];
+            st.last_x = temp_x as i16;
+            st.last_y = temp_y as i16;
+            st.sp_z = temp_z;
+
+            let off = temp_x + temp_y * 320;
+
+            let mut temp_col: u8 = if g.starlib.gray_b {
+                (temp_z >> 1) as u8
+            } else {
+                g.starlib.p_color.wrapping_add(((temp_z >> 4) & 31) as u8)
+            };
+
+            if (640..320 * 200 - 640).contains(&off) {
+                let surf = &mut g.video.vga_mut().pixels;
+                let o = off as usize;
+                surf[o] = temp_col;
+
+                temp_col = temp_col.wrapping_add(72);
+                for p in [o - 1, o + 1, o - 320, o + 320] {
+                    surf[p] = temp_col;
+                }
+
+                temp_col = temp_col.wrapping_add(72);
+                for p in [o - 2, o + 2, o - 640, o + 640] {
+                    surf[p] = temp_col;
+                }
+            }
+        }
+    }
+
+    push_joysticks_as_keyboard(g);
+    handle_sdl_events(g)?;
+
+    let got_keyboard_input = keyboard_get_input(g, Some(keyboard_input));
+
+    if got_keyboard_input {
+        let combo = key_combo(
+            u32::from(keyboard_input.r#mod),
+            u32::from(keyboard_input.scancode),
+        );
+        let shift = |sc: u32| key_combo(KMOD_SHIFT, sc);
+        match combo {
+            c if c == shift(SC_EQUALS) => {
+                g.starlib.starlib_speed = g.starlib.starlib_speed.wrapping_add(1);
+                g.starlib.speed_change = 0;
+            }
+            SC_MINUS => {
+                g.starlib.starlib_speed = g.starlib.starlib_speed.wrapping_sub(1);
+                g.starlib.speed_change = 0;
+            }
+            // 1-9 select setups 1-9, 0 selects 10.
+            c if (SC_1..=SC_0).contains(&c) => je_change_setup(g, (c - SC_1 + 1) as u8),
+            // Shift+1-4 select setups 11-14.
+            c if (shift(SC_1)..=shift(SC_1 + 3)).contains(&c) => {
+                je_change_setup(g, (c - shift(SC_1) + 11) as u8);
+            }
+            c if c == SC_C || c == shift(SC_C) => je_reset_values(g),
+            c if c == SC_S || c == shift(SC_S) => {
+                g.starlib.nsp_var_var_inc = mt_rand_1(g) * 0.01 - 0.005;
+            }
+            c if c == SC_X || c == shift(SC_X) || c == SC_ESCAPE => g.starlib.run = false,
+            SC_LEFTBRACKET => g.starlib.p_color = g.starlib.p_color.wrapping_sub(1),
+            SC_RIGHTBRACKET => g.starlib.p_color = g.starlib.p_color.wrapping_add(1),
+            c if c == shift(SC_LEFTBRACKET) => {
+                g.starlib.p_color = g.starlib.p_color.wrapping_sub(72);
+            }
+            c if c == shift(SC_RIGHTBRACKET) => {
+                g.starlib.p_color = g.starlib.p_color.wrapping_add(72);
+            }
+            SC_GRAVE => g.starlib.do_change = !g.starlib.do_change,
+            c if c == SC_P || c == shift(SC_P) => wait_until_get_input(g)?,
+            _ => {}
+        }
+    }
+
+    if g.starlib.do_change {
+        g.starlib.step_counter = g.starlib.step_counter.wrapping_add(1);
+        if g.starlib.step_counter > g.starlib.change_time {
+            je_change_setup(g, 0);
+        }
+    }
+
+    if mt_rand(g) % 1000 == 1 {
+        g.starlib.nsp_var_var_inc = mt_rand_1(g) * 0.01 - 0.005;
+    }
+
+    g.starlib.nsp_var_inc += g.starlib.nsp_var_var_inc;
+
+    Ok(got_keyboard_input)
 }

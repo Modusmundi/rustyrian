@@ -7,15 +7,16 @@
 //! `const char *` text parameters are byte slices read up to the first NUL
 //! (or their end).
 
-use crate::game::Game;
-use crate::nortsong;
+use crate::game::{Flow, Game};
+use crate::keyboard::wait_until_get_input_or_elapsed;
+use crate::nortsong::{self, set_frame_count};
 use crate::sndmast::S_WARNING;
 use crate::sprite::{
     TINY_FONT, blit_sprite_dark, blit_sprite_hv, blit_sprite_hv_blend, blit_sprite_hv_unsafe,
     sprite, sprite_exists,
 };
 use crate::vga256d::fill_rectangle_xy;
-use crate::video::{self, ScreenId};
+use crate::video::{self, ScreenId, je_show_vga};
 use serde::{Deserialize, Serialize};
 
 pub const PART_SHADE: u32 = 0;
@@ -388,4 +389,52 @@ pub fn je_update_warning(g: &mut Game, screen: ScreenId) {
             nortsong::je_play_sample_num(g, S_WARNING);
         }
     }
+}
+
+/// Draws `s` with a glow that brightens and then settles at
+/// `textGlowBrightness`, one step per frame; input skips the animation.
+#[doc(alias = "JE_outTextGlow")]
+pub fn je_out_text_glow(g: &mut Game, screen: ScreenId, x: i32, y: i32, s: &[u8]) -> Flow {
+    let c: u32 = if g.fonthand.warning_red { 7 } else { 15 };
+    let font = u32::from(g.fonthand.text_glow_font);
+
+    je_out_text_adjust(g, screen, x.wrapping_sub(1), y, s, 0, -12, font, false);
+    je_out_text_adjust(g, screen, x, y.wrapping_sub(1), s, 0, -12, font, false);
+    je_out_text_adjust(g, screen, x.wrapping_add(1), y, s, 0, -12, font, false);
+    je_out_text_adjust(g, screen, x, y.wrapping_add(1), s, 0, -12, font, false);
+
+    if g.nortsong.frame_count_max > 0 {
+        for z in 1..=12 {
+            set_frame_count(g, g.nortsong.frame_count_max);
+
+            je_out_text_adjust(g, screen, x, y, s, c, z - 10, font, false);
+
+            je_show_vga(g);
+
+            if wait_until_get_input_or_elapsed(g)? {
+                g.nortsong.frame_count_max = 0;
+            }
+        }
+    }
+
+    let mut z: i32 = if g.nortsong.frame_count_max == 0 {
+        6
+    } else {
+        12
+    };
+    while z >= i32::from(g.fonthand.text_glow_brightness) {
+        set_frame_count(g, g.nortsong.frame_count_max);
+
+        je_out_text_adjust(g, screen, x, y, s, c, z - 10, font, false);
+
+        je_show_vga(g);
+
+        if wait_until_get_input_or_elapsed(g)? {
+            g.nortsong.frame_count_max = 0;
+        }
+        z -= 1;
+    }
+
+    g.fonthand.text_glow_brightness = 6;
+    Ok(())
 }

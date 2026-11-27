@@ -11,7 +11,11 @@ use crate::config_file::{
     config_set_bool_option, config_set_int_option, config_set_option, config_set_value,
     config_string_to_cstr, scan_integer,
 };
+use crate::game::Flow;
+use crate::keyboard::{INPUT_NO_MOTION, handle_sdl_events, has_input};
 use crate::logging::SDL_LOG_CATEGORY_APPLICATION;
+use crate::network::network_keep_alive;
+use crate::nortsong::{delay_until_elapsed, set_frame_count};
 use crate::platform::{Event, JoystickId};
 use serde::{Deserialize, Serialize};
 
@@ -818,4 +822,102 @@ pub fn joystick_assignment_cmp(a: &JoystickAssignment, b: &JoystickAssignment) -
     }
 
     false
+}
+
+/// Waits until joystick `j` reports a new axis, button or hat movement (stored
+/// in `assignment`; returns true) or any key or mouse button is pressed
+/// (returns false). Input from other joysticks is ignored.
+pub fn detect_joystick_assignment(
+    g: &mut Game,
+    j: i32,
+    assignment: &mut JoystickAssignment,
+) -> Flow<bool> {
+    // The starting state, to compare against.
+    let handle = handle_of(&sticks(g)[j as usize]);
+
+    let axes = g.platform.joystick_num_axes(handle);
+    let axis: Vec<i16> = (0..axes)
+        .map(|i| g.platform.joystick_get_axis(handle, i))
+        .collect();
+
+    let buttons = g.platform.joystick_num_buttons(handle);
+    let mut button: Vec<u8> = (0..buttons)
+        .map(|i| g.platform.joystick_get_button(handle, i))
+        .collect();
+
+    let hats = g.platform.joystick_num_hats(handle);
+    let mut hat: Vec<u8> = (0..hats)
+        .map(|i| g.platform.joystick_get_hat(handle, i))
+        .collect();
+
+    let mut detected = false;
+
+    loop {
+        set_frame_count(g, 1);
+
+        network_keep_alive(g)?;
+
+        delay_until_elapsed(g);
+
+        handle_sdl_events(g)?;
+
+        for i in 0..axes {
+            let temp = g.platform.joystick_get_axis(handle, i);
+            let old = axis[i as usize];
+
+            if (i32::from(temp) - i32::from(old)).abs() > JOYSTICK_ANALOG_MAX * 2 / 3 {
+                assignment.r#type = JoystickAssignmentTypes::Axis;
+                assignment.num = i;
+                assignment.negative_axis = temp < old;
+                detected = true;
+                break;
+            }
+        }
+
+        for i in 0..buttons {
+            let new_button = g.platform.joystick_get_button(handle, i);
+            let changed = button[i as usize] ^ new_button;
+
+            if changed == 0 {
+                continue;
+            }
+
+            if new_button == 0 {
+                // Released.
+                button[i as usize] = new_button;
+            } else {
+                // Pressed.
+                assignment.r#type = JoystickAssignmentTypes::Button;
+                assignment.num = i;
+                detected = true;
+                break;
+            }
+        }
+
+        for i in 0..hats {
+            let new_hat = g.platform.joystick_get_hat(handle, i);
+            let changed = hat[i as usize] ^ new_hat;
+
+            if changed == 0 {
+                continue;
+            }
+
+            if i32::from(new_hat & changed) == SDL_HAT_CENTERED {
+                // Back to centre.
+                hat[i as usize] = new_hat;
+            } else {
+                assignment.r#type = JoystickAssignmentTypes::Hat;
+                assignment.num = i;
+                assignment.x_axis = i32::from(changed) & (SDL_HAT_LEFT | SDL_HAT_RIGHT) != 0;
+                assignment.negative_axis = i32::from(changed) & (SDL_HAT_LEFT | SDL_HAT_UP) != 0;
+                detected = true;
+            }
+        }
+
+        if detected || has_input(g, INPUT_NO_MOTION) {
+            break;
+        }
+    }
+
+    Ok(detected)
 }
