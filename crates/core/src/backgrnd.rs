@@ -567,15 +567,63 @@ fn at(i: isize) -> usize {
     usize::try_from(i).expect("pixel index inside the surface")
 }
 
-pub fn lava_filter(g: &mut Game, dst: ScreenId, src: ScreenId) {
+/// A filter's source and destination pixels: two surfaces, or one when
+/// `JE_main` filters `game_screen` in place (`VGAScreen` is `game_screen`
+/// after an earlier filter), reading what it has already written as C does.
+enum FilterBufs<'a> {
+    Two { src: &'a [u8], dst: &'a mut [u8] },
+    One(&'a mut [u8]),
+}
+
+impl FilterBufs<'_> {
+    fn src(&self, i: usize) -> Swar8 {
+        match self {
+            FilterBufs::Two { src, .. } => swar8_read(&src[i..]),
+            FilterBufs::One(b) => swar8_read(&b[i..]),
+        }
+    }
+
+    fn dst(&self, i: usize) -> Swar8 {
+        match self {
+            FilterBufs::Two { dst, .. } => swar8_read(&dst[i..]),
+            FilterBufs::One(b) => swar8_read(&b[i..]),
+        }
+    }
+
+    fn write(&mut self, i: usize, v: Swar8) {
+        match self {
+            FilterBufs::Two { dst, .. } => swar8_write(&mut dst[i..], v),
+            FilterBufs::One(b) => swar8_write(&mut b[i..], v),
+        }
+    }
+}
+
+/// The pixels of `src` and `dst` (the same surface or two) with their
+/// pitches (source, destination).
+fn filter_bufs(g: &mut Game, dst: ScreenId, src: ScreenId) -> (FilterBufs<'_>, usize, usize) {
+    if dst == src {
+        let s = g.video.screen_mut(src);
+        assert_vga_surface(s);
+        let pitch = s.pitch as usize;
+        return (FilterBufs::One(&mut s.pixels), pitch, pitch);
+    }
     let (src, dst) = g.video.screen_pair_mut(src, dst);
     assert_vga_surface(src);
     assert_vga_surface(dst);
+    let (src_pitch, dst_pitch) = (src.pitch as usize, dst.pitch as usize);
+    (
+        FilterBufs::Two {
+            src: &src.pixels,
+            dst: &mut dst.pixels,
+        },
+        src_pitch,
+        dst_pitch,
+    )
+}
 
-    let src_pitch = src.pitch as isize;
-    let dst_pitch = dst.pitch as isize;
-    let src_pixels = &src.pixels;
-    let dst_pixels = &mut dst.pixels;
+pub fn lava_filter(g: &mut Game, dst: ScreenId, src: ScreenId) {
+    let (mut b, src_pitch, dst_pitch) = filter_bufs(g, dst, src);
+    let (src_pitch, dst_pitch) = (src_pitch as isize, dst_pitch as isize);
     let vga_width = VGA_WIDTH as isize;
 
     // The original implementation also worked on 8-pixel chunks, but the
@@ -601,11 +649,11 @@ pub fn lava_filter(g: &mut Game, dst: ScreenId, src: ScreenId) {
                 di -= sw;
                 si -= sw;
 
-                let mut values = (swar8_read(&src_pixels[at(si + wavey)..]) & swar8(0x0F)) << 1;
-                values += swar8_read(&dst_pixels[at(di + wavey + dst_pitch)..]) & swar8(0x0F);
-                values += swar8_read(&dst_pixels[at(di + wavey - dst_pitch)..]) & swar8(0x0F);
+                let mut values = (b.src(at(si + wavey)) & swar8(0x0F)) << 1;
+                values += b.dst(at(di + wavey + dst_pitch)) & swar8(0x0F);
+                values += b.dst(at(di + wavey - dst_pitch)) & swar8(0x0F);
                 values = (values >> 2) & swar8(0x0F);
-                swar8_write(&mut dst_pixels[at(di)..], swar8(0x70) | values);
+                b.write(at(di), swar8(0x70) | values);
             }
             diw -= 8;
         }
@@ -622,11 +670,11 @@ pub fn lava_filter(g: &mut Game, dst: ScreenId, src: ScreenId) {
             di -= sw;
             si -= sw;
 
-            let mut values = (swar8_read(&src_pixels[at(si + wavey)..]) & swar8(0x0F)) << 1;
-            values += swar8_read(&dst_pixels[at(di + wavey + dst_pitch)..]) & swar8(0x0F);
+            let mut values = (b.src(at(si + wavey)) & swar8(0x0F)) << 1;
+            values += b.dst(at(di + wavey + dst_pitch)) & swar8(0x0F);
             // Assume values above top row of pixels are zero.
             values = (values >> 2) & swar8(0x0F);
-            swar8_write(&mut dst_pixels[at(di)..], swar8(0x70) | values);
+            b.write(at(di), swar8(0x70) | values);
         }
         diw -= 8;
     }
@@ -636,14 +684,8 @@ pub fn lava_filter(g: &mut Game, dst: ScreenId, src: ScreenId) {
 
 pub fn water_filter(g: &mut Game, dst: ScreenId, src: ScreenId) {
     let hue = g.backgrnd.smoothie_data[2 - 1] << 4;
-    let (src, dst) = g.video.screen_pair_mut(src, dst);
-    assert_vga_surface(src);
-    assert_vga_surface(dst);
-
-    let src_pitch = src.pitch as isize;
-    let dst_pitch = dst.pitch as isize;
-    let src_pixels = &src.pixels;
-    let dst_pixels = &mut dst.pixels;
+    let (mut b, src_pitch, dst_pitch) = filter_bufs(g, dst, src);
+    let (src_pitch, dst_pitch) = (src_pitch as isize, dst_pitch as isize);
     let vga_width = VGA_WIDTH as isize;
 
     let hues = swar8(hue);
@@ -667,7 +709,7 @@ pub fn water_filter(g: &mut Game, dst: ScreenId, src: ScreenId) {
                 di -= sw;
                 si -= sw;
 
-                let src_px = swar8_read(&src_pixels[at(si)..]);
+                let src_px = b.src(at(si));
 
                 let mut water_mask = src_px & swar8(0x30);
                 // Put 0x01 in lanes where either of the bits is set, and 0x00
@@ -677,14 +719,14 @@ pub fn water_filter(g: &mut Game, dst: ScreenId, src: ScreenId) {
                 water_mask = (water_mask << 8).wrapping_sub(water_mask);
 
                 let mut values = src_px & swar8(0x0F);
-                values += swar8_read(&dst_pixels[at(di + wavey + dst_pitch)..]) & swar8(0x0F);
+                values += b.dst(at(di + wavey + dst_pitch)) & swar8(0x0F);
                 values = (values >> 1) & swar8(0x0F);
                 let water_pixels = hues | values;
 
                 // Conditionally select each lane by mask.
                 let dst_px = src_px ^ ((src_px ^ water_pixels) & water_mask);
 
-                swar8_write(&mut dst_pixels[at(di)..], dst_px);
+                b.write(at(di), dst_px);
             }
             diw -= 8;
         }
@@ -696,12 +738,7 @@ pub fn water_filter(g: &mut Game, dst: ScreenId, src: ScreenId) {
 /// Shared loop of [`iced_blur_filter`] and [`blur_filter`]: `f` maps
 /// (source, destination) lanes to the new destination lanes.
 fn blur_with(g: &mut Game, dst: ScreenId, src: ScreenId, f: impl Fn(Swar8, Swar8) -> Swar8) {
-    let (src, dst) = g.video.screen_pair_mut(src, dst);
-    assert_vga_surface(src);
-    assert_vga_surface(dst);
-
-    let src_pitch = src.pitch as usize;
-    let dst_pitch = dst.pitch as usize;
+    let (mut b, src_pitch, dst_pitch) = filter_bufs(g, dst, src);
     let vga_width = VGA_WIDTH as usize;
 
     let mut di = dst_pitch * 184;
@@ -716,8 +753,8 @@ fn blur_with(g: &mut Game, dst: ScreenId, src: ScreenId, f: impl Fn(Swar8, Swar8
                 di -= SW;
                 si -= SW;
 
-                let v = f(swar8_read(&src.pixels[si..]), swar8_read(&dst.pixels[di..]));
-                swar8_write(&mut dst.pixels[di..], v);
+                let v = f(b.src(si), b.dst(di));
+                b.write(di, v);
             }
         }
     }

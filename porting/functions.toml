@@ -4387,9 +4387,9 @@ notes = ""
 c = "tyrian2.c::JE_main"
 c_sha = "42f38628a2f9"
 rust = "rustyrian_core::tyrian2::je_main"
-status = "todo"
-verify = []
-notes = "blocked on demo.c, mainint.c and varz.c callees (endPlayDemo, endRecordDemo, JE_doInGameSetup, JE_mainGamePlayerFunctions, JE_doSP, JE_setupExplosion, ...) and tyrian2.c::JE_drawEnemy/JE_eventSystem/JE_loadMap, shots.c::player_shot_move_and_draw"
+status = "verified"
+verify = ["diff:tyrian2::je_main_stops_a_demo_on_input", "diff:tyrian2::je_main_plays_demo_1", "diff:tyrian2::je_main_plays_demo_2", "diff:tyrian2::je_main_plays_demo_3", "diff:tyrian2::je_main_plays_demo_4", "diff:tyrian2::je_main_plays_demo_5", "diff:tyrian2::je_main_plays_one_player", "diff:tyrian2::je_main_plays_two_player_and_arcade", "diff:tyrian2::je_main_ends_a_level"]
+notes = "R9: labels start_level, start_level_first, level_loop as MainLabel. D-UB-TYRIAN2-4: eventLoc 0 after a jump to the first event reads no event; a kill by the Zinglon beam (no shooting player) scores for nobody; an enemy flag number outside 1..=10 sets nothing"
 
 [[fn]]
 c = "tyrian2.c::readEpisodeString"
@@ -4403,9 +4403,9 @@ notes = ""
 c = "tyrian2.c::JE_loadMap"
 c_sha = "25307f5c5725"
 rust = "rustyrian_core::tyrian2::je_load_map"
-status = "todo"
-verify = []
-notes = "blocked on demo.c::beginPlayDemo, demo.c::beginRecordDemo, game_menu.c::JE_itemScreen, mainint.c::JE_nextEpisode, mainint.c::JE_totalScore, mainint.c::str_pop_int, tyrian2.c::JE_displayText"
+status = "verified"
+verify = ["diff:tyrian2::je_load_map_loads_every_level_of_episode_1", "diff:tyrian2::je_load_map_loads_every_level_of_episode_2", "diff:tyrian2::je_load_map_loads_every_level_of_episode_3", "diff:tyrian2::je_load_map_loads_every_level_of_episode_4", "diff:tyrian2::je_load_map_runs_script_commands", "diff:tyrian2::je_load_map_shows_texts_and_pictures", "diff:tyrian2::je_load_map_enters_the_item_screen", "diff:tyrian2::je_load_map_ends_an_episode", "diff:tyrian2::je_load_map_refuses_invalid_level_data", "diff:tyrian2::je_load_map_bounds_script_tables", "diff:tyrian2::je_load_map_pans_right_within_the_screen"]
+notes = "R10 input boundary for level and episode-script data: D-UB-TYRIAN2-1 (level file: enemy count 1..=40, enemy records, event indices, skip and jump targets, map bytes), D-UB-TYRIAN2-2 (script tables: next-level choices, shop rows, palette numbers, level numbers), D-UB-TYRIAN2-3 (pan-right last-row byte)"
 
 [[fn]]
 c = "tyrian2.c::networkStartScreen"
