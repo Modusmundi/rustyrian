@@ -182,17 +182,21 @@ fn rust_only_allocation_failure(dir: &Path) {
     );
 }
 
-/// A sparse `tshp2.pcx` larger than any address space (2^60 bytes, or 2^52
-/// where the file system caps file sizes lower, as APFS does) exercises the
-/// allocation guard on every platform.
+/// A `tshp2.pcx` whose length no allocation can hold exercises the
+/// allocation guard: on Linux a directory (ext4 reports LLONG_MAX as its
+/// SEEK_END length, the case that crashed C), elsewhere a sparse file of
+/// 2^60 bytes, or 2^52 where the file system caps file sizes lower (APFS).
 #[test]
 fn je_load_pcx_allocation_failure_is_a_read_error() {
     let dir = tmp("sparse");
-    let f = std::fs::File::create(dir.join("tshp2.pcx")).expect("create");
-    let sized = [1u64 << 60, 1 << 52]
-        .into_iter()
-        .any(|n| f.set_len(n).is_ok());
-    assert!(sized, "the file system refuses a 2^52-byte sparse file");
-    drop(f);
+    if cfg!(target_os = "linux") {
+        std::fs::create_dir(dir.join("tshp2.pcx")).expect("mkdir");
+    } else {
+        let f = std::fs::File::create(dir.join("tshp2.pcx")).expect("create");
+        let sized = [1u64 << 60, 1 << 52]
+            .into_iter()
+            .any(|n| f.set_len(n).is_ok());
+        assert!(sized, "the file system refuses a 2^52-byte sparse file");
+    }
     rust_only_allocation_failure(&dir);
 }
