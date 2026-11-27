@@ -2411,65 +2411,65 @@ notes = "blocked: calls network.c::network_check, nortsong.c::getFrameCountTicks
 c = "lds_play.c::lds_load"
 c_sha = "54c8c2ef5fdb"
 rust = "rustyrian_core::lds_play::lds_load"
-status = "todo"
-verify = []
-notes = ""
+status = "verified"
+verify = ["diff:lds_play::lds_load_matches_every_song", "diff:lds_play::mutated_songs_are_exact_or_rejected", "diff:lds_play::lds_load_rejects_mode_above_2_like_c"]
+notes = "D-UB-LDS-1: load-time song validation"
 
 [[fn]]
 c = "lds_play.c::lds_free"
 c_sha = "0a407222f1b3"
 rust = "rustyrian_core::lds_play::lds_free"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:lds_play::lds_fade_rewind_free_match", "diff:loudness::deinit_audio_matches"]
 notes = ""
 
 [[fn]]
 c = "lds_play.c::lds_rewind"
 c_sha = "f7c9806d349f"
 rust = "rustyrian_core::lds_play::lds_rewind"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:lds_play::lds_fade_rewind_free_match", "diff:lds_play::lds_load_matches_every_song"]
 notes = ""
 
 [[fn]]
 c = "lds_play.c::lds_fade"
 c_sha = "a73871646b79"
 rust = "rustyrian_core::lds_play::lds_fade"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:lds_play::lds_fade_rewind_free_match", "diff:loudness::random_sessions_match"]
 notes = ""
 
 [[fn]]
 c = "lds_play.c::lds_setregs"
 c_sha = "d36f5d745854"
 rust = "rustyrian_core::lds_play::lds_setregs"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:lds_play::lds_setregs_match", "diff:lds_play::lds_update_matches_every_song"]
 notes = ""
 
 [[fn]]
 c = "lds_play.c::lds_setregs_adv"
 c_sha = "14bcfcf81d51"
 rust = "rustyrian_core::lds_play::lds_setregs_adv"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:lds_play::lds_setregs_match", "diff:lds_play::lds_update_matches_every_song"]
 notes = ""
 
 [[fn]]
 c = "lds_play.c::lds_update"
 c_sha = "5439c5177f62"
 rust = "rustyrian_core::lds_play::lds_update"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:lds_play::lds_update_matches_every_song", "diff:lds_play::lds_update_from_perturbed_states_matches", "diff:lds_play::mutated_songs_are_exact_or_rejected", "diff:lds_play::lds_fade_rewind_free_match"]
 notes = ""
 
 [[fn]]
 c = "lds_play.c::lds_playsound"
 c_sha = "e2adf6f02cb9"
 rust = "rustyrian_core::lds_play::lds_playsound"
-status = "todo"
-verify = []
-notes = ""
+status = "verified"
+verify = ["diff:lds_play::lds_playsound_matches", "diff:lds_play::lds_update_matches_every_song"]
+notes = "D-UB-LDS-1: guarded instrument read"
 
 [[fn]]
 c = "logging.c::logFatal"
@@ -2484,80 +2484,80 @@ notes = ""
 c = "loudness.c::init_audio"
 c_sha = "f1b10ba06a74"
 rust = "rustyrian_core::loudness::init_audio"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:loudness::init_audio_matches", "diff:loudness::init_audio_failures_match"]
 notes = ""
 
 [[fn]]
 c = "loudness.c::audioCallback"
 c_sha = "36a5c0a2ff0a"
 rust = "rustyrian_core::loudness::audio_callback"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:loudness::every_song_is_bit_identical", "diff:loudness::every_sound_mixes_identically", "diff:loudness::random_sessions_match"]
 notes = ""
 
 [[fn]]
 c = "loudness.c::deinit_audio"
 c_sha = "e9432fb87c87"
 rust = "rustyrian_core::loudness::deinit_audio"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:loudness::deinit_audio_matches", "diff:loudness::init_audio_failures_match"]
 notes = ""
 
 [[fn]]
 c = "loudness.c::load_song"
 c_sha = "4372618a8e82"
 rust = "rustyrian_core::loudness::load_song"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:loudness::load_song_out_of_range_and_failures_match", "diff:loudness::every_song_is_bit_identical"]
 notes = ""
 
 [[fn]]
 c = "loudness.c::play_song"
 c_sha = "cdabc11d8b35"
 rust = "rustyrian_core::loudness::play_song"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:loudness::random_sessions_match", "diff:loudness::load_song_out_of_range_and_failures_match", "diff:loudness::init_audio_failures_match"]
 notes = ""
 
 [[fn]]
 c = "loudness.c::restart_song"
 c_sha = "6b9ffda0f716"
 rust = "rustyrian_core::loudness::restart_song"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:loudness::random_sessions_match", "diff:loudness::init_audio_failures_match"]
 notes = ""
 
 [[fn]]
 c = "loudness.c::stop_song"
 c_sha = "b718d1788569"
 rust = "rustyrian_core::loudness::stop_song"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:loudness::random_sessions_match", "diff:loudness::init_audio_failures_match"]
 notes = ""
 
 [[fn]]
 c = "loudness.c::fade_song"
 c_sha = "5821996b16f7"
 rust = "rustyrian_core::loudness::fade_song"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:loudness::random_sessions_match", "diff:loudness::init_audio_failures_match"]
 notes = ""
 
 [[fn]]
 c = "loudness.c::set_volume"
 c_sha = "6e9d75f5f0d0"
 rust = "rustyrian_core::loudness::set_volume"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:loudness::random_sessions_match", "diff:loudness::init_audio_failures_match", "diff:nortsong::change_volume_and_play_sample_match"]
 notes = ""
 
 [[fn]]
 c = "loudness.c::multiSamplePlay"
 c_sha = "47046cb4da9c"
 rust = "rustyrian_core::loudness::multi_sample_play"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:loudness::random_sessions_match", "diff:loudness::init_audio_failures_match", "diff:nortsong::change_volume_and_play_sample_match"]
 notes = ""
 
 [[fn]]
@@ -3509,80 +3509,80 @@ notes = ""
 c = "nortsong.c::setFrameSpeed"
 c_sha = "0b10252e5631"
 rust = "rustyrian_core::nortsong::set_frame_speed"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:nortsong::timer_sessions_match"]
 notes = ""
 
 [[fn]]
 c = "nortsong.c::setFrameCount"
 c_sha = "790abcf9e332"
 rust = "rustyrian_core::nortsong::set_frame_count"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:nortsong::timer_sessions_match"]
 notes = ""
 
 [[fn]]
 c = "nortsong.c::setFrameCount2"
 c_sha = "42aa602e0983"
 rust = "rustyrian_core::nortsong::set_frame_count2"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:nortsong::timer_sessions_match"]
 notes = ""
 
 [[fn]]
 c = "nortsong.c::getFrameCountTicks"
 c_sha = "c1d4015037f8"
 rust = "rustyrian_core::nortsong::get_frame_count_ticks"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:nortsong::timer_sessions_match"]
 notes = ""
 
 [[fn]]
 c = "nortsong.c::getFrameCount2Ticks"
 c_sha = "3d6d001d3c6f"
 rust = "rustyrian_core::nortsong::get_frame_count2_ticks"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:nortsong::timer_sessions_match"]
 notes = ""
 
 [[fn]]
 c = "nortsong.c::delayUntilElapsed"
 c_sha = "6f27f7ece358"
 rust = "rustyrian_core::nortsong::delay_until_elapsed"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:nortsong::timer_sessions_match"]
 notes = ""
 
 [[fn]]
 c = "nortsong.c::loadSounds"
 c_sha = "399a53481026"
 rust = "rustyrian_core::nortsong::load_sounds"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:nortsong::load_sounds_matches", "diff:nortsong::load_snd_file_matches_on_real_data", "diff:nortsong::load_snd_file_failures_match"]
 notes = ""
 
 [[fn]]
 c = "nortsong.c::loadSndFile"
 c_sha = "dd0c05343b3c"
 rust = "rustyrian_core::nortsong::load_snd_file"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:nortsong::load_snd_file_matches_on_real_data", "diff:nortsong::load_snd_file_failures_match"]
 notes = ""
 
 [[fn]]
 c = "nortsong.c::JE_playSampleNum"
 c_sha = "18c4b82001c4"
 rust = "rustyrian_core::nortsong::je_play_sample_num"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:nortsong::change_volume_and_play_sample_match"]
 notes = ""
 
 [[fn]]
 c = "nortsong.c::JE_changeVolume"
 c_sha = "312055314cb6"
 rust = "rustyrian_core::nortsong::je_change_volume"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:nortsong::change_volume_and_play_sample_match"]
 notes = ""
 
 [[fn]]
@@ -3669,201 +3669,201 @@ notes = ""
 c = "opl.c::operator_advance"
 c_sha = "4c32cc593a2e"
 rust = "rustyrian_core::opl::operator_advance"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opl::operator_advance_and_output_match", "diff:opl::adlib_getsample_matches"]
 notes = ""
 
 [[fn]]
 c = "opl.c::operator_advance_drums"
 c_sha = "59d85b5b5d01"
 rust = "rustyrian_core::opl::operator_advance_drums"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opl::adlib_getsample_matches", "diff:loudness::every_song_is_bit_identical"]
 notes = ""
 
 [[fn]]
 c = "opl.c::operator_output"
 c_sha = "153b955c496b"
 rust = "rustyrian_core::opl::operator_output"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opl::operator_advance_and_output_match", "diff:opl::adlib_getsample_matches"]
 notes = ""
 
 [[fn]]
 c = "opl.c::operator_off"
 c_sha = "061347b7408f"
 rust = "rustyrian_core::opl::operator_off"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opl::envelope_functions_match"]
 notes = ""
 
 [[fn]]
 c = "opl.c::operator_sustain"
 c_sha = "4db58aedb3a8"
 rust = "rustyrian_core::opl::operator_sustain"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opl::envelope_functions_match", "diff:opl::adlib_getsample_matches"]
 notes = ""
 
 [[fn]]
 c = "opl.c::operator_release"
 c_sha = "db817466221f"
 rust = "rustyrian_core::opl::operator_release"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opl::envelope_functions_match", "diff:opl::adlib_getsample_matches"]
 notes = ""
 
 [[fn]]
 c = "opl.c::operator_decay"
 c_sha = "eb42ce25129b"
 rust = "rustyrian_core::opl::operator_decay"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opl::envelope_functions_match", "diff:opl::adlib_getsample_matches"]
 notes = ""
 
 [[fn]]
 c = "opl.c::operator_attack"
 c_sha = "43a91aa007a9"
 rust = "rustyrian_core::opl::operator_attack"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opl::envelope_functions_match", "diff:opl::adlib_getsample_matches"]
 notes = ""
 
 [[fn]]
 c = "opl.c::change_attackrate"
 c_sha = "fe7db7183475"
 rust = "rustyrian_core::opl::change_attackrate"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opl::change_functions_match", "diff:opl::adlib_write_sequences_match"]
 notes = ""
 
 [[fn]]
 c = "opl.c::change_decayrate"
 c_sha = "d43aecf66f2a"
 rust = "rustyrian_core::opl::change_decayrate"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opl::change_functions_match", "diff:opl::adlib_write_sequences_match"]
 notes = ""
 
 [[fn]]
 c = "opl.c::change_releaserate"
 c_sha = "53839a1e4199"
 rust = "rustyrian_core::opl::change_releaserate"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opl::change_functions_match", "diff:opl::adlib_write_sequences_match"]
 notes = ""
 
 [[fn]]
 c = "opl.c::change_sustainlevel"
 c_sha = "5d4448bd055d"
 rust = "rustyrian_core::opl::change_sustainlevel"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opl::change_functions_match", "diff:opl::adlib_write_sequences_match"]
 notes = ""
 
 [[fn]]
 c = "opl.c::change_waveform"
 c_sha = "50efabafa18d"
 rust = "rustyrian_core::opl::change_waveform"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opl::change_functions_match", "diff:opl::adlib_write_sequences_match"]
 notes = ""
 
 [[fn]]
 c = "opl.c::change_keepsustain"
 c_sha = "bc8c5629af8e"
 rust = "rustyrian_core::opl::change_keepsustain"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opl::change_functions_match", "diff:opl::adlib_write_sequences_match"]
 notes = ""
 
 [[fn]]
 c = "opl.c::change_vibrato"
 c_sha = "504058302d75"
 rust = "rustyrian_core::opl::change_vibrato"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opl::change_functions_match", "diff:opl::adlib_write_sequences_match"]
 notes = ""
 
 [[fn]]
 c = "opl.c::change_feedback"
 c_sha = "53e9bd4d39f5"
 rust = "rustyrian_core::opl::change_feedback"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opl::change_functions_match", "diff:opl::adlib_write_sequences_match"]
 notes = ""
 
 [[fn]]
 c = "opl.c::change_frequency"
 c_sha = "66b091ff0cc5"
 rust = "rustyrian_core::opl::change_frequency"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opl::change_functions_match", "diff:opl::adlib_write_sequences_match"]
 notes = ""
 
 [[fn]]
 c = "opl.c::enable_operator"
 c_sha = "b4c7e2da0bc8"
 rust = "rustyrian_core::opl::enable_operator"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opl::change_functions_match", "diff:opl::adlib_write_sequences_match"]
 notes = ""
 
 [[fn]]
 c = "opl.c::disable_operator"
 c_sha = "997169d68d99"
 rust = "rustyrian_core::opl::disable_operator"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opl::change_functions_match", "diff:opl::adlib_write_sequences_match"]
 notes = ""
 
 [[fn]]
 c = "opl.c::adlib_init"
 c_sha = "ed20b77d056b"
 rust = "rustyrian_core::opl::adlib_init"
-status = "todo"
-verify = []
-notes = ""
+status = "verified"
+verify = ["diff:opl::adlib_init_matches", "diff:opl::adlib_init_state_loads_as_expected"]
+notes = "D-CONFIG-1: OPL2 path only"
 
 [[fn]]
 c = "opl.c::adlib_write"
 c_sha = "57a98d8ec00c"
 rust = "rustyrian_core::opl::adlib_write"
-status = "todo"
-verify = []
-notes = ""
+status = "verified"
+verify = ["diff:opl::adlib_write_sequences_match", "diff:opl::adlib_getsample_matches"]
+notes = "D-CONFIG-1: OPL2 path only"
 
 [[fn]]
 c = "opl.c::adlib_reg_read"
 c_sha = "ae486248bbaf"
 rust = "rustyrian_core::opl::adlib_reg_read"
-status = "todo"
-verify = []
-notes = ""
+status = "verified"
+verify = ["diff:opl::adlib_reg_read_and_write_index_match"]
+notes = "D-CONFIG-1: OPL2 path only"
 
 [[fn]]
 c = "opl.c::adlib_write_index"
 c_sha = "73af0f6d5e31"
 rust = "rustyrian_core::opl::adlib_write_index"
-status = "todo"
-verify = []
-notes = ""
+status = "verified"
+verify = ["diff:opl::adlib_reg_read_and_write_index_match"]
+notes = "D-CONFIG-1: OPL2 path only"
 
 [[fn]]
 c = "opl.c::clipit16"
 c_sha = "4c60b93d6842"
 rust = "rustyrian_core::opl::clipit16"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opl::clipit16_matches"]
 notes = ""
 
 [[fn]]
 c = "opl.c::adlib_getsample"
 c_sha = "d323ec475792"
 rust = "rustyrian_core::opl::adlib_getsample"
-status = "todo"
-verify = []
-notes = ""
+status = "verified"
+verify = ["diff:opl::adlib_getsample_matches", "diff:loudness::every_song_is_bit_identical"]
+notes = "D-CONFIG-1: OPL2 path only"
 
 [[fn]]
 c = "palette.c::loadPals"
