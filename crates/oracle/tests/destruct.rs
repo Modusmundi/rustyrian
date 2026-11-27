@@ -285,18 +285,23 @@ fn same_flow<T: PartialEq + std::fmt::Debug>(
     compare(rig)
 }
 
-/// Runs `f` for `cases / div` generated values on one pair of engines.
+/// Runs `f` for `cases` generated values on one pair of engines.
+///
+/// Every case stores the whole game into C and compares the whole game
+/// afterwards (about 20 ms per compared call), so case counts are fixed and
+/// small rather than scaled by `PROPTEST_CASES`; the grouped tests run each
+/// of their functions on every generated world instead.
 fn run_cases<S: Strategy>(
-    div: u32,
+    cases: u32,
     strategy: S,
     f: impl Fn(&mut Rig, S::Value) -> Result<(), TestCaseError>,
 ) {
+    assert!(cases <= 64);
     let rig = RefCell::new(setup("ots 1\n"));
-    let config = ProptestConfig::default();
     TestRunner::new(ProptestConfig {
-        cases: (config.cases / div).max(1),
+        cases,
         max_shrink_iters: 32,
-        ..config
+        ..ProptestConfig::default()
     })
     .run(&strategy, |v| f(&mut rig.borrow_mut(), v))
     .unwrap();
@@ -745,8 +750,9 @@ fn load_destruct_config_matches_c() {
         ),
         prop::collection::vec(arb_opt(UNIT_VALUES, 13), 2),
     );
+    // 64 cases: one whole-game compare each (about 20 ms).
     run_cases(
-        2,
+        64,
         sections,
         |rig, (present, bools, ints, keys, (enable, nums), units)| {
             let cfg = &mut rig.g.config.opentyrian_config;
@@ -802,238 +808,263 @@ fn load_destruct_config_matches_c() {
 }
 
 /// `DE_RaiseAngle`, `DE_LowerAngle`, `DE_RaisePower`, `DE_LowerPower`,
-/// `DE_isValidUnit`, `DE_CycleWeaponUp`, `DE_CycleWeaponDown`.
+/// `DE_isValidUnit`, `DE_CycleWeaponUp`, `DE_CycleWeaponDown`, each on
+/// every generated world.
 #[test]
 fn unit_functions_match_c() {
+    // 64 cases: seven whole-game compares each (about 150 ms).
     run_cases(
-        1,
-        (arb_world(), 0usize..2, 0usize..10, 0u8..7),
-        |rig, (mut w, p, u, which)| {
+        64,
+        (arb_world(), 0usize..2, 0usize..10),
+        |rig, (w, p, u)| {
             let u = u % unit_count(&w);
-            let unit = &mut w.s.destruct_player[p].unit.as_mut().expect("units")[u];
-            if which >= 5 && unit.unit_type == UNIT_SATELLITE {
-                // A satellite has no weapon to cycle to (the game never asks).
-                unit.unit_type = UNIT_TANK;
+            for which in 0..7u8 {
+                let mut w = w.clone();
+                let unit = &mut w.s.destruct_player[p].unit.as_mut().expect("units")[u];
+                if which >= 5 && unit.unit_type == UNIT_SATELLITE {
+                    // A satellite has no weapon to cycle to (the game never asks).
+                    unit.unit_type = UNIT_TANK;
+                }
+                apply(&mut rig.g, &w);
+                same(
+                    rig,
+                    // SAFETY: a stored unit.
+                    move || unsafe {
+                        let cu = c_unit(p, u);
+                        match which {
+                            0 => ob::ot_s_destruct_DE_RaiseAngle(cu),
+                            1 => ob::ot_s_destruct_DE_LowerAngle(cu),
+                            2 => ob::ot_s_destruct_DE_RaisePower(cu),
+                            3 => ob::ot_s_destruct_DE_LowerPower(cu),
+                            4 => return ob::ot_s_destruct_DE_isValidUnit(cu),
+                            5 => ob::ot_s_destruct_DE_CycleWeaponUp(cu),
+                            _ => ob::ot_s_destruct_DE_CycleWeaponDown(cu),
+                        }
+                        false
+                    },
+                    move |g| {
+                        let unit =
+                            &mut g.destruct.destruct_player[p].unit.as_mut().expect("units")[u];
+                        match which {
+                            0 => de::de_raise_angle(unit),
+                            1 => de::de_lower_angle(unit),
+                            2 => de::de_raise_power(unit),
+                            3 => de::de_lower_power(unit),
+                            4 => return de::de_is_valid_unit(unit),
+                            5 => de::de_cycle_weapon_up(g, p, u),
+                            _ => de::de_cycle_weapon_down(g, p, u),
+                        }
+                        false
+                    },
+                )?;
             }
-            apply(&mut rig.g, &w);
-            same(
-                rig,
-                // SAFETY: a stored unit.
-                move || unsafe {
-                    let cu = c_unit(p, u);
-                    match which {
-                        0 => ob::ot_s_destruct_DE_RaiseAngle(cu),
-                        1 => ob::ot_s_destruct_DE_LowerAngle(cu),
-                        2 => ob::ot_s_destruct_DE_RaisePower(cu),
-                        3 => ob::ot_s_destruct_DE_LowerPower(cu),
-                        4 => return ob::ot_s_destruct_DE_isValidUnit(cu),
-                        5 => ob::ot_s_destruct_DE_CycleWeaponUp(cu),
-                        _ => ob::ot_s_destruct_DE_CycleWeaponDown(cu),
-                    }
-                    false
-                },
-                move |g| {
-                    let unit = &mut g.destruct.destruct_player[p].unit.as_mut().expect("units")[u];
-                    match which {
-                        0 => de::de_raise_angle(unit),
-                        1 => de::de_lower_angle(unit),
-                        2 => de::de_raise_power(unit),
-                        3 => de::de_lower_power(unit),
-                        4 => return de::de_is_valid_unit(unit),
-                        5 => de::de_cycle_weapon_up(g, p, u),
-                        _ => de::de_cycle_weapon_down(g, p, u),
-                    }
-                    false
-                },
-            )
+            Ok(())
         },
     );
 }
 
 /// `DE_RunTickGravity`, `DE_GravityLowerUnit`, `DE_GravityFlyUnit`,
-/// `DE_GravityDrawUnit`, `JE_stabilityCheck`.
+/// `DE_GravityDrawUnit`, `JE_stabilityCheck`, each on every generated world.
 #[test]
 fn gravity_matches_c() {
+    // 64 cases: five whole-game compares each (about 100 ms).
     run_cases(
-        1,
-        (arb_world(), 0usize..2, 0usize..10, 0u8..5),
-        |rig, (w, p, u, which)| {
+        64,
+        (arb_world(), 0usize..2, 0usize..10),
+        |rig, (w, p, u)| {
             let u = u % unit_count(&w);
-            apply(&mut rig.g, &w);
             let unit = w.s.destruct_player[p].unit.as_ref().expect("units")[u];
             let (x, y) = (unit.unit_x, unit.unit_y.round() as u32);
-            same(
-                rig,
-                // SAFETY: stored units; the checked rows are inside the surface.
-                move || unsafe {
-                    match which {
-                        0 => ob::ot_s_destruct_DE_RunTickGravity(),
-                        1 => ob::ot_s_destruct_DE_GravityLowerUnit(c_unit(p, u)),
-                        2 => ob::ot_s_destruct_DE_GravityFlyUnit(c_unit(p, u)),
-                        3 => ob::ot_s_destruct_DE_GravityDrawUnit(p as i32, c_unit(p, u)),
-                        _ => return ob::ot_s_destruct_JE_stabilityCheck(x, y),
-                    }
-                    false
-                },
-                move |g| {
-                    match which {
-                        0 => de::de_run_tick_gravity(g),
-                        1 => de::de_gravity_lower_unit(g, p, u),
-                        2 => de::de_gravity_fly_unit(g, p, u),
-                        3 => de::de_gravity_draw_unit(g, p as u32, u),
-                        _ => return de::je_stability_check(g, x, y),
-                    }
-                    false
-                },
-            )
+            for which in 0..5u8 {
+                apply(&mut rig.g, &w);
+                same(
+                    rig,
+                    // SAFETY: stored units; the checked rows are inside the surface.
+                    move || unsafe {
+                        match which {
+                            0 => ob::ot_s_destruct_DE_RunTickGravity(),
+                            1 => ob::ot_s_destruct_DE_GravityLowerUnit(c_unit(p, u)),
+                            2 => ob::ot_s_destruct_DE_GravityFlyUnit(c_unit(p, u)),
+                            3 => ob::ot_s_destruct_DE_GravityDrawUnit(p as i32, c_unit(p, u)),
+                            _ => return ob::ot_s_destruct_JE_stabilityCheck(x, y),
+                        }
+                        false
+                    },
+                    move |g| {
+                        match which {
+                            0 => de::de_run_tick_gravity(g),
+                            1 => de::de_gravity_lower_unit(g, p, u),
+                            2 => de::de_gravity_fly_unit(g, p, u),
+                            3 => de::de_gravity_draw_unit(g, p as u32, u),
+                            _ => return de::je_stability_check(g, x, y),
+                        }
+                        false
+                    },
+                )?;
+            }
+            Ok(())
         },
     );
 }
 
 /// `DE_RunTickShots`, `DE_DrawTrails`, `JE_pixCool`, `DE_MakeShot`,
-/// `DE_RunMagnet`.
+/// `DE_RunMagnet`, each on every generated world.
 #[test]
 fn shots_match_c() {
     let args = (
         arb_world(),
         0usize..2,
         0usize..10,
-        0u8..5,
         (0u32..=330, 1u32..=210, any::<u8>(), any::<bool>()),
     );
-    run_cases(1, args, |rig, (mut w, p, i, which, (x, y, c, heli))| {
-        let sel = w.s.destruct_player[p].unit_selected as usize;
-        if which >= 3 && heli {
-            w.s.destruct_player[p].unit.as_mut().expect("units")[sel].unit_type = de::UNIT_HELI;
-        }
-        apply(&mut rig.g, &w);
+    // 64 cases: five whole-game compares each (about 100 ms).
+    run_cases(64, args, |rig, (w, p, i, (x, y, c, heli))| {
         let shots = w.s.config.max_shots as usize;
-        // `DE_DrawTrails` needs a shot slot; without one, exercise the others.
-        let which = if which == 1 && shots == 0 { 0 } else { which };
         let i = if shots == 0 { 0 } else { i % shots };
         let (count, decay, start) = if p == 0 { (2, 4, 250) } else { (4, 3, 252) };
         let sel = w.s.destruct_player[p].unit_selected as usize;
         let dir = if p == 0 { -1 } else { 1 };
-        same(
-            rig,
-            // SAFETY: stored shots and units.
-            move || unsafe {
-                match which {
-                    0 => ob::ot_s_destruct_DE_RunTickShots(),
-                    1 => ob::ot_s_destruct_DE_DrawTrails(c_shot(i), count, decay, start),
-                    2 => ob::ot_s_destruct_JE_pixCool(x, y, c),
-                    3 => ob::ot_s_destruct_DE_MakeShot(p as i32, c_unit(p, sel), dir),
-                    _ => ob::ot_s_destruct_DE_RunMagnet(p as i32, c_unit(p, sel)),
-                }
-            },
-            move |g| match which {
-                0 => de::de_run_tick_shots(g),
-                1 => de::de_draw_trails(g, i, count, decay, start),
-                2 => de::je_pix_cool(g, x, y, c),
-                3 => de::de_make_shot(g, p as u32, sel, dir),
-                _ => de::de_run_magnet(g, p as u32, sel),
-            },
-        )
+        for which in 0..5u8 {
+            // `DE_DrawTrails` needs a shot slot.
+            if which == 1 && shots == 0 {
+                continue;
+            }
+            let mut w = w.clone();
+            if which >= 3 && heli {
+                w.s.destruct_player[p].unit.as_mut().expect("units")[sel].unit_type = de::UNIT_HELI;
+            }
+            apply(&mut rig.g, &w);
+            same(
+                rig,
+                // SAFETY: stored shots and units.
+                move || unsafe {
+                    match which {
+                        0 => ob::ot_s_destruct_DE_RunTickShots(),
+                        1 => ob::ot_s_destruct_DE_DrawTrails(c_shot(i), count, decay, start),
+                        2 => ob::ot_s_destruct_JE_pixCool(x, y, c),
+                        3 => ob::ot_s_destruct_DE_MakeShot(p as i32, c_unit(p, sel), dir),
+                        _ => ob::ot_s_destruct_DE_RunMagnet(p as i32, c_unit(p, sel)),
+                    }
+                },
+                move |g| match which {
+                    0 => de::de_run_tick_shots(g),
+                    1 => de::de_draw_trails(g, i, count, decay, start),
+                    2 => de::je_pix_cool(g, x, y, c),
+                    3 => de::de_make_shot(g, p as u32, sel, dir),
+                    _ => de::de_run_magnet(g, p as u32, sel),
+                },
+            )?;
+        }
+        Ok(())
     });
 }
 
 /// `DE_RunTickExplosions`, `JE_superPixel`, `DE_TestExplosionCollision`,
-/// `DE_DestroyUnit`, `JE_makeExplosion`, `JE_eSound`.
+/// `DE_DestroyUnit`, `JE_makeExplosion`, `JE_eSound`, each on every
+/// generated world.
 #[test]
 fn explosions_match_c() {
     let args = (
         arb_world(),
         0usize..2,
         0usize..10,
-        0u8..6,
         (0u32..=320, 16u32..200, -1i32..17, 0u32..40),
     );
-    run_cases(1, args, |rig, (w, p, u, which, (x, y, shot, sound))| {
+    // 64 cases: six whole-game compares each (about 120 ms).
+    run_cases(64, args, |rig, (w, p, u, (x, y, shot, sound))| {
         let u = u % unit_count(&w);
-        apply(&mut rig.g, &w);
-        same(
-            rig,
-            // SAFETY: stored units; positions inside the playfield.
-            move || unsafe {
-                match which {
-                    0 => ob::ot_s_destruct_DE_RunTickExplosions(),
-                    1 => ob::ot_s_destruct_JE_superPixel(x, y),
-                    2 => ob::ot_s_destruct_DE_TestExplosionCollision(x, y),
-                    3 => ob::ot_s_destruct_DE_DestroyUnit(p as i32, c_unit(p, u)),
-                    4 => ob::ot_s_destruct_JE_makeExplosion(x, y, shot),
-                    _ => ob::ot_s_destruct_JE_eSound(sound),
-                }
-            },
-            move |g| match which {
-                0 => de::de_run_tick_explosions(g),
-                1 => de::je_super_pixel(g, x, y),
-                2 => de::de_test_explosion_collision(g, x, y),
-                3 => de::de_destroy_unit(g, p as u32, u),
-                4 => de::je_make_explosion(g, x, y, shot),
-                _ => de::je_e_sound(g, sound),
-            },
-        )
+        for which in 0..6u8 {
+            apply(&mut rig.g, &w);
+            same(
+                rig,
+                // SAFETY: stored units; positions inside the playfield.
+                move || unsafe {
+                    match which {
+                        0 => ob::ot_s_destruct_DE_RunTickExplosions(),
+                        1 => ob::ot_s_destruct_JE_superPixel(x, y),
+                        2 => ob::ot_s_destruct_DE_TestExplosionCollision(x, y),
+                        3 => ob::ot_s_destruct_DE_DestroyUnit(p as i32, c_unit(p, u)),
+                        4 => ob::ot_s_destruct_JE_makeExplosion(x, y, shot),
+                        _ => ob::ot_s_destruct_JE_eSound(sound),
+                    }
+                },
+                move |g| match which {
+                    0 => de::de_run_tick_explosions(g),
+                    1 => de::je_super_pixel(g, x, y),
+                    2 => de::de_test_explosion_collision(g, x, y),
+                    3 => de::de_destroy_unit(g, p as u32, u),
+                    4 => de::je_make_explosion(g, x, y, shot),
+                    _ => de::je_e_sound(g, sound),
+                },
+            )?;
+        }
+        Ok(())
     });
 }
 
-/// The once-per-tick helpers and resets.
+/// The once-per-tick helpers and resets, each on every generated world.
 #[test]
 fn tick_parts_match_c() {
-    run_cases(1, (arb_world(), 0u8..16), |rig, (w, which)| {
-        apply(&mut rig.g, &w);
-        same(
-            rig,
-            // SAFETY: the stored world.
-            move || unsafe {
-                match which {
-                    0 => ob::ot_s_destruct_DE_ResetUnits(),
-                    1 => ob::ot_s_destruct_DE_ResetPlayers(),
-                    2 => ob::ot_s_destruct_DE_ResetWeapons(),
-                    3 => ob::ot_s_destruct_DE_ResetAI(),
-                    4 => ob::ot_s_destruct_DE_ResetActions(),
-                    5 => ob::ot_s_destruct_DE_RunTickCycleDeadUnits(),
-                    6 => ob::ot_s_destruct_DE_RunTickAnimate(),
-                    7 => ob::ot_s_destruct_DE_RunTickDrawWalls(),
-                    8 => ob::ot_s_destruct_DE_RunTickAI(),
-                    9 => ob::ot_s_destruct_DE_RunTickDrawCrosshairs(),
-                    10 => ob::ot_s_destruct_DE_RunTickDrawHUD(),
-                    11 => ob::ot_s_destruct_DE_RunTickGetInput(),
-                    12 => ob::ot_s_destruct_DE_ProcessInput(),
-                    13 => return ob::ot_s_destruct_DE_RunTickCheckEndgame(),
-                    14 => ob::ot_s_destruct_DE_RunTickPlaySounds(),
-                    _ => ob::ot_s_destruct_JE_tempScreenChecking(),
-                }
-                false
-            },
-            move |g| {
-                match which {
-                    0 => de::de_reset_units(g),
-                    1 => de::de_reset_players(g),
-                    2 => de::de_reset_weapons(g),
-                    3 => de::de_reset_ai(g),
-                    4 => de::de_reset_actions(g),
-                    5 => de::de_run_tick_cycle_dead_units(g),
-                    6 => de::de_run_tick_animate(g),
-                    7 => de::de_run_tick_draw_walls(g),
-                    8 => de::de_run_tick_ai(g),
-                    9 => de::de_run_tick_draw_crosshairs(g),
-                    10 => de::de_run_tick_draw_hud(g),
-                    11 => de::de_run_tick_get_input(g).expect("no exit"),
-                    12 => de::de_process_input(g),
-                    13 => return de::de_run_tick_check_endgame(g),
-                    14 => de::de_run_tick_play_sounds(g),
-                    _ => de::je_temp_screen_checking(g),
-                }
-                false
-            },
-        )
+    // 48 cases: sixteen whole-game compares each (about 350 ms).
+    run_cases(48, arb_world(), |rig, w| {
+        for which in 0..16u8 {
+            apply(&mut rig.g, &w);
+            same(
+                rig,
+                // SAFETY: the stored world.
+                move || unsafe {
+                    match which {
+                        0 => ob::ot_s_destruct_DE_ResetUnits(),
+                        1 => ob::ot_s_destruct_DE_ResetPlayers(),
+                        2 => ob::ot_s_destruct_DE_ResetWeapons(),
+                        3 => ob::ot_s_destruct_DE_ResetAI(),
+                        4 => ob::ot_s_destruct_DE_ResetActions(),
+                        5 => ob::ot_s_destruct_DE_RunTickCycleDeadUnits(),
+                        6 => ob::ot_s_destruct_DE_RunTickAnimate(),
+                        7 => ob::ot_s_destruct_DE_RunTickDrawWalls(),
+                        8 => ob::ot_s_destruct_DE_RunTickAI(),
+                        9 => ob::ot_s_destruct_DE_RunTickDrawCrosshairs(),
+                        10 => ob::ot_s_destruct_DE_RunTickDrawHUD(),
+                        11 => ob::ot_s_destruct_DE_RunTickGetInput(),
+                        12 => ob::ot_s_destruct_DE_ProcessInput(),
+                        13 => return ob::ot_s_destruct_DE_RunTickCheckEndgame(),
+                        14 => ob::ot_s_destruct_DE_RunTickPlaySounds(),
+                        _ => ob::ot_s_destruct_JE_tempScreenChecking(),
+                    }
+                    false
+                },
+                move |g| {
+                    match which {
+                        0 => de::de_reset_units(g),
+                        1 => de::de_reset_players(g),
+                        2 => de::de_reset_weapons(g),
+                        3 => de::de_reset_ai(g),
+                        4 => de::de_reset_actions(g),
+                        5 => de::de_run_tick_cycle_dead_units(g),
+                        6 => de::de_run_tick_animate(g),
+                        7 => de::de_run_tick_draw_walls(g),
+                        8 => de::de_run_tick_ai(g),
+                        9 => de::de_run_tick_draw_crosshairs(g),
+                        10 => de::de_run_tick_draw_hud(g),
+                        11 => de::de_run_tick_get_input(g).expect("no exit"),
+                        12 => de::de_process_input(g),
+                        13 => return de::de_run_tick_check_endgame(g),
+                        14 => de::de_run_tick_play_sounds(g),
+                        _ => de::je_temp_screen_checking(g),
+                    }
+                    false
+                },
+            )?;
+        }
+        Ok(())
     });
 }
 
 /// One whole `DE_RunTick` (ESCAPE, BACKSPACE, F10 and F11 pressed at random).
 #[test]
 fn run_tick_matches_c() {
-    run_cases(2, arb_world(), |rig, w| {
+    // 64 cases: one whole tick and compare each (about 70 ms).
+    run_cases(64, arb_world(), |rig, w| {
         apply(&mut rig.g, &w);
         same_flow(
             rig,
@@ -1106,47 +1137,46 @@ fn places_wall_at_309(rig: &mut Rig, r: impl FnOnce(&mut Game)) -> bool {
     bad
 }
 
-/// Terrain generation and its helpers.
+/// Terrain generation and its helpers, each on every generated world.
 #[test]
 fn terrain_matches_c() {
     let args = (
         arb_world(),
-        0u8..10,
         (0u32..32, any::<bool>(), 0u32..320, 1u32..=320, 0u32..200),
     );
-    run_cases(
-        1,
-        args,
-        |rig, (mut w, which, (flags, flag, x, width, y))| {
-            // Enough units for every mode's fleet, as `JE_destructGame` sizes them.
-            w.s.config.max_installations = 10;
-            for p in &mut w.s.destruct_player {
-                p.unit
-                    .as_mut()
-                    .expect("units")
-                    .resize(10, DestructUnitS::default());
-            }
-            for wall in w.s.world.map_walls.iter_mut().flatten() {
-                wall.wall_x = wall.wall_x.min(308);
-            }
+    // 48 cases: ten whole-game compares each, three after a Rust dry run
+    // (about 300 ms).
+    run_cases(48, args, |rig, (mut w, (flags, flag, x, width, y))| {
+        // Enough units for every mode's fleet, as `JE_destructGame` sizes them.
+        w.s.config.max_installations = 10;
+        for p in &mut w.s.destruct_player {
+            p.unit
+                .as_mut()
+                .expect("units")
+                .resize(10, DestructUnitS::default());
+        }
+        for wall in w.s.world.map_walls.iter_mut().flatten() {
+            wall.wall_x = wall.wall_x.min(308);
+        }
+        let screen = if flag {
+            ScreenId::VgaScreenSeg
+        } else {
+            ScreenId::GameScreen
+        };
+        let pixel = if flag { 25 } else { 0 };
+        let width = 1 + (width - 1) % (320 - x);
+        for which in 0..10u8 {
             apply(&mut rig.g, &w);
-            let screen = if flag {
-                ScreenId::VgaScreenSeg
-            } else {
-                ScreenId::GameScreen
+            // A wall at x 309 reads past `baseMap` in C (D-UB-DESTRUCT-1).
+            let bad = match which {
+                3 => places_wall_at_309(rig, de::de_generate_walls),
+                8 | 9 => places_wall_at_309(rig, |g| {
+                    de::de_reset_level(g).expect("no exit");
+                }),
+                _ => false,
             };
-            let pixel = if flag { 25 } else { 0 };
-            let width = 1 + (width - 1) % (320 - x);
-            match which {
-                0 => {}
-                3 => prop_assume!(!places_wall_at_309(rig, de::de_generate_walls)),
-                8 | 9 => {
-                    let bad = places_wall_at_309(rig, |g| {
-                        de::de_reset_level(g).expect("no exit");
-                    });
-                    prop_assume!(!bad);
-                }
-                _ => {}
+            if bad {
+                continue;
             }
             same_flow(
                 rig,
@@ -1199,9 +1229,10 @@ fn terrain_matches_c() {
                     }
                     Ok(0)
                 },
-            )
-        },
-    );
+            )?;
+        }
+        Ok(())
+    });
 }
 
 /// An input script tapping `keys` 200 ms apart from 500 ms on.
@@ -1253,11 +1284,12 @@ fn screens_match_c() {
         prop_oneof![Just("RETURN"), Just("ESCAPE")],
         -1i32..7,
     );
-    let config = ProptestConfig::default();
+    // 32 cases: each builds a fresh pair of engines on its own script and runs
+    // one screen to its scripted end (about 250 ms).
     TestRunner::new(ProptestConfig {
-        cases: (config.cases / 8).max(4),
+        cases: 32,
         max_shrink_iters: 8,
-        ..config
+        ..ProptestConfig::default()
     })
     .run(&args, |(w, which, mut keys, last, mode)| {
         keys.push(last);
@@ -1508,6 +1540,294 @@ fn edge_cases_match_c() {
             |g| de::de_make_shot(g, 0, 0, -1),
         )
         .unwrap_or_else(|e| panic!("heli shot, last move {last_move}: {e}"));
+    }
+}
+
+/// A deterministic world with `n` units per player, for the fixed sweeps.
+fn fixed_world(n: usize) -> World {
+    let mut w = arb_world()
+        .new_tree(&mut TestRunner::deterministic())
+        .expect("a world")
+        .current();
+    w.s.config.max_installations = n as u32;
+    w.keys.clear();
+    for p in &mut w.s.destruct_player {
+        p.unit_selected = 0;
+        p.units_remaining = 1;
+        p.shot_delay = 0;
+        p.moves = DestructMovesS::default();
+        p.unit = Some(vec![
+            DestructUnitS {
+                unit_x: 60,
+                unit_y: 190.0,
+                unit_type: UNIT_TANK,
+                shot_type: SHOT_SMALL,
+                power: 3.0,
+                health: 0,
+                ..DestructUnitS::default()
+            };
+            n
+        ]);
+    }
+    w
+}
+
+/// Every branch of `DE_RunTickCheckEndgame` in every mode: the left or the
+/// right team out of units, both (the left branch wins), neither.
+#[test]
+fn endgame_branches_match_c() {
+    let mut rig = setup("ots 1\n");
+    let mut w = fixed_world(2);
+    for mode in 0..6 {
+        for (left, right) in [(0, 3), (3, 0), (0, 0), (2, 2)] {
+            w.s.world.destruct_mode = mode;
+            w.s.destruct_player[0].units_remaining = left;
+            w.s.destruct_player[1].units_remaining = right;
+            apply(&mut rig.g, &w);
+            same(
+                &mut rig,
+                // SAFETY: the stored world.
+                || unsafe { ob::ot_s_destruct_DE_RunTickCheckEndgame() },
+                de::de_run_tick_check_endgame,
+            )
+            .unwrap_or_else(|e| panic!("mode {mode}, units {left}/{right}: {e}"));
+        }
+    }
+}
+
+/// `DE_RunTickAI` over fixed random streams for each kind of selected unit:
+/// helis in the air, on the ground, at both edges, rising and sinking, and
+/// cannons with every aim and power memory, against targets that include a
+/// satellite and a heli right below.
+#[test]
+fn ai_sweep_matches_c() {
+    let mut rig = setup("ots 1\n");
+    let heli = |x: u32, y: f32, air: bool, last_move: i32, y_mov: f32| DestructUnitS {
+        unit_x: x,
+        unit_y: y,
+        unit_y_mov: y_mov,
+        is_y_in_air: air,
+        unit_type: de::UNIT_HELI,
+        shot_type: de::SHOT_MINI,
+        power: 3.0,
+        last_move,
+        health: 40,
+        ..DestructUnitS::default()
+    };
+    let cannon = |t: i32, shot: i32, angle: f32, power: f32| DestructUnitS {
+        unit_x: 150,
+        unit_y: 150.0,
+        unit_type: t,
+        shot_type: shot,
+        angle,
+        power,
+        health: 200,
+        ..DestructUnitS::default()
+    };
+    let selected = [
+        heli(150, 100.0, true, 0, 0.0),
+        heli(305, 150.0, false, 3, 0.0),
+        heli(20, 80.0, true, -3, -0.2),
+        heli(200, 120.0, true, 4, 0.005),
+        cannon(UNIT_TANK, de::SHOT_TRACER, 1.5, 4.5),
+        cannon(UNIT_TANK, SHOT_SMALL, 0.1, 1.5),
+        cannon(de::UNIT_LASER, de::SHOT_MINILASER, 0.5, 6.0),
+    ];
+    for (k, cur) in selected.into_iter().enumerate() {
+        for seed in 0..40u64 {
+            let mut w = fixed_world(4);
+            w.seed = seed;
+            let me = &mut w.s.destruct_player[0];
+            me.is_cpu = true;
+            let flip = |b: bool| if b { 1 } else { -1 };
+            me.ai_memory = DestructAiS {
+                c_angle: flip(seed % 2 == 0) * (1 + (seed % 3 == 0) as i32),
+                c_power: flip(seed % 4 < 2) * (1 + (seed % 5 == 0) as i32),
+                c_fire: (seed % 3) as i32 - 1,
+                c_no_down: (seed % 2) as u32 * 3,
+            };
+            let units = me.unit.as_mut().expect("units");
+            units[0] = cur;
+            // A second, alive heli for "prefer helicopter" on odd seeds.
+            if seed % 2 == 1 {
+                units[2] = heli(90, 90.0, true, 0, 0.0);
+            }
+            let them = &mut w.s.destruct_player[1];
+            them.is_cpu = false;
+            let targets = them.unit.as_mut().expect("units");
+            targets[0] = heli(cur.unit_x.saturating_sub(3).max(1), 140.0, true, 0, 0.0);
+            targets[1] = DestructUnitS {
+                unit_x: cur.unit_x + 4,
+                unit_y: 40.0,
+                unit_type: UNIT_SATELLITE,
+                shot_type: SHOT_INVALID,
+                health: 300,
+                ..DestructUnitS::default()
+            };
+            apply(&mut rig.g, &w);
+            same(
+                &mut rig,
+                // SAFETY: the stored world.
+                || unsafe { ob::ot_s_destruct_DE_RunTickAI() },
+                de::de_run_tick_ai,
+            )
+            .unwrap_or_else(|e| panic!("unit {k}, seed {seed}: {e}"));
+        }
+    }
+}
+
+/// `DE_ProcessInput` for each player and each kind of selected unit (helis
+/// in the air, on the ground and at both edges), with each action alone and
+/// all of them together.
+#[test]
+fn process_input_sweep_matches_c() {
+    let mut rig = setup("ots 1\n");
+    let mut units: Vec<DestructUnitS> = [0, 1, 2, 4, 5, 6, 7]
+        .into_iter()
+        .map(|t| DestructUnitS {
+            unit_x: 150,
+            unit_y: 120.0,
+            is_y_in_air: t == de::UNIT_HELI,
+            unit_type: t,
+            shot_type: de::DEFAULT_WEAPON[t as usize],
+            angle: 0.7,
+            power: 3.0,
+            health: 100,
+            ..DestructUnitS::default()
+        })
+        .collect();
+    for (x, air) in [(6, true), (304, true), (150, false)] {
+        units.push(DestructUnitS {
+            unit_x: x,
+            is_y_in_air: air,
+            ..units[6]
+        });
+    }
+    for p in 0..2 {
+        for (k, cur) in units.iter().enumerate() {
+            for actions in 0..=de::MAX_MOVE {
+                let mut w = fixed_world(2);
+                w.seed = k as u64;
+                let pl = &mut w.s.destruct_player[p];
+                pl.unit.as_mut().expect("units")[0] = *cur;
+                pl.moves.actions = std::array::from_fn(|m| actions == de::MAX_MOVE || m == actions);
+                apply(&mut rig.g, &w);
+                same(
+                    &mut rig,
+                    // SAFETY: the stored world.
+                    || unsafe { ob::ot_s_destruct_DE_ProcessInput() },
+                    de::de_process_input,
+                )
+                .unwrap_or_else(|e| panic!("player {p}, unit {k}, actions {actions}: {e}"));
+            }
+        }
+    }
+}
+
+/// `JE_makeExplosion` for every shot type (and none) with and without a free
+/// slot, and `DE_RunTickExplosions` for dirt and flare explosions at both
+/// edges (wrapping) and both vertical limits, next to a unit that dies.
+#[test]
+fn explosion_sweep_matches_c() {
+    let mut rig = setup("ots 1\n");
+    for free in [true, false] {
+        for shot in -1..17 {
+            let mut w = fixed_world(2);
+            w.s.config.max_explosions = 2;
+            w.s.explo_rec = Some(vec![
+                DestructExploS {
+                    is_available: free,
+                    ..DestructExploS::default()
+                };
+                2
+            ]);
+            apply(&mut rig.g, &w);
+            same(
+                &mut rig,
+                // SAFETY: the stored world.
+                || unsafe { ob::ot_s_destruct_JE_makeExplosion(100, 100, shot) },
+                |g| de::je_make_explosion(g, 100, 100, shot),
+            )
+            .unwrap_or_else(|e| panic!("shot {shot}, free {free}: {e}"));
+        }
+    }
+    for (x, y, dirt) in [
+        (2, 100, true),
+        (318, 100, true),
+        (160, 17, true),
+        (2, 100, false),
+        (318, 100, false),
+        (160, 17, false),
+        (160, 198, false),
+    ] {
+        for seed in 0..4u64 {
+            let mut w = fixed_world(2);
+            w.seed = seed;
+            w.s.config.max_explosions = 1;
+            w.s.explo_rec = Some(vec![DestructExploS {
+                is_available: false,
+                x,
+                y,
+                explowidth: 20,
+                explomax: 21,
+                explofill: 25,
+                explo_type: if dirt { EXPL_DIRT } else { EXPL_NORMAL },
+            }]);
+            let u = &mut w.s.destruct_player[0].unit.as_mut().expect("units")[0];
+            *u = DestructUnitS {
+                unit_x: x.saturating_sub(8),
+                unit_y: (y + 6) as f32,
+                health: 1,
+                ..*u
+            };
+            apply(&mut rig.g, &w);
+            same(
+                &mut rig,
+                // SAFETY: the stored world.
+                || unsafe { ob::ot_s_destruct_DE_RunTickExplosions() },
+                de::de_run_tick_explosions,
+            )
+            .unwrap_or_else(|e| panic!("explosion at ({x}, {y}), dirt {dirt}: {e}"));
+        }
+    }
+}
+
+/// `DE_RunTickShots` against a wall: entering from below and from above
+/// (both vertical bounces), from the side, and a demolishing shot.
+#[test]
+fn shot_walls_match_c() {
+    let mut rig = setup("ots 1\n");
+    for (x, y, xmov, ymov, shot) in [
+        (105.0, 165.5, 0.0, -2.0, SHOT_SMALL),
+        (105.0, 148.5, 0.0, 2.0, SHOT_SMALL),
+        (98.5, 155.0, 3.0, 0.0, SHOT_SMALL),
+        (105.0, 155.0, 0.0, 0.0, de::SHOT_DEMO),
+    ] {
+        let mut w = fixed_world(2);
+        w.s.config.max_walls = 1;
+        w.s.world.map_walls = Some(vec![DestructWallS {
+            wall_exist: true,
+            wall_x: 100,
+            wall_y: 150,
+        }]);
+        w.s.config.max_shots = 1;
+        w.s.shot_rec = Some(vec![DestructShotS {
+            is_available: false,
+            x,
+            y,
+            xmov,
+            ymov,
+            shottype: shot as u32,
+            ..DestructShotS::default()
+        }]);
+        apply(&mut rig.g, &w);
+        same(
+            &mut rig,
+            // SAFETY: the stored world.
+            || unsafe { ob::ot_s_destruct_DE_RunTickShots() },
+            de::de_run_tick_shots,
+        )
+        .unwrap_or_else(|e| panic!("shot at ({x}, {y}): {e}"));
     }
 }
 
