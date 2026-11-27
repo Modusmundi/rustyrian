@@ -3,7 +3,16 @@
 // Copyright (C) rustyrian contributors
 
 //! Port of upstream `fonthand.c` / `fonthand.h`.
+//!
+//! `const char *` text parameters are byte slices read up to the first NUL
+//! (or their end).
 
+use crate::game::Game;
+use crate::sprite::{
+    TINY_FONT, blit_sprite_dark, blit_sprite_hv, blit_sprite_hv_blend, blit_sprite_hv_unsafe,
+    sprite, sprite_exists,
+};
+use crate::video::ScreenId;
 use serde::{Deserialize, Serialize};
 
 pub const PART_SHADE: u32 = 0;
@@ -64,6 +73,288 @@ impl Default for State {
             armor_ship_delay: 0,
             warning_col: 0,
             warning_col_change: 0,
+        }
+    }
+}
+
+/// The bytes of a C string: up to (not including) the first NUL, or all of
+/// `s` if it has none.
+pub fn c_str(s: &[u8]) -> &[u8] {
+    s.iter().position(|&c| c == 0).map_or(s, |n| &s[..n])
+}
+
+/// `fontMap[c]` as C's `int sprite_id`.
+fn sprite_id(c: u8) -> i32 {
+    i32::from(FONT_MAP[usize::from(c)])
+}
+
+/// The width of a font sprite plus one pixel of spacing.
+fn advance(g: &Game, font: u32, sprite_id: i32) -> i32 {
+    i32::from(sprite(g, font, sprite_id as u32).width) + 1
+}
+
+/// Text with a darkened drop shadow, in the default brightness.
+#[doc(alias = "JE_dString")]
+pub fn je_d_string(g: &mut Game, screen: ScreenId, mut x: i32, y: i32, s: &[u8], font: u32) {
+    const DEFAULT_BRIGHTNESS: i32 = -3;
+
+    let mut bright = 0;
+
+    for &c in c_str(s) {
+        let sprite_id = sprite_id(c);
+
+        match c {
+            b' ' => x = x.wrapping_add(6),
+            b'~' => bright = if bright == 0 { 2 } else { 0 },
+            _ => {
+                if sprite_id != -1 {
+                    let id = sprite_id as u32;
+                    blit_sprite_dark(
+                        g,
+                        screen,
+                        x.wrapping_add(2),
+                        y.wrapping_add(2),
+                        font,
+                        id,
+                        false,
+                    );
+                    blit_sprite_hv_unsafe(
+                        g,
+                        screen,
+                        x,
+                        y,
+                        font,
+                        id,
+                        0xf,
+                        (DEFAULT_BRIGHTNESS + bright) as i8,
+                    );
+
+                    x = x.wrapping_add(advance(g, font, sprite_id));
+                }
+            }
+        }
+    }
+}
+
+#[doc(alias = "JE_fontCenter")]
+pub fn je_font_center(g: &Game, s: &[u8], font: u32) -> i32 {
+    160 - (je_text_width(g, s, font) / 2)
+}
+
+#[doc(alias = "JE_textWidth")]
+pub fn je_text_width(g: &Game, s: &[u8], font: u32) -> i32 {
+    let mut x: i32 = 0;
+
+    for &c in c_str(s) {
+        let sprite_id = sprite_id(c);
+
+        if c == b' ' {
+            x = x.wrapping_add(6);
+        } else if sprite_id != -1 {
+            x = x.wrapping_add(advance(g, font, sprite_id));
+        }
+    }
+
+    x
+}
+
+#[doc(alias = "JE_textShade")]
+#[allow(clippy::too_many_arguments)]
+pub fn je_text_shade(
+    g: &mut Game,
+    screen: ScreenId,
+    x: i32,
+    y: i32,
+    s: &[u8],
+    colorbank: u32,
+    brightness: i32,
+    shadetype: u32,
+) {
+    match shadetype {
+        PART_SHADE => {
+            je_out_text(g, screen, x.wrapping_add(1), y.wrapping_add(1), s, 0, -1);
+            je_out_text(g, screen, x, y, s, colorbank, brightness);
+        }
+        FULL_SHADE => {
+            je_out_text(g, screen, x.wrapping_sub(1), y, s, 0, -1);
+            je_out_text(g, screen, x.wrapping_add(1), y, s, 0, -1);
+            je_out_text(g, screen, x, y.wrapping_sub(1), s, 0, -1);
+            je_out_text(g, screen, x, y.wrapping_add(1), s, 0, -1);
+            je_out_text(g, screen, x, y, s, colorbank, brightness);
+        }
+        DARKEN => {
+            je_out_text_and_darken(
+                g,
+                screen,
+                x.wrapping_add(1),
+                y.wrapping_add(1),
+                s,
+                colorbank,
+                brightness as u32,
+                TINY_FONT as u32,
+            );
+        }
+        TRICK => {
+            je_out_text_modify(
+                g,
+                screen,
+                x,
+                y,
+                s,
+                colorbank,
+                brightness as u32,
+                TINY_FONT as u32,
+            );
+        }
+        _ => {}
+    }
+}
+
+#[doc(alias = "JE_outText")]
+pub fn je_out_text(
+    g: &mut Game,
+    screen: ScreenId,
+    mut x: i32,
+    y: i32,
+    s: &[u8],
+    colorbank: u32,
+    brightness: i32,
+) {
+    let tiny = TINY_FONT as u32;
+    let mut bright = 0;
+
+    for &c in c_str(s) {
+        let sprite_id = sprite_id(c);
+
+        match c {
+            b' ' => x = x.wrapping_add(6),
+            b'~' => bright = if bright == 0 { 4 } else { 0 },
+            _ => {
+                if sprite_id != -1 && sprite_exists(g, tiny, sprite_id as u32) {
+                    let id = sprite_id as u32;
+                    if brightness >= 0 {
+                        let value = brightness.wrapping_add(bright) as i8;
+                        blit_sprite_hv_unsafe(g, screen, x, y, tiny, id, colorbank as u8, value);
+                    } else {
+                        blit_sprite_dark(g, screen, x, y, tiny, id, true);
+                    }
+
+                    x = x.wrapping_add(advance(g, tiny, sprite_id));
+                }
+            }
+        }
+    }
+}
+
+#[doc(alias = "JE_outTextModify")]
+#[allow(clippy::too_many_arguments)]
+pub fn je_out_text_modify(
+    g: &mut Game,
+    screen: ScreenId,
+    mut x: i32,
+    y: i32,
+    s: &[u8],
+    filter: u32,
+    brightness: u32,
+    font: u32,
+) {
+    for &c in c_str(s) {
+        let sprite_id = sprite_id(c);
+
+        if c == b' ' {
+            x = x.wrapping_add(6);
+        } else if sprite_id != -1 {
+            let id = sprite_id as u32;
+            blit_sprite_hv_blend(g, screen, x, y, font, id, filter as u8, brightness as i8);
+
+            x = x.wrapping_add(advance(g, font, sprite_id));
+        }
+    }
+}
+
+#[doc(alias = "JE_outTextAdjust")]
+#[allow(clippy::too_many_arguments)]
+pub fn je_out_text_adjust(
+    g: &mut Game,
+    screen: ScreenId,
+    mut x: i32,
+    y: i32,
+    s: &[u8],
+    filter: u32,
+    brightness: i32,
+    font: u32,
+    shadow: bool,
+) {
+    let mut bright = 0;
+
+    for &c in c_str(s) {
+        let sprite_id = sprite_id(c);
+
+        match c {
+            b' ' => x = x.wrapping_add(6),
+            b'~' => bright = if bright == 0 { 4 } else { 0 },
+            _ => {
+                if sprite_id != -1 && sprite_exists(g, TINY_FONT as u32, sprite_id as u32) {
+                    let id = sprite_id as u32;
+                    if shadow {
+                        blit_sprite_dark(
+                            g,
+                            screen,
+                            x.wrapping_add(2),
+                            y.wrapping_add(2),
+                            font,
+                            id,
+                            false,
+                        );
+                    }
+                    let value = brightness.wrapping_add(bright) as i8;
+                    blit_sprite_hv(g, screen, x, y, font, id, filter as u8, value);
+
+                    x = x.wrapping_add(advance(g, font, sprite_id));
+                }
+            }
+        }
+    }
+}
+
+#[doc(alias = "JE_outTextAndDarken")]
+#[allow(clippy::too_many_arguments)]
+pub fn je_out_text_and_darken(
+    g: &mut Game,
+    screen: ScreenId,
+    mut x: i32,
+    y: i32,
+    s: &[u8],
+    colorbank: u32,
+    brightness: u32,
+    font: u32,
+) {
+    let mut bright: u32 = 0;
+
+    for &c in c_str(s) {
+        let sprite_id = sprite_id(c);
+
+        match c {
+            b' ' => x = x.wrapping_add(6),
+            b'~' => bright = if bright == 0 { 4 } else { 0 },
+            _ => {
+                if sprite_id != -1 && sprite_exists(g, TINY_FONT as u32, sprite_id as u32) {
+                    let id = sprite_id as u32;
+                    blit_sprite_dark(
+                        g,
+                        screen,
+                        x.wrapping_add(1),
+                        y.wrapping_add(1),
+                        font,
+                        id,
+                        false,
+                    );
+                    let value = brightness.wrapping_add(bright) as i8;
+                    blit_sprite_hv_unsafe(g, screen, x, y, font, id, colorbank as u8, value);
+
+                    x = x.wrapping_add(advance(g, font, sprite_id));
+                }
+            }
         }
     }
 }
