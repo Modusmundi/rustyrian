@@ -906,3 +906,30 @@ fn mirror_round_trip() {
     assert_eq!(diff::load::<cf::State>(), d.game.config_file);
     let _ = ConfigString::default();
 }
+
+/// A list option inspected before and after removing a value, so the list
+/// branch of `config_get_value_count` runs in every test run, not only when
+/// the random operations happen to build a list.
+#[test]
+fn list_options_match() {
+    let (mut c, mut r) = parse_both(b"");
+    let ops = [
+        Op::AddSection(0, None, false),
+        Op::SetOption(0, 0, Some(1), false),
+        Op::AddValue(0, 0, 2, false),
+        Op::AddValue(0, 0, 3, true),
+        Op::Inspect(0, 0),
+        Op::RemoveValue(0, 0, 0),
+        Op::Inspect(0, 0),
+    ];
+    for op in &ops {
+        let (cv, rv) = apply(op, &mut c, &mut r);
+        assert_eq!(cv, rv, "{op:?}");
+        // SAFETY: a valid config.
+        assert_eq!(unsafe { config_from_c(&c) }, r, "{op:?}");
+    }
+    assert!(cf::config_is_value_list(&r.sections[0].options[0]), "a list option");
+    // SAFETY: as above.
+    unsafe { b::config_deinit(&raw mut c) };
+    cf::config_deinit(&mut r);
+}
