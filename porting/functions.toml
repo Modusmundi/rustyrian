@@ -3660,8 +3660,8 @@ notes = ""
 c = "opentyr.c::setupMenu"
 c_sha = "2403ee7222a6"
 rust = "rustyrian_core::opentyr::setup_menu"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opentyr::setup_menu_graphics_pickers_match", "diff:opentyr::setup_menu_sound_matches", "diff:opentyr::setup_menu_jukebox_matches", "diff:opentyr::setup_menu_mouse_matches", "diff:opentyr::setup_menu_matches"]
 notes = ""
 
 [[fn]]

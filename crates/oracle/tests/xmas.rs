@@ -9,7 +9,7 @@ use rustyrian_oracle::mirror::Mirror;
 mod net_support;
 use net_support::Rig;
 mod menus_support;
-use menus_support::{Act, any_act, output_rect, script};
+use menus_support::{Act, any_act, output_rect, run_capped, script};
 
 #[test]
 fn initial_state_matches_c() {
@@ -57,34 +57,32 @@ fn run_prompt(acts: &[(Act, u32)], shop_loaded: bool) -> bool {
     r.expect("no exit")
 }
 
-proptest! {
-    #![proptest_config(ProptestConfig { cases: 48, ..ProptestConfig::default() })]
-
-    /// `xmas_prompt`: snow animation, keyboard and mouse choice, answering or
-    /// cancelling.
-    #[test]
-    fn xmas_prompt_matches(
-        acts in prop::collection::vec(
-            (
-                any_act(
-                    vec![(140, 126), (180, 126)],
-                    vec![
-                        Act::Key("LEFT"),
-                        Act::Key("RIGHT"),
-                        Act::Key("SPACE"),
-                        Act::Key("RETURN"),
-                        Act::Key("ESCAPE"),
-                        Act::Key("A"),
-                    ],
-                ),
-                20u32..400,
+/// `xmas_prompt`: snow animation, keyboard and mouse choice, answering or
+/// cancelling. Each case runs the whole prompt on both engines (about 0.4 s),
+/// so the case count is capped at 48 whatever `PROPTEST_CASES` says.
+#[test]
+fn xmas_prompt_matches() {
+    let acts = prop::collection::vec(
+        (
+            any_act(
+                vec![(140, 126), (180, 126)],
+                vec![
+                    Act::Key("LEFT"),
+                    Act::Key("RIGHT"),
+                    Act::Key("SPACE"),
+                    Act::Key("RETURN"),
+                    Act::Key("ESCAPE"),
+                    Act::Key("A"),
+                ],
             ),
-            0..8,
+            20u32..400,
         ),
-        shop_loaded: bool,
-    ) {
+        0..8,
+    );
+    run_capped(48, (acts, any::<bool>()), |(acts, shop_loaded)| {
         run_prompt(&acts, shop_loaded);
-    }
+        Ok(())
+    });
 }
 
 /// Both answers by keyboard and by mouse.
