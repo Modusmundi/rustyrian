@@ -125,7 +125,8 @@ fn load_snd_file_failures_match() {
     assert_eq!(diff::load::<State>(), d.game.nortsong);
     assert_eq!(d.c_calls(), log.take());
 
-    // Truncated files: short reads.
+    // Truncated files: short reads (defined in C: zero fill and a logged
+    // read error), identical in both engines.
     let dir = scratch("short");
     let snd = std::fs::read(data_dir().join("tyrian.snd")).unwrap();
     std::fs::write(dir.join("tyrian.snd"), &snd[..snd.len() / 2]).unwrap();
@@ -378,5 +379,111 @@ fn out_of_range_sample_numbers_queue_silence() {
         drop(a);
         let calls: Vec<_> = d.rust_calls().into_iter().map(|c| c.name).collect();
         assert_eq!(calls, ["SDL_LockAudioDevice", "SDL_UnlockAudioDevice"]);
+    }
+}
+
+/// A `.snd` file: the sound count, `positions`, then `payload`.
+fn snd_file(count: u16, positions: &[u32], payload: &[u8]) -> Vec<u8> {
+    let mut v = count.to_le_bytes().to_vec();
+    for p in positions {
+        v.extend_from_slice(&p.to_le_bytes());
+    }
+    v.extend_from_slice(payload);
+    v
+}
+
+/// D-UB-SND-2: crafted sound files (positions past the end, decreasing
+/// positions, huge positions, a short header) load without panicking; a
+/// sound larger than the whole file holds only the bytes after its position.
+#[test]
+fn crafted_sound_files_load_bounded() {
+    const SFX: usize = 29;
+    const VOICES: usize = 9;
+    let header = |n: usize| 2 + 4 * n as u32;
+    let payload: Vec<u8> = (0..50u8).collect();
+    let cases: Vec<(&str, Vec<u8>, Vec<u8>)> = vec![
+        (
+            // Every position past the end of the file.
+            "past-eof",
+            snd_file(SFX as u16, &[0xffff_ff00; SFX], &payload),
+            snd_file(VOICES as u16, &[0xffff_ff00; VOICES], &payload),
+        ),
+        (
+            // Decreasing positions: every sound but the last is empty.
+            "decreasing",
+            snd_file(
+                SFX as u16,
+                &(0..SFX as u32)
+                    .rev()
+                    .map(|k| header(SFX) + k)
+                    .collect::<Vec<_>>(),
+                &payload,
+            ),
+            snd_file(
+                VOICES as u16,
+                &(0..VOICES as u32)
+                    .rev()
+                    .map(|k| header(VOICES) + k)
+                    .collect::<Vec<_>>(),
+                &payload,
+            ),
+        ),
+        (
+            // The first sound starts in the file and "ends" 4 GiB later; the
+            // others start past the end.
+            "huge",
+            snd_file(
+                SFX as u16,
+                &[[header(SFX)].as_slice(), &[0xffff_ff00; SFX - 1]].concat(),
+                &payload,
+            ),
+            snd_file(
+                VOICES as u16,
+                &[[header(VOICES)].as_slice(), &[0xffff_ff00; VOICES - 1]].concat(),
+                &[payload.as_slice(); 4].concat(),
+            ),
+        ),
+        (
+            // A count with no positions after it.
+            "short",
+            vec![SFX as u8, 0],
+            vec![0xff, 0xff, 1, 2, 3],
+        ),
+    ];
+    for (name, sfx, voices) in cases {
+        let dir = scratch(name);
+        std::fs::write(dir.join("tyrian.snd"), &sfx).unwrap();
+        std::fs::write(dir.join("voices.snd"), &voices).unwrap();
+        let mut d = fresh(&dir, 44100);
+        assert_eq!(ns::load_snd_file(&mut d.game, false), Ok(()), "{name}");
+        for (file, offset, n, trim) in [(&sfx, 0, SFX, 0), (&voices, SFX, VOICES, 100)] {
+            let len = file.len() as i64;
+            for i in 0..n {
+                let pos = |k: usize| {
+                    file.get(2 + 4 * k..6 + 4 * k)
+                        .map_or(0, |b| i64::from(u32::from_le_bytes(b.try_into().unwrap())))
+                };
+                let (p, end) = (pos(i), if i + 1 < n { pos(i + 1) } else { len });
+                // Upstream's size, unless it exceeds the whole file: then
+                // the bytes after the position (D-UB-SND-2).
+                let size = (end - p).max(0);
+                let size = if size > len { (len - p).max(0) } else { size };
+                let bound = (size - trim).max(0) as usize * 4; // 11025 Hz to 44100 Hz
+                assert!(
+                    d.game.nortsong.sound_sample_count[offset + i] <= bound,
+                    "{name}: sound {} has {} samples, bound {bound}",
+                    offset + i,
+                    d.game.nortsong.sound_sample_count[offset + i]
+                );
+            }
+        }
+        if name == "huge" {
+            // Bounded by the bytes after the position, not the next position.
+            assert_eq!(d.game.nortsong.sound_sample_count[0], payload.len() * 4);
+            assert_eq!(
+                d.game.nortsong.sound_sample_count[SFX],
+                (4 * payload.len() - 100) * 4
+            );
+        }
     }
 }

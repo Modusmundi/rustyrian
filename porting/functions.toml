@@ -3569,8 +3569,8 @@ c = "nortsong.c::loadSounds"
 c_sha = "399a53481026"
 rust = "rustyrian_core::nortsong::load_sounds"
 status = "verified"
-verify = ["diff:nortsong::load_sounds_matches", "diff:nortsong::load_snd_file_matches_on_real_data", "diff:nortsong::load_snd_file_failures_match"]
-notes = ""
+verify = ["diff:nortsong::load_sounds_matches", "diff:nortsong::load_snd_file_matches_on_real_data", "diff:nortsong::load_snd_file_failures_match", "diff:nortsong::crafted_sound_files_load_bounded"]
+notes = "D-UB-SND-2: sounds larger than the file bounded; buffer reserved fallibly"
 
 [[fn]]
 c = "nortsong.c::loadSndFile"
