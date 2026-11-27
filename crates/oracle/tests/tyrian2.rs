@@ -17,6 +17,8 @@ mod net_support;
 use net_support::{Rig, data_dir, taps};
 mod menus_support;
 use menus_support::{Act, output_rect, script as menu_script};
+mod mainint_support;
+use mainint_support::Rig as ScriptRig;
 
 /// Mid-level fixture frames of `demo-cycle` (run `cargo xtask fixtures`).
 const FRAMES: [u64; 2] = [500, 2000];
@@ -1533,6 +1535,1198 @@ fn title_screen_matches() {
         let started = run_title(&acts, false);
         assert_eq!(started, i != 1, "name {i} {name}");
     }
+}
+
+// ---------------------------------------------------------------------------
+// JE_loadMap
+// ---------------------------------------------------------------------------
+
+/// One episode-script line as `readEncryptedString` reads it: the length,
+/// then the bytes encrypted with the help-text key (the inverse of
+/// `decrypt_string`).
+fn encrypted_line(plain: &[u8]) -> Vec<u8> {
+    const KEY: [u8; 10] = [204, 129, 63, 255, 71, 19, 25, 62, 1, 99];
+    let mut out = vec![plain.len() as u8];
+    let mut prev = 0u8;
+    for (i, &p) in plain.iter().enumerate() {
+        let e = if i == 0 {
+            p ^ KEY[0]
+        } else {
+            p ^ KEY[i % KEY.len()] ^ prev
+        };
+        out.push(e);
+        prev = e;
+    }
+    out
+}
+
+/// An episode script of `lines`.
+fn episode_script(lines: &[String]) -> Vec<u8> {
+    lines
+        .iter()
+        .flat_map(|l| encrypted_line(l.as_bytes()))
+        .collect()
+}
+
+/// A `]L[` line: next section, name, song, level number in the level file,
+/// and the bonus-level marks at columns 27 and 28.
+fn level_line(next: u8, name: &str, song: u8, lvl: u8, normal_bonus: bool, bonus: bool) -> String {
+    let mut s = format!("]L[      {next:03} {name:<9}{song:02} {lvl:02}");
+    s.push(if normal_bonus { '$' } else { ' ' });
+    s.push(if bonus { '$' } else { ' ' });
+    s
+}
+
+/// A data directory with every freeware file plus `files` replacing or
+/// adding some.
+fn crafted_data(name: &str, files: &[(String, Vec<u8>)]) -> std::path::PathBuf {
+    let dir = net_support::tmp(name);
+    for entry in std::fs::read_dir(data_dir()).expect("data dir") {
+        let entry = entry.expect("data entry");
+        let file = entry.file_name();
+        if !files.iter().any(|(n, _)| std::ffi::OsStr::new(n) == file) {
+            std::os::unix::fs::symlink(entry.path(), dir.join(&file)).expect("symlink");
+        }
+    }
+    for (n, bytes) in files {
+        std::fs::write(dir.join(n), bytes).expect("crafted file");
+    }
+    dir
+}
+
+/// Both engines from the 500 fixture on input `script`, with game data from
+/// `data` and episode `ep` initialized.
+fn load_map_rig(script: &str, data: &std::path::Path, ep: u8) -> ScriptRig {
+    let mut rig = ScriptRig::from_fixture(script, 500);
+    let f = &mut rig.g.file;
+    f.custom_data_dir_path = Some(data.as_os_str().as_bytes().to_vec());
+    f.data_dir_path = None;
+    f.data_dir_path_len = 0;
+    rig.g.demo.play_demo = false;
+    rig.g.demo.record_demo = false;
+    rig.store();
+    // SAFETY: plain C call inside the guard.
+    let r = rig.run(
+        || unsafe { b::JE_initEpisode(ep) },
+        |g| episodes::je_init_episode(g, ep),
+    );
+    assert_eq!(r, Ok(()));
+    rig.clear();
+    rig
+}
+
+/// Runs `JE_loadMap` on both engines and compares outcome, calls, state,
+/// saved files and every frame; returns the outcome.
+fn run_load_map(mut rig: ScriptRig) -> Result<(), i32> {
+    rig.store();
+    rig.clear();
+    // SAFETY: plain C call inside the guard; the level data is valid.
+    let r = rig.run(|| unsafe { b::JE_loadMap() }, t2::je_load_map);
+    match r {
+        Ok(()) => rig.check(),
+        Err(_) => {
+            net_support::forget_freed_c();
+            rig.check_halted();
+        }
+    }
+    rig.check_frames();
+    r
+}
+
+/// The number of levels in `tyrian{ep}.lvl`.
+fn level_count(ep: u8) -> u8 {
+    let bytes = std::fs::read(data_dir().join(format!("tyrian{ep}.lvl"))).expect("level file");
+    (u16::from_le_bytes([bytes[0], bytes[1]]) / 2) as u8
+}
+
+/// Every level of `ep` through `JE_loadMap`: a crafted episode script whose
+/// section k starts level k, so each level's events, shapes and maps load
+/// with no menus in between.
+fn load_every_level(ep: u8) {
+    let n = level_count(ep);
+    let mut lines = Vec::new();
+    for k in 1..=n {
+        lines.push("*".to_owned());
+        lines.push(level_line(
+            0,
+            &format!("LEVEL {k}"),
+            k % 30 + 1,
+            k,
+            k % 5 == 1,
+            k % 7 == 2,
+        ));
+    }
+    let data = crafted_data(
+        &format!("levels-{ep}"),
+        &[(format!("levels{ep}.dat"), episode_script(&lines))],
+    );
+    for k in 1..=n {
+        let mut rig = load_map_rig("ots 1\n", &data, ep);
+        rig.g.config.main_level = k;
+        assert_eq!(run_load_map(rig), Ok(()), "episode {ep} level {k}");
+    }
+}
+
+// Each level load presents the 50-step fade and compares every frame (about
+// 0.5 s per level), so each episode is its own test.
+
+#[test]
+fn je_load_map_loads_every_level_of_episode_1() {
+    load_every_level(1);
+}
+
+#[test]
+fn je_load_map_loads_every_level_of_episode_2() {
+    load_every_level(2);
+}
+
+#[test]
+fn je_load_map_loads_every_level_of_episode_3() {
+    load_every_level(3);
+}
+
+#[test]
+fn je_load_map_loads_every_level_of_episode_4() {
+    load_every_level(4);
+}
+
+/// Crafted episode scripts: `sections` for episode `ep`, and for every other
+/// episode one section starting its first level (`JE_nextEpisode` moves on
+/// to one).
+fn crafted_scripts(name: &str, ep: u8, sections: &[Vec<String>]) -> std::path::PathBuf {
+    let files: Vec<(String, Vec<u8>)> = (1..=4u8)
+        .map(|e| {
+            let lines: Vec<String> = if e == ep {
+                sections
+                    .iter()
+                    .flat_map(|s| std::iter::once("*".to_owned()).chain(s.iter().cloned()))
+                    .collect()
+            } else {
+                vec!["*".to_owned(), level_line(0, "NEXT", 3, 1, false, false)]
+            };
+            (format!("levels{e}.dat"), episode_script(&lines))
+        })
+        .collect();
+    crafted_data(name, &files)
+}
+
+/// Runs `JE_loadMap` from section 1 of crafted episode `ep` on input
+/// `script`, after `setup`; returns the outcome.
+fn run_script_case(
+    name: &str,
+    ep: u8,
+    sections: &[Vec<String>],
+    script: &str,
+    setup: impl FnOnce(&mut Game),
+) -> Result<(), i32> {
+    let data = crafted_scripts(name, ep, sections);
+    let mut rig = load_map_rig(script, &data, ep);
+    rig.g.config.main_level = 1;
+    rig.g.config.game_has_repeated = true;
+    setup(&mut rig.g);
+    run_load_map(rig)
+}
+
+fn lines(ls: &[&str]) -> Vec<String> {
+    ls.iter().map(|&l| l.to_owned()).collect()
+}
+
+/// RETURN taps every `gap` ms from 1 s to 120 s.
+fn returns_every(gap: u32) -> String {
+    let mut s = String::from("ots 1\n");
+    let mut t = 1_000;
+    while t < 120_000 {
+        s.push_str(&format!(
+            "@{t} key-down RETURN\n@{} key-up RETURN\n",
+            t + 45
+        ));
+        t += gap;
+    }
+    s
+}
+
+/// Script commands that need no input: next-level choices, data cubes,
+/// modes, saves, music, palettes and pictures, difficulty skips and every
+/// kind of section jump, under the modes each jump tests.
+#[test]
+fn je_load_map_runs_script_commands() {
+    let first = lines(&[
+        "]G[ 01 2 02 005  03 006",
+        "]?[ 06 001 002 023 024 025",
+        "]![ 09",
+        "]+[ 02",
+        "]?[ 02 007 008",
+        "]@[",
+        "]x[",
+        "]s[",
+        "]i 038[",
+        "]M 016[",
+        "]n[",
+        "]S[",
+        "]B[",
+        "]C[",
+        "]F[",
+        "]P 005[",
+        "]P 907[",
+        "]P 000[ Load TSHP2.PCX",
+        "]h[",
+        "]x[",
+        "]H[ 02",
+        "]J[ 02",
+    ]);
+    let second = lines(&["]g[", "]b[", "]e[", "]J[ 03"]);
+    let jumps = lines(&["]w[ 03", "]t[ 04", "]l[ 05", "]2[ 06", "]J[ 07"]);
+    let mut sections = vec![first, jumps];
+    for k in 3..=7u8 {
+        sections.push(vec![level_line(k, &format!("SEC {k}"), k, k, false, false)]);
+    }
+    let setups: [fn(&mut Game); 8] = [
+        |_| {},
+        |g| g.config.initial_difficulty = 4,
+        |g| g.config.two_player_mode = true,
+        |g| g.player.player[0].items.ship = 13,
+        |g| {
+            g.varz.level_timer = true;
+            g.varz.level_timer_countdown = 0;
+        },
+        |g| {
+            g.config.initial_difficulty = 3;
+            g.player.player[0].is_alive = false;
+        },
+        // Netplay skips the fades and syncs the (unused) `]S[` text.
+        |g| g.network.is_network_game = true,
+        |g| {
+            // The fixture is mid-demo: close its demo file first.
+            rustyrian_core::file::file_close(&mut g.demo.demo_file);
+            g.demo.record_demo = true;
+        },
+    ];
+    for (i, setup) in setups.into_iter().enumerate() {
+        assert_eq!(
+            run_script_case(&format!("commands-{i}"), 1, &sections, "ots 1\n", setup),
+            Ok(()),
+            "setup {i}"
+        );
+    }
+    // The galaga, auto-save and engage section on its own.
+    let r = run_script_case(
+        "commands-modes",
+        1,
+        &[
+            second,
+            vec![],
+            vec![level_line(0, "MODES", 4, 2, true, false)],
+        ],
+        "ots 1\n",
+        |_| {},
+    );
+    assert_eq!(r, Ok(()));
+}
+
+/// The pans broken off by ESC: during the first (its input check), then at
+/// the start of each later one (ESC still pressed).
+#[test]
+fn je_load_map_pans_stop_on_escape() {
+    let sections = [lines(&[
+        "]U 008[",
+        "]U 008[",
+        "]V 005[",
+        "]R 009[",
+        "]n[",
+        "]L[      000 PANS     03 02",
+    ])];
+    let mut script = String::from("ots 1\n");
+    for t in (1_000..20_000).step_by(400) {
+        script.push_str(&format!(
+            "@{t} key-down ESCAPE\n@{} key-up ESCAPE\n",
+            t + 45
+        ));
+    }
+    assert_eq!(
+        run_script_case("pans-escape", 1, &sections, &script, |_| {}),
+        Ok(())
+    );
+}
+
+/// Missing or broken data files: the episode script, the level file, its
+/// shape file, a level with too many events, and short shape and level
+/// files. Both engines log the error and exit.
+#[test]
+fn je_load_map_reports_bad_files() {
+    let start = vec![vec![level_line(0, "FILES", 3, 1, false, false)]];
+    let level = std::fs::read(data_dir().join("tyrian1.lvl")).expect("level file");
+    let shapes = std::fs::read(data_dir().join("shapesz.dat")).expect("shape file");
+    /// (name, files replaced, file removed)
+    type Case<'a> = (&'a str, Vec<(String, Vec<u8>)>, Option<&'a str>);
+    let cases: Vec<Case> = vec![
+        ("no-script", vec![], Some("levels1.dat")),
+        ("no-level", vec![], Some("tyrian1.lvl")),
+        ("no-shapes", vec![], Some("shapesz.dat")),
+        (
+            "many-events",
+            vec![(
+                "tyrian1.lvl".to_owned(),
+                crafted_level(|b, at| {
+                    let e = first_event(b, at) - 2;
+                    b[e..e + 2].copy_from_slice(&2500u16.to_le_bytes());
+                }),
+            )],
+            None,
+        ),
+        (
+            "short-shapes",
+            vec![(
+                "shapesz.dat".to_owned(),
+                shapes[..shapes.len() / 2].to_vec(),
+            )],
+            None,
+        ),
+        (
+            "short-level",
+            vec![(
+                "tyrian1.lvl".to_owned(),
+                level[..level_offset(&level, 1) - 100].to_vec(),
+            )],
+            None,
+        ),
+    ];
+    for (name, files, remove) in cases {
+        let mut all: Vec<(String, Vec<u8>)> = (1..=4u8)
+            .map(|e| (format!("levels{e}.dat"), episode_script(&starred(&start))))
+            .collect();
+        all.extend(files);
+        let data = crafted_data(&format!("files-{name}"), &all);
+        if let Some(f) = remove {
+            std::fs::remove_file(data.join(f)).expect("crafted file");
+        }
+        let mut rig = load_map_rig("ots 1\n", &data, 1);
+        rig.g.config.main_level = 1;
+        assert_eq!(run_load_map(rig), Err(1), "{name}");
+    }
+}
+
+/// Episode-script lines for `sections`, each opened by a `*` line.
+fn starred(sections: &[Vec<String>]) -> Vec<String> {
+    sections
+        .iter()
+        .flat_map(|s| std::iter::once("*".to_owned()).chain(s.iter().cloned()))
+        .collect()
+}
+
+/// Text windows (with and without the warning, too many lines), the three
+/// picture pans (cut short by input or run to the end, or skipped by ESC),
+/// the ending animation, and all of it skipped by `constantPlay`.
+#[test]
+fn je_load_map_shows_texts_and_pictures() {
+    let mut text = vec!["]Wy 13[".to_owned()];
+    text.extend((0..11).map(|i| format!("Line {i} of a long warning")));
+    text.push("#".to_owned());
+    text.extend(lines(&["]Wn 02[", "Short text", "#"]));
+    text.extend(lines(&[
+        "]U 008[", "]V 005[", "]R 009[", "]A[", "]n[", "]W 01[", "Shown", "#",
+    ]));
+    text.push(level_line(0, "TEXTS", 5, 3, false, false));
+    let sections = [text];
+    let scripts = [
+        returns_every(1_500),
+        returns_every(9_000),
+        // ESC first (skips the warning texts and pans), then taps for the
+        // animation and the text shown after `]n[` clears ESC.
+        format!(
+            "ots 1\n@600 key-down ESCAPE\n@650 key-up ESCAPE\n{}",
+            returns_every(1_500)
+                .trim_start_matches("ots 1\n")
+                .lines()
+                .skip(40)
+                .map(|l| format!("{l}\n"))
+                .collect::<String>()
+        ),
+    ];
+    for (i, script) in scripts.iter().enumerate() {
+        assert_eq!(
+            run_script_case(&format!("texts-{i}"), 1, &sections, script, |_| {}),
+            Ok(()),
+            "script {i}"
+        );
+    }
+    let r = run_script_case("texts-constant", 1, &sections, "ots 1\n", |g| {
+        g.params.constant_play = true;
+    });
+    assert_eq!(r, Ok(()));
+}
+
+/// The shop: item lists (short and long lines), then the item screen left
+/// for the next level, or quit (back to the title screen).
+#[test]
+fn je_load_map_enters_the_item_screen() {
+    let mut shop = lines(&["]G[ 01 2 02 002  03 003", "]I["]);
+    shop.extend(lines(&[
+        "         1 2 3 4 5",
+        "         1 2 3 4 13",
+        "         9 10 11 12 14",
+        "         1 2",
+        "short",
+        "         1 2 3 4 5 6 7 8 9 10",
+        "         1",
+        "         1 2 3",
+        "         1 2 3 4 5",
+    ]));
+    shop.push(level_line(0, "SHOP", 6, 4, false, false));
+    let sections = [
+        shop,
+        vec![level_line(0, "PLANET A", 8, 5, false, false)],
+        vec![level_line(0, "PLANET B", 9, 6, false, false)],
+    ];
+    let keys = |steps: &[&str]| {
+        let mut s = String::from("ots 1\n");
+        let mut t = 2_000;
+        for k in steps {
+            s.push_str(&format!("@{t} key-down {k}\n@{} key-up {k}\n", t + 45));
+            t += 400;
+        }
+        s.push_str(&format!("@{} quit\n", t + 30_000));
+        s
+    };
+    let next = run_script_case(
+        "shop-next",
+        1,
+        &sections,
+        &keys(&["DOWN", "DOWN", "DOWN", "DOWN", "RETURN", "RETURN"]),
+        |g| g.player.player[0].cash = 100_000,
+    );
+    assert_eq!(next, Ok(()));
+    let quit = run_script_case(
+        "shop-quit",
+        1,
+        &sections,
+        &keys(&["ESCAPE", "RETURN"]),
+        |_| {},
+    );
+    assert_eq!(quit, Ok(()));
+}
+
+/// The end of an episode: score lines for one or two players, a hint chosen
+/// at random, the next episode, and after the last one the super-arcade
+/// screen for each kind of next ship (or SuperTyrian's return to the title).
+#[test]
+fn je_load_map_ends_an_episode() {
+    let mut end = vec!["]Q[".to_owned()];
+    for h in 0..12 {
+        end.push(format!("Hint {h}"));
+        // Every hint is longer than the warning text holds.
+        end.extend((0..9).map(|i| format!("Hint {h} line {i}")));
+        end.push("#".to_owned());
+    }
+    end.push(level_line(0, "AFTER", 7, 5, false, false));
+    let sections = [end];
+    type Setup = fn(&mut Game);
+    let cases: [(u8, Setup); 8] = [
+        (1, |_| {}),
+        (1, |g| g.config.two_player_mode = true),
+        (4, |g| g.config.super_arcade_mode = 0),
+        (4, |g| g.config.super_arcade_mode = 2),
+        (4, |g| g.config.super_arcade_mode = 7),
+        (4, |g| {
+            g.config.super_tyrian = true;
+            g.config.initial_difficulty = rustyrian_core::config::DIFFICULTY_ZINGLON;
+        }),
+        (4, |g| g.config.super_tyrian = true),
+        // Netplay syncs the text after the super-arcade screen.
+        (4, |g| g.network.is_network_game = true),
+    ];
+    for (i, (ep, setup)) in cases.into_iter().enumerate() {
+        let r = run_script_case(
+            &format!("end-{i}"),
+            ep,
+            &sections,
+            &returns_every(700),
+            |g| {
+                g.config.secret_hint = (i % 3 + 1) as u8;
+                g.episodes.episode_avail = [true, true, true, true, false];
+                setup(g);
+            },
+        );
+        assert_eq!(r, Ok(()), "case {i}");
+    }
+}
+
+// Rust-only guard tests: these inputs make upstream read or write outside
+// its arrays, so the oracle cannot run them (D-UB-TYRIAN2-1..3).
+
+/// Runs only the Rust `JE_loadMap` from section 1 of a crafted script for
+/// episode 1, with `level_file` as `tyrian1.lvl`; returns the outcome and the
+/// Rust game.
+fn rust_load_map(
+    name: &str,
+    sections: &[Vec<String>],
+    level_file: Option<Vec<u8>>,
+    script: &str,
+) -> (Result<(), i32>, Box<Game>) {
+    let mut files: Vec<(String, Vec<u8>)> = (1..=4u8)
+        .map(|e| {
+            let lines: Vec<String> = if e == 1 {
+                sections
+                    .iter()
+                    .flat_map(|s| std::iter::once("*".to_owned()).chain(s.iter().cloned()))
+                    .collect()
+            } else {
+                vec!["*".to_owned(), level_line(0, "NEXT", 3, 1, false, false)]
+            };
+            (format!("levels{e}.dat"), episode_script(&lines))
+        })
+        .collect();
+    if let Some(bytes) = level_file {
+        files.push(("tyrian1.lvl".to_owned(), bytes));
+    }
+    let data = crafted_data(name, &files);
+    let mut rig = load_map_rig(script, &data, 1);
+    rig.g.config.main_level = 1;
+    let r = t2::je_load_map(&mut rig.g).map_err(|h| h.code);
+    let ScriptRig { g, .. } = rig;
+    (r, g)
+}
+
+/// The byte offset of level `k` (0-based) in a level file.
+fn level_offset(bytes: &[u8], k: usize) -> usize {
+    u32::from_le_bytes(bytes[2 + 8 * k..6 + 8 * k].try_into().expect("4 bytes")) as usize
+}
+
+/// `tyrian1.lvl` with level 1 changed by `f` (given the level's offset).
+fn crafted_level(f: impl FnOnce(&mut Vec<u8>, usize)) -> Vec<u8> {
+    let mut bytes = std::fs::read(data_dir().join("tyrian1.lvl")).expect("level file");
+    let at = level_offset(&bytes, 0);
+    f(&mut bytes, at);
+    bytes
+}
+
+/// The offset of level 1's first event record, given the level's offset.
+fn first_event(bytes: &[u8], at: usize) -> usize {
+    let enemies = usize::from(u16::from_le_bytes([bytes[at + 8], bytes[at + 9]]));
+    at + 10 + 2 * enemies + 2
+}
+
+/// D-UB-TYRIAN2-1: level files whose enemy count, events or map bytes would
+/// index outside upstream's tables are refused with a fatal error.
+#[test]
+fn je_load_map_refuses_invalid_level_data() {
+    let start = vec![vec![level_line(0, "BAD", 3, 1, false, false)]];
+    let cases: Vec<(&str, Vec<u8>)> = vec![
+        (
+            "Level has an invalid number of enemies.",
+            crafted_level(|b, at| b[at + 8..at + 10].copy_from_slice(&41u16.to_le_bytes())),
+        ),
+        (
+            "Level has an invalid number of enemies.",
+            crafted_level(|b, at| b[at + 8..at + 10].copy_from_slice(&0u16.to_le_bytes())),
+        ),
+        (
+            "Level has an invalid event.",
+            crafted_level(|b, at| b[at + 10..at + 12].copy_from_slice(&900u16.to_le_bytes())),
+        ),
+        (
+            "Level has an invalid event.",
+            crafted_level(|b, at| {
+                let e = first_event(b, at);
+                b[e + 2] = 61; // global flag 0
+                b[e + 3..e + 5].copy_from_slice(&0i16.to_le_bytes());
+            }),
+        ),
+        (
+            "Level has an invalid event.",
+            crafted_level(|b, at| {
+                let e = first_event(b, at);
+                b[e + 2] = 5; // shape bank 40
+                b[e + 3..e + 5].copy_from_slice(&40i16.to_le_bytes());
+            }),
+        ),
+        (
+            "Level has an invalid event.",
+            crafted_level(|b, at| {
+                let e = first_event(b, at);
+                b[e + 2] = 75; // newPL index 20
+                b[e + 7] = 100;
+            }),
+        ),
+        (
+            "Level has an invalid event.",
+            crafted_level(|b, at| {
+                let e = first_event(b, at);
+                b[e + 2] = 54; // a jump past the 65500 sentinel, not a return
+                b[e + 3..e + 5].copy_from_slice(&(-20i16).to_le_bytes());
+            }),
+        ),
+        (
+            "Level map has an invalid shape.",
+            crafted_level(|b, at| {
+                // the last byte of map 3 (each level ends with its maps)
+                let end = level_offset(b, 1);
+                let _ = at;
+                b[end - 1] = 200;
+            }),
+        ),
+    ];
+    for (i, (message, level)) in cases.into_iter().enumerate() {
+        let (r, g) = rust_load_map(&format!("bad-level-{i}"), &start, Some(level), "ots 1\n");
+        assert_eq!(r, Err(1), "case {i}");
+        let _ = (g, message);
+    }
+    // A script naming level 0, or a level the file does not have.
+    for (i, lvl) in [0u8, 40].into_iter().enumerate() {
+        let sections = vec![vec![level_line(0, "NONE", 3, lvl, false, false)]];
+        let (r, _) = rust_load_map(&format!("bad-lvl-{i}"), &sections, None, "ots 1\n");
+        assert_eq!(r, Err(1), "level {lvl}");
+    }
+}
+
+/// D-UB-TYRIAN2-2: script commands with more next-level choices or shop
+/// items than the tables hold are cut to size, and a palette number past
+/// `pcxpal` is ignored.
+#[test]
+fn je_load_map_bounds_script_tables() {
+    let sections = vec![lines(&[
+        "]G[ 01 7 02 002  03 003  04 004  05 005  06 006  07 007  08 008",
+        "]P 950[",
+        "]I[",
+        "         1 2 3 4 5 6 7 8 9 10 11 12",
+        "         1",
+        "         1",
+        "         1",
+        "         1",
+        "         1",
+        "         1",
+        "         1",
+        "         1 2 3 4 5 6 7 8 9 10 11 12 13",
+        "]L[      000 BOUNDS   03 02",
+    ])];
+    let script = "ots 1\n@2000 key-down ESCAPE\n@2045 key-up ESCAPE\n@2400 key-down RETURN\n@2445 key-up RETURN\n";
+    let (r, g) = rust_load_map("bounds", &sections, None, script);
+    assert_eq!(r, Ok(()));
+    assert_eq!(g.varz.map_p_num, 5);
+    assert_eq!(g.varz.map_planet, [2, 3, 4, 5, 6]);
+    assert_eq!(g.tyrian2.item_avail_max[0], 10);
+    assert_eq!(g.tyrian2.item_avail_max[8], 10);
+    assert_eq!(g.tyrian2.item_avail[0], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+}
+
+/// D-UB-TYRIAN2-3: the pan to the right ends one byte short of upstream's
+/// last row, which writes past the screen.
+#[test]
+fn je_load_map_pans_right_within_the_screen() {
+    let sections = vec![lines(&["]R 009[", "]L[      000 PAN      03 02"])];
+    let (r, g) = rust_load_map("pan-right", &sections, None, "ots 1\n");
+    assert_eq!(r, Ok(()));
+    assert_eq!(g.varz.lvl_file_num, 2);
+}
+
+// ---------------------------------------------------------------------------
+// JE_main
+// ---------------------------------------------------------------------------
+
+/// Runs `JE_main` on both engines and compares outcome, calls, state, saved
+/// files and every frame; returns the outcome and the number of frames.
+fn run_main(rig: ScriptRig) -> (Result<(), i32>, usize) {
+    let (r, frames, _) = run_main_at(rig);
+    (r, frames)
+}
+
+/// [`run_main`], also returning the episode section (`mainLevel`) the run
+/// ended in.
+fn run_main_at(mut rig: ScriptRig) -> (Result<(), i32>, usize, u8) {
+    rig.store();
+    rig.clear();
+    // SAFETY: plain C call inside the guard.
+    let r = rig.run(|| unsafe { b::JE_main() }, t2::je_main);
+    let section = rig.g.config.main_level;
+    // Compare the calls first, naming the first difference (the whole lists
+    // are too long to read).
+    let (c, rust) = (rig.c_calls(), rig.rust_calls());
+    if let Some(i) = c.iter().zip(&rust).position(|(a, b)| a != b) {
+        let from = i.saturating_sub(3);
+        panic!(
+            "platform call {i} of {} differs:\nC {:#?}\nRust {:#?}",
+            c.len(),
+            &c[from..(i + 1).min(c.len())],
+            &rust[from..(i + 1).min(rust.len())]
+        );
+    }
+    assert_eq!(c.len(), rust.len(), "platform call counts differ");
+    match r {
+        Ok(()) => rig.check(),
+        Err(_) => {
+            net_support::forget_freed_c();
+            rig.check_halted();
+        }
+    }
+    let frames = rig.check_frames();
+    (r, frames, section)
+}
+
+/// Shipped demo `k` played through `JE_main` from the 500 fixture, with no
+/// input (the demo ends by itself) or cut short by a key at `stop_ms`.
+fn play_demo(k: u8, stop_ms: Option<u32>) -> usize {
+    let script = stop_ms.map_or("ots 1\n".to_owned(), |t| {
+        format!("ots 1\n@{t} key-down SPACE\n@{} key-up SPACE\n", t + 45)
+    });
+    let mut rig = ScriptRig::from_fixture(&script, 500);
+    rig.g.demo.play_demo = true;
+    rig.g.demo.record_demo = false;
+    rig.g.demo.demo_num = k - 1;
+    // The fixture is mid-demo: close its demo file first.
+    rustyrian_core::file::file_close(&mut rig.g.demo.demo_file);
+    let (r, frames) = run_main(rig);
+    assert_eq!(r, Ok(()), "demo {k}");
+    frames
+}
+
+/// A demo cut short by a key (the demo-stopping input).
+#[test]
+fn je_main_stops_a_demo_on_input() {
+    assert!(play_demo(2, Some(4_000)) > 50);
+}
+
+// Each shipped demo plays for about 1,500-3,000 frames, compared frame by
+// frame (about 30 s per demo), so the full runs are ignored by default; the
+// coverage and nightly runs include them.
+
+#[test]
+#[ignore = "long: a whole demo, about 30 s"]
+fn je_main_plays_demo_1() {
+    assert!(play_demo(1, None) > 100);
+}
+
+#[test]
+#[ignore = "long: a whole demo, about 30 s"]
+fn je_main_plays_demo_2() {
+    assert!(play_demo(2, None) > 100);
+}
+
+#[test]
+#[ignore = "long: a whole demo, about 30 s"]
+fn je_main_plays_demo_3() {
+    assert!(play_demo(3, None) > 100);
+}
+
+#[test]
+#[ignore = "long: a whole demo, about 30 s"]
+fn je_main_plays_demo_4() {
+    assert!(play_demo(4, None) > 100);
+}
+
+#[test]
+#[ignore = "long: a whole demo, about 30 s"]
+fn je_main_plays_demo_5() {
+    assert!(play_demo(5, None) > 100);
+}
+
+/// A gameplay script: fire held from 1 s, a movement pattern, a pause and
+/// the in-game menu (each left again), extra `keys`, then a window close at
+/// `end_ms` (both engines exit the same way).
+fn play_script(end_ms: u32, keys: &[(u32, &str)]) -> String {
+    let mut ev: Vec<(u32, String)> = vec![(1_000, "key-down SPACE".to_owned())];
+    let moves = ["LEFT", "UP", "RIGHT", "DOWN", "RIGHT", "UP", "LEFT", "DOWN"];
+    let mut t = 1_500;
+    let mut i = 0;
+    while t + 400 < end_ms {
+        let k = moves[i % moves.len()];
+        ev.push((t, format!("key-down {k}")));
+        ev.push((t + 350, format!("key-up {k}")));
+        t += 700;
+        i += 1;
+    }
+    for &(at, k) in keys {
+        ev.push((at, format!("key-down {k}")));
+        ev.push((at + 45, format!("key-up {k}")));
+    }
+    ev.push((end_ms - 100, "key-up SPACE".to_owned()));
+    ev.push((end_ms, "quit".to_owned()));
+    ev.sort_by_key(|e| e.0);
+    let mut s = String::from("ots 1\n");
+    for (at, e) in ev {
+        s.push_str(&format!("@{at} {e}\n"));
+    }
+    s
+}
+
+/// Plays level `lvl` of episode `ep` through `JE_main` (a crafted script
+/// starting it) on `script`, after `setup`; returns the outcome and frames.
+fn run_main_case(
+    name: &str,
+    ep: u8,
+    lvl: u8,
+    script: &str,
+    setup: impl FnOnce(&mut Game),
+) -> (Result<(), i32>, usize) {
+    let sections = [
+        vec![level_line(2, "PLAY", lvl % 30 + 1, lvl, false, false)],
+        lines(&["]I[", "", "", "", "", "", "", "", "", ""]),
+    ];
+    let data = crafted_scripts(name, ep, &sections);
+    let mut rig = load_map_rig(script, &data, ep);
+    rig.g.config.main_level = 1;
+    rig.g.config.game_has_repeated = true;
+    setup(&mut rig.g);
+    run_main(rig)
+}
+
+/// Level 1 of episode 1 with its first event made a jump (event 38) to
+/// `to`, so play reaches the level's end quickly.
+fn level_jumping_to(to: i16) -> Vec<u8> {
+    crafted_level(|b, at| {
+        let e = first_event(b, at);
+        b[e + 2] = 38;
+        b[e + 3..e + 5].copy_from_slice(&to.to_le_bytes());
+    })
+}
+
+/// Plays level 1 of episode 1 from crafted `level` (section 2 is a shop)
+/// through `JE_main` on `script`, after `setup`.
+fn run_main_on_level(
+    name: &str,
+    level: Vec<u8>,
+    script: &str,
+    setup: impl FnOnce(&mut Game),
+) -> (Result<(), i32>, usize, u8) {
+    run_main_on_level_with(name, &[], level, script, setup)
+}
+
+/// [`run_main_on_level`] with script lines `prefix` before the level starts.
+fn run_main_on_level_with(
+    name: &str,
+    prefix: &[&str],
+    level: Vec<u8>,
+    script: &str,
+    setup: impl FnOnce(&mut Game),
+) -> (Result<(), i32>, usize, u8) {
+    let mut files: Vec<(String, Vec<u8>)> = (1..=4u8)
+        .map(|e| {
+            let lines: Vec<String> = if e == 1 {
+                let mut l = vec!["*".to_owned()];
+                l.extend(prefix.iter().map(|&p| p.to_owned()));
+                l.extend([level_line(2, "PLAY", 2, 1, false, false), "*".to_owned()]);
+                l.extend(lines(&[
+                    "]G[ 01 1 02 001",
+                    "]I[",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                ]));
+                l
+            } else {
+                vec!["*".to_owned(), level_line(0, "NEXT", 3, 1, false, false)]
+            };
+            (format!("levels{e}.dat"), episode_script(&lines))
+        })
+        .collect();
+    files.push(("tyrian1.lvl".to_owned(), level));
+    let data = crafted_data(name, &files);
+    let mut rig = load_map_rig(script, &data, 1);
+    rig.g.config.main_level = 1;
+    rig.g.config.game_has_repeated = true;
+    setup(&mut rig.g);
+    run_main_at(rig)
+}
+
+/// Fire held, then the level's end: the end-of-level screen and on to the
+/// next section's shop, where the window closes (both engines exit there).
+#[test]
+fn je_main_ends_a_level() {
+    let mut s = String::from("ots 1\n@1000 key-down SPACE\n@20000 key-up SPACE\n");
+    let mut t = 22_000;
+    while t < 60_000 {
+        s.push_str(&format!(
+            "@{t} key-down RETURN\n@{} key-up RETURN\n",
+            t + 45
+        ));
+        t += 2_000;
+    }
+    s.push_str("@70000 quit\n");
+    // A started game's difficulty (the demo fixture has none).
+    let (r, frames, section) = run_main_on_level("main-end", level_jumping_to(7_700), &s, |g| {
+        g.config.initial_difficulty = 2;
+        g.config.difficulty_level = 2;
+    });
+    assert_eq!(r, Err(0));
+    assert_eq!(section, 2, "the level ended and the next section began");
+    assert!(frames > 300, "{frames} frames");
+}
+
+/// One player: firing and moving through the start of a level, pausing
+/// (`P`) and opening the in-game menu (ESC), until the window closes.
+#[test]
+fn je_main_plays_one_player() {
+    let script = play_script(
+        16_000,
+        &[
+            (5_000, "P"),
+            (6_000, "P"),
+            (9_000, "ESCAPE"),
+            (10_000, "ESCAPE"),
+            // In-game help, left again (the frame is skipped).
+            (12_000, "F1"),
+            (13_000, "ESCAPE"),
+        ],
+    );
+    let (r, frames) = run_main_case("main-1p", 1, 1, &script, |_| {});
+    assert_eq!(r, Err(0));
+    // Pause and menu time present no frames.
+    assert!(frames > 300, "{frames} frames");
+}
+
+/// Two players and one-player arcade on other levels.
+#[test]
+fn je_main_plays_two_player_and_arcade() {
+    let script = play_script(10_000, &[]);
+    let (r, frames) = run_main_case("main-2p", 1, 2, &script, |g| {
+        g.config.two_player_mode = true;
+    });
+    assert_eq!(r, Err(0));
+    assert!(frames > 300, "{frames} frames");
+    let (r, frames) = run_main_case("main-arcade", 2, 3, &script, |g| {
+        g.config.one_player_action = true;
+        g.config.super_arcade_mode = 3;
+    });
+    assert_eq!(r, Err(0));
+    assert!(frames > 300, "{frames} frames");
+}
+
+/// Level 1 of episode 1 with its first events replaced by `events`
+/// (`(type, eventdat, eventdat2, eventdat3)` at time 0), in order.
+fn level_with_events(events: &[(u8, i16, i16, i8)]) -> Vec<u8> {
+    crafted_level(|b, at| {
+        let first = first_event(b, at);
+        for (k, &(ty, d, d2, d3)) in events.iter().enumerate() {
+            let e = first + 11 * k;
+            b[e..e + 2].copy_from_slice(&0u16.to_le_bytes());
+            b[e + 2] = ty;
+            b[e + 3..e + 5].copy_from_slice(&d.to_le_bytes());
+            b[e + 5..e + 7].copy_from_slice(&d2.to_le_bytes());
+            b[e + 7] = d3 as u8;
+            b[e + 8..e + 11].fill(0);
+        }
+    })
+}
+
+/// The level-loop features levels switch on through events: every smoothie
+/// (with fast and slow processors, and the flipped and headlight views),
+/// the level timer running out, random explosions, a return jump, layer
+/// orders, forced events with the background stopped, the debug overlay
+/// and transparent explosions; under wild and super-wild modes.
+#[test]
+fn je_main_runs_level_features() {
+    type Event = (u8, i16, i16, i8);
+    let all_smoothies: Vec<Event> = vec![
+        (64, 1, 1, 0),
+        (64, 2, 1, 0),
+        (64, 3, 1, 0),
+        (64, 4, 1, 0),
+        (64, 5, 1, 0),
+        (64, 6, 1, 0),
+        (64, 9, 1, 0),
+    ];
+    let rest: Vec<Event> = vec![
+        (67, 1, 400, 4),
+        (68, 1, 0, 0),
+        (43, 0, 0, 0),
+        (42, 0, 0, 0),
+        (73, 1, 0, 0),
+        (29, 0, 0, 0),
+        // A return needs an earlier jump (upstream reads `eventRec[-1]` when
+        // it returns to location 0, D-UB-TYRIAN2-4): jump to 1 first.
+        (76, 0, 0, 0),
+        (54, 1, 0, 0),
+    ];
+    let script = play_script(9_000, &[]);
+    let runs: Vec<(Vec<Event>, u8, bool)> = vec![
+        ([all_smoothies.clone(), rest.clone()].concat(), 4, true),
+        ([all_smoothies.clone(), rest.clone()].concat(), 2, false),
+        // The lava smoothie with its second variant, and one view each.
+        (
+            [vec![(64, 1, 1, 5), (64, 9, 1, 0)], rest.clone()].concat(),
+            3,
+            false,
+        ),
+        (
+            [vec![(64, 6, 1, 0), (64, 2, 1, 3)], rest.clone()].concat(),
+            3,
+            true,
+        ),
+        // The background stopped, events forced on.
+        (vec![(2, 0, 0, 0), (53, 0, 0, 0), (4, 2, 0, 0)], 4, false),
+        // Opaque background 2 under and over the enemies, the sky enemies
+        // drawn last with the background stopped for them, and the map
+        // wrapped back from near its top.
+        // (Positions 13: the drawing reads from 12 rows before.)
+        (
+            vec![(43, 0, 0, 0), (48, 0, 0, 0), (77, 26, 26, 0)],
+            4,
+            false,
+        ),
+        (
+            vec![(43, 2, 0, 0), (48, 0, 0, 0), (73, 1, 0, 0), (4, 2, 0, 0)],
+            4,
+            false,
+        ),
+    ];
+    for (i, (events, processor, super_wild)) in runs.into_iter().enumerate() {
+        let (r, frames, _) = run_main_on_level(
+            &format!("main-features-{i}"),
+            level_with_events(&events),
+            &script,
+            |g| {
+                g.config.processor_type = processor;
+                g.config.wild = true;
+                g.config.super_wild = super_wild;
+                g.config.explosion_transparent = i % 2 == 0;
+                g.varz.debug = true;
+            },
+        );
+        assert_eq!(r, Err(0), "run {i}");
+        assert!(frames > 200, "run {i}: {frames} frames");
+    }
+    // The other background-2 orders, transparent or not.
+    let layers = [(43, 2, 0, 0), (21, 0, 0, 0), (65, 0, 0, 0)];
+    let (r, _, _) = run_main_on_level("main-layers", level_with_events(&layers), &script, |g| {
+        g.config.wild = true;
+    });
+    assert_eq!(r, Err(0));
+    let layers = [
+        (43, 2, 0, 0),
+        (48, 0, 0, 0),
+        (43, 3, 0, 0),
+        (22, 0, 0, 0),
+        (72, 1, 0, 0),
+    ];
+    let (r, _, _) = run_main_on_level("main-layers-3", level_with_events(&layers), &script, |_| {});
+    assert_eq!(r, Err(0));
+}
+
+/// A level that ends at once (backgrounds stopped, ready to end, no
+/// enemies): the end-of-frame checks, the level's end in episode 4 with
+/// fast play, a recorded demo, and galaga mode, on to the next section.
+#[test]
+fn je_main_ends_quiet_levels() {
+    let events = [(4, 1, 0, 0), (36, 0, 0, 0), (67, 1, 0, 5)];
+    let mut s = String::from("ots 1\n");
+    for t in (3_000..40_000).step_by(1_500) {
+        s.push_str(&format!(
+            "@{t} key-down RETURN\n@{} key-up RETURN\n",
+            t + 45
+        ));
+    }
+    s.push_str("@45000 quit\n");
+    type Setup = fn(&mut Game);
+    let setups: [Setup; 3] = [
+        |g| g.config.fast_play = 1,
+        |g| {
+            // The fixture is mid-demo: close its demo file first.
+            rustyrian_core::file::file_close(&mut g.demo.demo_file);
+            g.demo.record_demo = true;
+        },
+        |g| {
+            g.config.galaga_mode = true;
+            g.config.two_player_mode = true;
+        },
+    ];
+    for (i, setup) in setups.into_iter().enumerate() {
+        let (r, _, section) = run_main_on_level(
+            &format!("main-quiet-{i}"),
+            level_with_events(&events),
+            &s,
+            |g| {
+                g.config.initial_difficulty = 1;
+                g.config.difficulty_level = 1;
+                setup(g);
+            },
+        );
+        assert_eq!(r, Err(0), "setup {i}");
+        assert_eq!(section, 2, "setup {i}: the level ended");
+    }
+}
+
+/// A galaga level ending (the second ship leaves at the level's end).
+#[test]
+fn je_main_quits_and_ends_bonus_levels() {
+    let mut s = String::from("ots 1\n");
+    for t in (5_000..30_000).step_by(1_000) {
+        s.push_str(&format!(
+            "@{t} key-down RETURN\n@{} key-up RETURN\n",
+            t + 45
+        ));
+    }
+    s.push_str("@35000 quit\n");
+    let quiet = [(4, 1, 0, 0), (36, 0, 0, 0)];
+    let (r, _, section) = run_main_on_level_with(
+        "main-galaga-end",
+        &["]g["],
+        level_with_events(&quiet),
+        &s,
+        |g| {
+            g.config.initial_difficulty = 2;
+            g.config.difficulty_level = 2;
+        },
+    );
+    assert_eq!(r, Err(0));
+    assert_eq!(section, 2, "the galaga level ended");
+}
+
+/// Galaga mode (the `]g[` bonus game): no shields, the second ship, extra
+/// lives and then cash from a large score.
+#[test]
+fn je_main_plays_galaga() {
+    let sections = [
+        vec!["]g[".to_owned(), level_line(2, "GALAGA", 5, 7, false, true)],
+        lines(&["]I[", "", "", "", "", "", "", "", "", ""]),
+    ];
+    let data = crafted_scripts("main-galaga", 1, &sections);
+    let mut rig = load_map_rig(&play_script(10_000, &[]), &data, 1);
+    rig.g.config.main_level = 1;
+    rig.g.config.two_player_mode = true;
+    rig.g.player.player[0].cash = 1_000_000;
+    let (r, frames) = run_main(rig);
+    assert_eq!(r, Err(0));
+    assert!(frames > 300, "{frames} frames");
+}
+
+/// Episode 4's levels play one difficulty step easier; a level whose random
+/// enemies include the sound-making enemy 2.
+#[test]
+fn je_main_plays_episode_4_and_random_enemy_2() {
+    let script = play_script(6_000, &[]);
+    let (r, _) = run_main_case("main-ep4", 4, 1, &script, |g| {
+        g.config.difficulty_level = 1;
+    });
+    assert_eq!(r, Err(0));
+    let (r, _) = run_main_case("main-enemy2", 1, 17, &script, |_| {});
+    assert_eq!(r, Err(0));
+}
+
+/// No input near the level's boss: the player dies, the game-over text
+/// shows, and a key restarts from the saved backup.
+#[test]
+#[ignore = "long: about 60 s of play until the player dies"]
+fn je_main_game_over() {
+    let mut s = String::from("ots 1\n");
+    let mut t = 60_000;
+    while t < 110_000 {
+        s.push_str(&format!(
+            "@{t} key-down RETURN\n@{} key-up RETURN\n",
+            t + 45
+        ));
+        t += 3_000;
+    }
+    s.push_str("@115000 quit\n");
+    let (r, frames, _) = run_main_on_level("main-death", level_jumping_to(7_300), &s, |g| {
+        g.config.initial_difficulty = 4;
+        g.config.difficulty_level = 4;
+    });
+    assert_eq!(r, Err(0));
+    assert!(frames > 1_000, "{frames} frames");
 }
 
 #[test]
