@@ -730,7 +730,10 @@ fn udp_follows_sdl_net_semantics() {
     // Resolve failure sets INADDR_NONE but still stores the port.
     let mut none = IpAddress::default();
     // `.invalid` never resolves (RFC 6761); "" resolves to the local host on Windows.
-    assert_eq!(p.net_resolve_host(&mut none, Some("no.such.host.invalid"), 4242), -1);
+    assert_eq!(
+        p.net_resolve_host(&mut none, Some("no.such.host.invalid"), 4242),
+        -1
+    );
     assert_eq!((none.host, none.port), (u32::MAX, 4242u16.to_be()));
     assert!(p.net_alloc_packet(-1).is_none());
 }
