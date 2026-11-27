@@ -36,6 +36,8 @@ jobs:
       - name: Rust/C throughput (bench-ratio)
         run: cargo xtask bench-ratio
       - name: Profile both runners (perf)
+        # The gate failing is the case worth profiling.
+        if: ${{ !cancelled() }}
         continue-on-error: true
         run: |
           sudo apt-get install -y "linux-tools-$(uname -r)" linux-tools-common
