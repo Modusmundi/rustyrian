@@ -3345,64 +3345,64 @@ notes = ""
 c = "network.c::packet_copy"
 c_sha = "08b91e1a0391"
 rust = "rustyrian_core::network::packet_copy"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:network::packet_copy_matches"]
 notes = ""
 
 [[fn]]
 c = "network.c::packets_shift_up"
 c_sha = "a4122d925747"
 rust = "rustyrian_core::network::packets_shift_up"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:network::packets_shift_up_matches", "diff:network::network_update_matches"]
 notes = ""
 
 [[fn]]
 c = "network.c::packets_shift_down"
 c_sha = "542803b89a07"
 rust = "rustyrian_core::network::packets_shift_down"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:network::packets_shift_down_matches", "diff:network::network_state_send_matches"]
 notes = ""
 
 [[fn]]
 c = "network.c::network_prepare"
 c_sha = "745c870369a3"
 rust = "rustyrian_core::network::network_prepare"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:network::prepare_and_send_match", "diff:network::network_send_queue_edges_match"]
 notes = ""
 
 [[fn]]
 c = "network.c::network_send_no_ack"
 c_sha = "76a64d5a89bf"
 rust = "rustyrian_core::network::network_send_no_ack"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:network::send_no_ack_and_acknowledge_match", "diff:network::prepare_and_send_match"]
 notes = ""
 
 [[fn]]
 c = "network.c::network_send"
 c_sha = "b8a96cd7480f"
 rust = "rustyrian_core::network::network_send"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:network::prepare_and_send_match", "diff:network::network_send_queue_edges_match", "diff:network::network_send_reaches_loopback_peer"]
 notes = ""
 
 [[fn]]
 c = "network.c::network_acknowledge"
 c_sha = "107b5d71fa18"
 rust = "rustyrian_core::network::network_acknowledge"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:network::send_no_ack_and_acknowledge_match"]
 notes = ""
 
 [[fn]]
 c = "network.c::network_is_alive"
 c_sha = "bd4b40846c58"
 rust = "rustyrian_core::network::network_is_alive"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:network::network_is_alive_matches"]
 notes = ""
 
 [[fn]]
@@ -3411,38 +3411,39 @@ c_sha = "e5e81b3dd246"
 rust = "rustyrian_core::network::network_check"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: network_tyrian_halt (network.c, itself blocked)"
 
 [[fn]]
 c = "network.c::network_update"
 c_sha = "c83323150eb1"
 rust = "rustyrian_core::network::network_update"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:network::network_update_matches"]
 notes = ""
 
 [[fn]]
 c = "network.c::network_is_sync"
 c_sha = "72fa2f4de7f9"
 rust = "rustyrian_core::network::network_is_sync"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:network::network_is_sync_matches", "diff:network::prepare_and_send_match"]
 notes = ""
 
 [[fn]]
 c = "network.c::network_state_prepare"
 c_sha = "9de8de7b6b91"
 rust = "rustyrian_core::network::network_state_prepare"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:network::network_state_prepare_matches"]
 notes = ""
 
 [[fn]]
 c = "network.c::network_state_send"
 c_sha = "63868c728fe7"
 rust = "rustyrian_core::network::network_state_send"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:network::network_state_send_matches"]
+waived_lines = [{ line = 457, reason = "second send failing after the first succeeded in the same call: the fake platform injects one-shot failures per SDL name and the first send consumes it" }, { line = 458, reason = "as line 457" }]
 notes = ""
 
 [[fn]]
@@ -3451,22 +3452,22 @@ c_sha = "7e30aed7855d"
 rust = "rustyrian_core::network::network_state_update"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: network_check (network.c, blocked via network_tyrian_halt)"
 
 [[fn]]
 c = "network.c::network_state_is_reset"
 c_sha = "060edcb8ca65"
 rust = "rustyrian_core::network::network_state_is_reset"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:network::network_state_is_reset_matches"]
 notes = ""
 
 [[fn]]
 c = "network.c::network_state_reset"
 c_sha = "75171f3b5759"
 rust = "rustyrian_core::network::network_state_reset"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:network::network_state_reset_matches"]
 notes = ""
 
 [[fn]]
@@ -3475,7 +3476,7 @@ c_sha = "dd79f3876457"
 rust = "rustyrian_core::network::network_connect"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: keyboard.c::keyboardGetInput, keyboard.c::waitUntilElapsed, nortsong.c::setFrameCount, network_tyrian_halt"
 
 [[fn]]
 c = "network.c::network_tyrian_halt"
@@ -3483,22 +3484,22 @@ c_sha = "ab7eb2b59f4e"
 rust = "rustyrian_core::network::network_tyrian_halt"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: palette.c::fade_black, palette.c::fade_palette, picload.c::JE_loadPic, fonthand.c::JE_dString, fonthand.c::JE_fontCenter, video.c::JE_showVGA, keyboard.c::waitUntilElapsed, keyboard.c::waitUntilGetInput, nortsong.c::setFrameCount, varz.c::JE_tyrianHalt"
 
 [[fn]]
 c = "network.c::network_init"
 c_sha = "8e2cbca187a5"
 rust = "rustyrian_core::network::network_init"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:network::network_init_matches"]
 notes = ""
 
 [[fn]]
 c = "network.c::JE_clearSpecialRequests"
 c_sha = "7043b2797574"
 rust = "rustyrian_core::network::je_clear_special_requests"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:network::je_clear_special_requests_matches"]
 notes = ""
 
 [[fn]]
