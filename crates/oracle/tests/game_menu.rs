@@ -1532,3 +1532,598 @@ fn je_menu_function_matches_every_action() {
         rig.check();
     }
 }
+
+/// A shop script: each step 300 ms after the previous one, from 1 s, then a
+/// window close 20 s later in case the steps leave the shop open (both
+/// engines then exit the same way). Steps: a key name or scancode (a tap),
+/// `hold:KEY:MS`, `alt:KEY`, `click:X:Y`.
+fn shop_script(steps: &[&str], pads: usize) -> String {
+    let mut s = String::from("ots 1\n");
+    for _ in 0..pads {
+        s.push_str("joystick \"Pad\" 2 4 1\n");
+    }
+    let mut t = 1000;
+    for step in steps {
+        let parts: Vec<&str> = step.split(':').collect();
+        match parts.as_slice() {
+            ["hold", key, ms] => {
+                let ms: u32 = ms.parse().expect("hold time");
+                s.push_str(&format!("@{t} key-down {key}\n@{} key-up {key}\n", t + ms));
+                t += ms;
+            }
+            ["alt", key] => s.push_str(&format!(
+                "@{t} key-down LALT\n@{} key-down {key}\n@{} key-up {key}\n@{} key-up LALT\n",
+                t + 10,
+                t + 55,
+                t + 60
+            )),
+            ["click", x, y] => s.push_str(&format!(
+                "@{t} mouse-move {x} {y}\n@{} mouse-down 1\n@{} mouse-up 1\n",
+                t + 10,
+                t + 55
+            )),
+            [key] => s.push_str(&format!("@{t} key-down {key}\n@{} key-up {key}\n", t + 45)),
+            _ => panic!("bad step {step}"),
+        }
+        t += 300;
+    }
+    s.push_str(&format!("@{} quit\n", t + 20_000));
+    s
+}
+
+/// Runs `JE_itemScreen` on both engines from the fixture state changed by
+/// `setup`, driven by `steps`; compares the outcome, state, calls, saved
+/// files and every presented frame.
+fn run_item_screen(label: &str, steps: &[&str], pads: usize, setup: impl FnOnce(&mut Game)) {
+    let mut rig = ScriptRig::from_fixture(&shop_script(steps, pads), 500);
+    if pads > 0 {
+        // SAFETY: plain C call.
+        unsafe { b::init_joysticks() };
+        rustyrian_core::joystick::init_joysticks(&mut rig.g);
+    }
+    rig.g.player.player[0].cash = 2_000_000;
+    // a map to go to (the fixture's demo has none)
+    rig.g.varz.map_origin = 3;
+    rig.g.varz.map_p_num = 3;
+    rig.g.varz.map_planet = [12, 7, 20, 0, 0];
+    rig.g.varz.map_section = [2, 5, 9, 0, 0];
+    // shops with several real items in each category (rows per itemAvailMap)
+    let shops: [(usize, [u8; 5]); 7] = [
+        (0, [1, 2, 3, 4, 5]),     // ships
+        (1, [1, 2, 3, 4, 13]),    // front weapons
+        (2, [9, 10, 11, 12, 14]), // rear weapons
+        (8, [1, 2, 3, 4, 5]),     // shields
+        (3, [1, 2, 3, 4, 5]),     // generators
+        (5, [1, 2, 3, 4, 5]),     // left sidekicks
+        (6, [1, 2, 3, 4, 5]),     // right sidekicks
+    ];
+    for (row, items) in shops {
+        rig.g.tyrian2.item_avail[row][..5].copy_from_slice(&items);
+        rig.g.tyrian2.item_avail_max[row] = 5;
+    }
+    setup(&mut rig.g);
+    rig.store();
+    rig.clear();
+    let r = rig.run(
+        // SAFETY: plain C call; exit is caught by the guard.
+        || unsafe { b::JE_itemScreen() },
+        gm::je_item_screen,
+    );
+    match r {
+        Ok(()) => rig.check(),
+        Err(_) => rig.check_halted(),
+    }
+    let frames = rig.check_frames();
+    assert!(frames > 2, "{label}: {frames} frames");
+}
+
+const NEXT_LEVEL: [&str; 6] = ["DOWN", "DOWN", "DOWN", "DOWN", "RETURN", "RETURN"];
+
+#[test]
+fn je_item_screen_next_level_matches() {
+    run_item_screen("next level", &NEXT_LEVEL, 0, |_| {});
+}
+
+/// Every upgrade category: browse, change power and weapon mode, buy, and
+/// leave a submenu without buying.
+#[test]
+fn je_item_screen_shop_matches() {
+    let mut steps = vec!["DOWN", "DOWN", "RETURN"];
+    for _row in 2..=8 {
+        steps.extend([
+            "RETURN", "DOWN", "DOWN", "UP", "RIGHT", "RIGHT", "LEFT", "SLASH", "SLASH", "RETURN",
+            "RETURN", "DOWN",
+        ]);
+    }
+    steps.extend(["UP", "RETURN", "UP", "UP", "ESCAPE", "ESCAPE"]);
+    steps.extend(["DOWN", "DOWN", "RETURN", "RETURN"]);
+    run_item_screen("shop", &steps, 0, |_| {});
+}
+
+/// Options: volumes, the keyboard menu (change a key, defaults), the
+/// joystick menu with a pad, the load and save menus and quick save/load.
+#[test]
+fn je_item_screen_options_matches() {
+    let steps = [
+        "DOWN", "DOWN", "DOWN", "RETURN", // options
+        "DOWN", "DOWN", "LEFT", "LEFT", "RIGHT", "DOWN", "LEFT", "RIGHT", "RIGHT", //
+        "DOWN", "RETURN", // joystick menu
+        "RIGHT", "LEFT", "DOWN", "LEFT", "RIGHT", "DOWN", "RIGHT", "LEFT", "LEFT", "DOWN", "RIGHT",
+        "UP", "UP", "UP", "DOWN", "DOWN", "DOWN", "DOWN", "ESCAPE", //
+        "DOWN", "RETURN", // keyboard menu
+        "RETURN", "A", "DOWN", "DOWN", "DOWN", "DOWN", "DOWN", "DOWN", "DOWN", "DOWN", "RETURN",
+        "ESCAPE", //
+        "UP", "UP", "UP", "UP", "UP", "RETURN", "ESCAPE", // load menu
+        "DOWN", "RETURN", "UP", "ESCAPE", // save menu
+        "alt:S", "ESCAPE", "alt:L", "DOWN", "ESCAPE", //
+        "ESCAPE", "DOWN", "DOWN", "RETURN", "RETURN",
+    ];
+    run_item_screen("options", &steps, 1, |_| {});
+}
+
+/// The data cube menu and reading a cube (scrolling with held keys and the
+/// mouse).
+#[test]
+fn je_item_screen_data_cubes_matches() {
+    let steps = [
+        "RETURN", // cubes
+        "RETURN", // read the first
+        "hold:78:700",
+        "hold:DOWN:400",
+        "hold:UP:200",
+        "hold:75:300",
+        "77",
+        "74",
+        "click:200:120",
+        "click:200:60",
+        "ESCAPE",
+        "DOWN",
+        "RETURN",
+        "click:270:165",
+        "DOWN",
+        "DOWN",
+        "RETURN",
+        "ESCAPE",
+        "UP",
+        "UP",
+        "RETURN",
+    ];
+    run_item_screen("cubes", &steps, 0, |g| {
+        g.config.cube_max = 2;
+        g.config.cube_list = [1, 4, 0, 0];
+    });
+    run_item_screen("no cubes", &["RETURN", "click:200:60", "ESCAPE"], 0, |g| {
+        g.config.cube_max = 0;
+    });
+}
+
+/// Quitting from the main menu, and help from the shop.
+#[test]
+fn je_item_screen_quit_and_help_match() {
+    run_item_screen("quit", &["ESCAPE", "RETURN"], 0, |_| {});
+    run_item_screen(
+        "help",
+        &["F1", "ESCAPE", "ESCAPE", "RETURN", "ESCAPE"],
+        0,
+        |_| {},
+    );
+}
+
+/// The arcade and Super Tyrian menus, the 2-player input devices and the
+/// super-ship texts.
+#[test]
+fn je_item_screen_arcade_modes_match() {
+    run_item_screen(
+        "two players",
+        &[
+            "DOWN", "LEFT", "RIGHT", "DOWN", "RIGHT", "LEFT", "DOWN", "RETURN", "ESCAPE", "UP",
+            "UP", "UP", "RETURN",
+        ],
+        0,
+        |g| g.config.two_player_mode = true,
+    );
+    run_item_screen(
+        "one player",
+        &["DOWN", "RETURN", "ESCAPE", "UP", "RETURN"],
+        0,
+        |g| {
+            g.config.one_player_action = true;
+            g.config.super_arcade_mode = 2;
+        },
+    );
+    run_item_screen(
+        "super tyrian",
+        &["DOWN", "DOWN", "RETURN", "ESCAPE", "UP", "UP", "RETURN"],
+        0,
+        |g| {
+            g.config.super_tyrian = true;
+        },
+    );
+    run_item_screen(
+        "next level menu",
+        &[
+            "DOWN", "DOWN", "DOWN", "DOWN", "RETURN", "DOWN", "UP", "UP", "RETURN",
+        ],
+        0,
+        |g| {
+            g.config.extra_game = true;
+        },
+    );
+}
+
+/// The menus by mouse: rows, the upgrade power buttons and the volumes.
+#[test]
+fn je_item_screen_mouse_matches() {
+    let row = |r: i32| format!("click:200:{}", 40 + (r - 2) * 16);
+    let r4 = row(4);
+    let r5 = row(5);
+    let r3 = row(3);
+    let steps = [
+        r4.as_str(),
+        r4.as_str(), // upgrade
+        r3.as_str(),
+        r3.as_str(), // front weapon
+        "click:200:93",
+        "click:200:67",
+        "click:125:160",
+        "click:30:160",
+        "click:200:200",
+        "click:200:41",
+        "ESCAPE",
+        "ESCAPE",
+        r5.as_str(),
+        r5.as_str(), // options
+        "click:250:75",
+        "click:280:90",
+        "ESCAPE",
+        "click:200:136",
+        "click:200:136",
+        "click:200:40",
+    ];
+    run_item_screen("mouse", &steps, 0, |_| {});
+}
+
+/// Rust only: shops listing more items than the screen's tables hold, and
+/// selections outside the lists, never panic (`D-UB-GAMEMENU-2`).
+#[test]
+fn je_item_screen_guards() {
+    let mut rig = ScriptRig::from_fixture(
+        &shop_script(
+            &[
+                "DOWN", "DOWN", "RETURN", "RETURN", "UP", "UP", "RETURN", "ESCAPE",
+            ],
+            0,
+        ),
+        500,
+    );
+    for m in rig.g.tyrian2.item_avail_max.iter_mut() {
+        *m = 10;
+    }
+    rig.g.varz.map_origin = 0;
+    rig.g.varz.map_p_num = 2;
+    rig.g.varz.map_planet = [0, 40, 0, 0, 0];
+    let _ = gm::je_item_screen(&mut rig.g);
+}
+
+/// Steps from the main menu to the options menu (and back), and to the
+/// upgrade menu.
+const TO_OPTIONS: [&str; 4] = ["DOWN", "DOWN", "DOWN", "RETURN"];
+const TO_UPGRADES: [&str; 3] = ["DOWN", "DOWN", "RETURN"];
+
+fn steps(parts: &[&[&str]]) -> Vec<&'static str> {
+    parts
+        .iter()
+        .flat_map(|p| {
+            p.iter()
+                .map(|s| -> &'static str { Box::leak(s.to_string().into_boxed_str()) })
+        })
+        .collect()
+}
+
+/// Shops the player can barely afford (the cursor skips to what is
+/// affordable), custom ships in the ship list, and a shop sheet loaded by
+/// the screen itself.
+#[test]
+fn je_item_screen_poor_shop_matches() {
+    let s = steps(&[
+        &TO_UPGRADES,
+        &[
+            "RETURN", "DOWN", "UP", "ESCAPE", "DOWN", "RETURN", "UP", "UP", "ESCAPE", "ESCAPE",
+        ],
+        &NEXT_LEVEL,
+    ]);
+    run_item_screen("poor", &s, 0, |g| {
+        g.player.player[0].cash = 0;
+        g.tyrian2.item_avail[0][..3].copy_from_slice(&[1, 91, 2]);
+        g.tyrian2.item_avail_max[0] = 3;
+        g.editship.extra_ships[0] = 3;
+        g.sprite.shop_sprite_sheet = Default::default();
+    });
+}
+
+/// The 2-player menu: devices out of range, two pads, the 2-player save
+/// slots.
+#[test]
+fn je_item_screen_two_player_details_match() {
+    let s = steps(&[
+        &[
+            "DOWN", "LEFT", "LEFT", "LEFT", "RIGHT", "RIGHT", "RIGHT", "DOWN", "LEFT", "LEFT",
+            "RIGHT", "RIGHT",
+        ],
+        &[
+            "DOWN", "RETURN", "RETURN", "DOWN", "ESCAPE", "ESCAPE", "UP", "UP", "UP", "RETURN",
+        ],
+    ]);
+    run_item_screen("two pads", &s, 2, |g| {
+        g.config.two_player_mode = true;
+        g.config.input_device = [3, 1];
+    });
+    run_item_screen(
+        "device out of range",
+        &["DOWN", "DOWN", "UP", "UP", "RETURN"],
+        0,
+        |g| {
+            g.config.two_player_mode = true;
+            g.config.input_device = [5, 1];
+        },
+    );
+}
+
+/// The joystick menu without a pad, and with one: analog settings down to
+/// their wraps, and the other joystick rows.
+#[test]
+fn je_item_screen_joystick_menu_matches() {
+    let menu = ["DOWN", "DOWN", "DOWN", "DOWN", "RETURN"];
+    let s = steps(&[
+        &TO_OPTIONS,
+        &menu,
+        &["DOWN", "UP", "ESCAPE", "ESCAPE"],
+        &NEXT_LEVEL,
+    ]);
+    run_item_screen("no pad", &s, 0, |_| {});
+    let lefts = ["LEFT"; 12];
+    let rights = ["RIGHT"; 12];
+    let s = steps(&[
+        &TO_OPTIONS,
+        &menu,
+        &["LEFT", "RIGHT", "DOWN", "RIGHT", "DOWN"],
+        &lefts,
+        &rights,
+        &["DOWN"],
+        &lefts,
+        &rights,
+        &[
+            "UP", "UP", "LEFT", "DOWN", "DOWN", "DOWN", "UP", "UP", "UP", "ESCAPE", "ESCAPE",
+        ],
+        &NEXT_LEVEL,
+    ]);
+    run_item_screen("pad", &s, 1, |_| {});
+}
+
+/// Volumes changed with music and samples disabled, by keys and by mouse.
+#[test]
+fn je_item_screen_volumes_match() {
+    let s = steps(&[
+        &TO_OPTIONS,
+        &["DOWN", "DOWN", "LEFT", "RIGHT", "DOWN", "RIGHT", "LEFT"],
+        &[
+            "click:250:75",
+            "click:300:75",
+            "click:230:90",
+            "click:300:92",
+            "click:100:100",
+        ],
+        &["ESCAPE"],
+        &NEXT_LEVEL,
+    ]);
+    for disabled in [true, false] {
+        run_item_screen("volumes", &s, 0, |g| {
+            let mut a = rustyrian_core::loudness::audio(g);
+            a.music_disabled = disabled;
+            a.samples_disabled = disabled;
+        });
+    }
+}
+
+/// Reading cubes: scrolling past the top, short cubes, a pad's directions,
+/// help while reading, and quick save/load from the cube menus.
+#[test]
+fn je_item_screen_cube_details_match() {
+    let mut s = vec!["RETURN", "RETURN"];
+    for ms in [30, 60, 90, 120, 150] {
+        s.extend(steps(&[&[
+            Box::leak(format!("hold:DOWN:{ms}").into_boxed_str()) as &str,
+            "hold:75:200",
+        ]]));
+    }
+    s.extend([
+        "F1",
+        "ESCAPE",
+        "ESCAPE",
+        "RETURN",
+        "ESCAPE",
+        "DOWN",
+        "RETURN",
+        "hold:DOWN:500",
+        "hold:DOWN:500",
+    ]);
+    s.extend([
+        "ESCAPE", "alt:S", "ESCAPE", "RETURN", "RETURN", "alt:L", "ESCAPE",
+    ]);
+    s.extend(NEXT_LEVEL);
+    for list in [[0u16, 5, 0, 0], [9, 2, 0, 0], [13, 11, 0, 0]] {
+        run_item_screen("cube details", &s, 1, |g| {
+            g.config.cube_max = 2;
+            g.config.cube_list = list;
+        });
+    }
+    let pad = steps(&[&["RETURN", "RETURN", "hold:DOWN:500"], &NEXT_LEVEL]);
+    run_item_screen("cube with pad", &pad, 1, |g| {
+        g.config.cube_max = 1;
+        g.config.cube_list = [3, 0, 0, 0];
+    });
+}
+
+/// Help from the next level and cube menus, and help in the weapon
+/// simulator.
+#[test]
+fn je_item_screen_help_in_menus_matches() {
+    let to_next = ["DOWN", "DOWN", "DOWN", "DOWN", "RETURN"];
+    let s = steps(&[
+        &to_next,
+        &[
+            "F1", "ESCAPE", "ESCAPE", "RETURN", "ESCAPE", "ESCAPE", "RETURN",
+        ],
+        &NEXT_LEVEL,
+    ]);
+    run_item_screen("help next level", &s, 0, |_| {});
+    let s = steps(&[
+        &[
+            "RETURN", "F1", "ESCAPE", "ESCAPE", "RETURN", "ESCAPE", "ESCAPE",
+        ],
+        &NEXT_LEVEL,
+    ]);
+    run_item_screen("help cubes", &s, 0, |g| {
+        g.config.cube_max = 1;
+        g.config.cube_list = [2, 0, 0, 0];
+    });
+    let s = steps(&[
+        &TO_UPGRADES,
+        &[
+            "DOWN", "RETURN", "F1", "ESCAPE", "ESCAPE", "RETURN", "ESCAPE", "ESCAPE", "ESCAPE",
+        ],
+        &NEXT_LEVEL,
+    ]);
+    run_item_screen("help weapon sim", &s, 0, |_| {});
+}
+
+/// The mouse in the 2-player, next level and upgrade submenus, including
+/// the power buttons.
+#[test]
+fn je_item_screen_mouse_menus_match() {
+    let row = |r: i32, step: i32| -> &'static str {
+        Box::leak(format!("click:200:{}", 38 + (r - 2) * step + 4).into_boxed_str())
+    };
+    let s = steps(&[&[
+        row(3, 16),
+        row(4, 16),
+        row(5, 16),
+        row(6, 16),
+        "UP",
+        "UP",
+        "UP",
+        "UP",
+        "RETURN",
+    ]]);
+    run_item_screen("mouse 2p", &s, 0, |g| g.config.two_player_mode = true);
+
+    let to_next = ["DOWN", "DOWN", "DOWN", "DOWN", "RETURN"];
+    let s = steps(&[
+        &to_next,
+        &[
+            row(3, 16),
+            row(6, 16),
+            row(7, 16),
+            "click:200:190",
+            "UP",
+            "UP",
+            "UP",
+            "RETURN",
+        ],
+    ]);
+    run_item_screen("mouse next level", &s, 0, |_| {});
+
+    let sub = [
+        "DOWN",
+        "RETURN", // front weapon
+        row(3, 26),
+        row(4, 26),
+        row(4, 26),
+        "click:30:160",
+        "click:30:160",
+        "click:125:160",
+        "click:125:160",
+        "click:125:160",
+        row(2, 26),
+        "RIGHT",
+        "RETURN",
+        "RETURN",
+        "DOWN",
+        "RETURN",
+        row(3, 26),
+        row(5, 26),
+        "click:30:160",
+        "ESCAPE",
+        "ESCAPE",
+    ];
+    let s = steps(&[&TO_UPGRADES, &sub, &NEXT_LEVEL]);
+    run_item_screen("mouse upgrade", &s, 0, |_| {});
+    run_item_screen("mouse upgrade, poor", &s, 0, |g| {
+        g.player.player[0].cash = 1500
+    });
+}
+
+/// A network game: the shop shows the 1-player arcade menu; after "play" it
+/// tells the opponent it is waiting, takes the opponent's waiting packet,
+/// and waits until its own packets are acknowledged.
+#[test]
+fn je_item_screen_network_game_matches() {
+    use net_support::{Rig as NetRig, store_net, taps};
+    use rustyrian_core::network::{NET_PACKET_SIZE, PACKET_WAITING};
+    use rustyrian_core::platform::{IpAddress, UdpPacket};
+    use std::os::unix::ffi::OsStrExt;
+
+    for queued in [true, false] {
+        let mut rig = NetRig::new(&taps(1000, 60_000));
+        rig.g.restore(fixture(500));
+        rig.g.file.custom_data_dir_path =
+            Some(net_support::data_dir().as_os_str().as_bytes().to_vec());
+        rig.g.video_scale.scaler = 0;
+        rig.g.loudness.audio_disabled = true;
+        rig.g.varz.map_origin = 3;
+        rig.g.varz.map_p_num = 3;
+        rig.g.varz.map_planet = [12, 7, 20, 0, 0];
+        rig.g.varz.map_section = [2, 5, 9, 0, 0];
+        rig.store();
+        rig.video();
+        rig.net();
+        let mut s = rig.g.network.clone();
+        s.connected = true;
+        s.is_network_game = true;
+        // acknowledged up to the packet the shop will send
+        s.queue_out_sync = 5;
+        s.last_ack_sync = 5;
+        if queued {
+            let mut data = vec![0; NET_PACKET_SIZE as usize];
+            data[..2].copy_from_slice(&PACKET_WAITING.to_be_bytes());
+            s.packet_in[0] = Some(UdpPacket {
+                channel: 0,
+                data,
+                len: 4,
+                maxlen: NET_PACKET_SIZE,
+                status: 0,
+                address: IpAddress {
+                    host: 0x0100_007f,
+                    port: 0x3605,
+                },
+            });
+        }
+        store_net(&mut rig, s);
+        if !queued {
+            // the opponent's waiting packet arrives while the shop waits
+            let mut p = PACKET_WAITING.to_be_bytes().to_vec();
+            p.extend_from_slice(&0u16.to_be_bytes());
+            rig.push(&p);
+        }
+        rig.clear();
+        let r = rig.run(
+            // SAFETY: plain C call (inside the guard).
+            || unsafe { b::JE_itemScreen() },
+            gm::je_item_screen,
+        );
+        match r {
+            Ok(()) => rig.check(),
+            Err(_) => rig.check_halted(),
+        }
+    }
+}
