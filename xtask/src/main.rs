@@ -2,6 +2,7 @@
 
 mod ast;
 mod check_trace;
+mod coverage;
 mod fetch_data;
 mod gen_oracle;
 mod inventory;
@@ -37,6 +38,10 @@ enum Cmd {
     CheckTrace,
     /// ASan/UBSan oracle on every scenario and the oracle tests.
     Sanitize,
+    /// Snapshot the C oracle at each fixture in `porting/fixtures.toml`.
+    Fixtures,
+    /// Per-function C line coverage into `porting/coverage.json`.
+    Coverage,
     /// Run the C oracle on a scenario and write its trace.
     RefTrace {
         scenario: String,
@@ -58,6 +63,8 @@ fn main() -> Result<()> {
         Cmd::Next { n } => manifest::next(&root, n),
         Cmd::CheckTrace => check_trace::run(&root),
         Cmd::Sanitize => sanitize::run(&root),
+        Cmd::Fixtures => scenario::fixtures(&root),
+        Cmd::Coverage => coverage::run(&root),
         Cmd::RefTrace {
             scenario,
             out,

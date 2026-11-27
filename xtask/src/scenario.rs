@@ -133,6 +133,59 @@ fn copy_tree(from: &Path, to: &Path) -> Result<()> {
     Ok(())
 }
 
+#[derive(Deserialize)]
+struct FixtureList {
+    #[serde(default)]
+    fixture: Vec<Fixture>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Fixture {
+    scenario: String,
+    frame: u64,
+}
+
+/// `cargo xtask fixtures`: the C oracle's mirrored game state at each
+/// `[[fixture]]` of `porting/fixtures.toml`, written to
+/// `target/fixtures/<scenario>@<frame>.postcard` (read by
+/// `rustyrian_oracle::diff::fixture`).
+pub fn fixtures(root: &Path) -> Result<()> {
+    let text = std::fs::read_to_string(root.join("porting/fixtures.toml"))?;
+    let list: FixtureList = toml::from_str(&text)?;
+    if list.fixture.is_empty() {
+        eprintln!("fixtures: porting/fixtures.toml lists no fixtures");
+        return Ok(());
+    }
+    let exe = build_runner(root, "ot-ref-run", false)?;
+    let dir = root.join("target/fixtures");
+    std::fs::create_dir_all(&dir)?;
+    for f in &list.fixture {
+        let mut sc = load(root, &f.scenario)?;
+        sc.frames = Some(f.frame + 1);
+        let out = dir.join(format!("{}@{}.postcard", f.scenario, f.frame));
+        let extra = vec![
+            "--snapshot-at".to_owned(),
+            f.frame.to_string(),
+            "--snapshot-out".to_owned(),
+            out.display().to_string(),
+        ];
+        let work = root
+            .join("target/fixtures/runs")
+            .join(format!("{}@{}", f.scenario, f.frame));
+        run(root, &exe, &f.scenario, &sc, &work, "c", &extra)?;
+        if !out.is_file() {
+            bail!(
+                "{}: the run ended before frame {} (no snapshot written)",
+                f.scenario,
+                f.frame
+            );
+        }
+        eprintln!("fixtures: wrote {}", out.display());
+    }
+    Ok(())
+}
+
 /// `cargo xtask ref-trace <scenario>`: the C oracle's trace for a scenario.
 pub fn ref_trace(root: &Path, name: &str, out: Option<&Path>, release: bool) -> Result<()> {
     let sc = load(root, name)?;

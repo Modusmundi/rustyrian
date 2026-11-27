@@ -1,0 +1,19 @@
+# Mid-game C states for differential tests (plan step 6, "Mid-game state").
+# `cargo xtask fixtures` runs each scenario on the C oracle up to `frame` and
+# writes the mirrored game state to target/fixtures/<scenario>@<frame>.postcard;
+# tests load it with `rustyrian_oracle::diff::fixture(scenario, frame)`.
+
+# Title screen and logos.
+[[fixture]]
+scenario = "demo-cycle"
+frame = 60
+
+# Demo 1 gameplay (level, enemies, shots on screen).
+[[fixture]]
+scenario = "demo-cycle"
+frame = 500
+
+# Demo 1 later in the level.
+[[fixture]]
+scenario = "demo-cycle"
+frame = 2000
