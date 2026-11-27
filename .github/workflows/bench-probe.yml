@@ -1,0 +1,72 @@
+name: bench-probe
+
+# Linux x86-64 measurement of `cargo xtask bench-ratio` (Rust/C headless
+# throughput on demo-cycle) for performance branches, plus a `perf` profile of
+# both release runners so hot spots can be compared on real x86 hardware.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "perf/**"
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  bench-ratio:
+    runs-on: ubuntu-24.04
+    env:
+      CC: clang-18
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+          persist-credentials: false
+      - run: sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list && sudo apt-get update && sudo apt-get install -y libsdl2-dev libclang-18-dev clang-18
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: data
+          key: tyrian21-7790d09a2a3addcd33c66ef063d5900eb81cc9c342f4807eb8356364dd1d9277
+      - run: cargo xtask fetch-data
+      - run: lscpu
+      - name: Rust/C throughput (bench-ratio)
+        run: cargo xtask bench-ratio
+      - name: Profile both runners (perf)
+        continue-on-error: true
+        run: |
+          sudo apt-get install -y "linux-tools-$(uname -r)" linux-tools-common
+          sudo sysctl kernel.perf_event_paranoid=-1
+          sudo sysctl kernel.kptr_restrict=0
+          mkdir -p target/bench-probe
+          for bin in ot-ref-run rs-run; do
+            rm -rf "target/bench-probe/$bin-user"
+            mkdir -p "target/bench-probe/$bin-user"
+            perf stat -e task-clock,cycles,instructions,branches,branch-misses -o "target/bench-probe/$bin.stat" -- \
+              "target/release/$bin" --data data --userdir "target/bench-probe/$bin-user" \
+              --input tests/scenarios/demo-cycle.ots --trace-out "target/bench-probe/$bin.jsonl" \
+              --until-ms 600000 --clock virtual --
+            cat "target/bench-probe/$bin.stat"
+            rm -rf "target/bench-probe/$bin-user"
+            mkdir -p "target/bench-probe/$bin-user"
+            perf record -F 2000 -o "target/bench-probe/$bin.data" -- \
+              "target/release/$bin" --data data --userdir "target/bench-probe/$bin-user" \
+              --input tests/scenarios/demo-cycle.ots --trace-out "target/bench-probe/$bin.jsonl" \
+              --until-ms 600000 --clock virtual --
+            echo "== $bin: top self-time symbols =="
+            perf report -i "target/bench-probe/$bin.data" --stdio --no-children --sort symbol --percent-limit 0.3 \
+              > "target/bench-probe/$bin.report.txt"
+            grep -v '^#' "target/bench-probe/$bin.report.txt" | grep -v '^$' | head -40
+          done
+          cmp <(tail -n +2 target/bench-probe/ot-ref-run.jsonl) <(tail -n +2 target/bench-probe/rs-run.jsonl)
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: bench-probe
+          path: |
+            target/bench-probe/*.stat
+            target/bench-probe/*.report.txt
+          if-no-files-found: warn
