@@ -2766,10 +2766,9 @@ notes = ""
 c = "mainint.c::JE_playCredits"
 c_sha = "38783e0b0976"
 rust = "rustyrian_core::mainint::je_play_credits"
-status = "verified"
+status = "ported"
 verify = ["diff:mainint::play_credits_matches_c", "diff:mainint::play_credits_for_a_minute_matches_c", "diff:mainint::play_credits_missing_file_halts_like_c", "diff:mainint::play_credits_truncated_file_halts_like_c"]
-waived_lines = [{ line = 2499, reason = "end of the 7860-tick roll only; covered by the ignored ~160 s diff:mainint::play_credits_to_the_end_matches_c" }, { line = 2502, reason = "end of the roll only; see diff:mainint::play_credits_to_the_end_matches_c (ignored, slow)" }, { line = 2506, reason = "end of the roll only; see diff:mainint::play_credits_to_the_end_matches_c (ignored, slow)" }, { line = 2507, reason = "end of the roll only; see diff:mainint::play_credits_to_the_end_matches_c (ignored, slow)" }, { line = 2508, reason = "end of the roll only; see diff:mainint::play_credits_to_the_end_matches_c (ignored, slow)" }]
-notes = ""
+notes = "lines 2499, 2502, 2506-2508 (fade_song, closing-song restart) are reached only at the end of the 7860-tick roll, by diff:mainint::play_credits_to_the_end_matches_c, which passes but is #[ignore]d (about 160 s); verified once coverage runs it or it is made cheaper"
 
 [[fn]]
 c = "mainint.c::JE_endLevelAni"
@@ -2825,7 +2824,7 @@ c_sha = "2e5845f8e9e9"
 rust = "rustyrian_core::mainint::je_main_keyboard_input"
 status = "todo"
 verify = []
-notes = "blocked: varz/demo callees being ported in wave 4a (JE_mainKeyboardInput reaches varz.c and demo.c)"
+notes = "blocked: varz.c::JE_drawArmor, JE_drawOptions, JE_drawShield, JE_getShipInfo, JE_portConfigs, JE_wipeShieldArmorBars"
 
 [[fn]]
 c = "mainint.c::JE_pauseGame"
@@ -2841,7 +2840,7 @@ c_sha = "109a2c331abc"
 rust = "rustyrian_core::mainint::je_player_movement"
 status = "todo"
 verify = []
-notes = "blocked: varz/demo callees being ported in wave 4a"
+notes = "blocked: demo.c::playDemoKeys, recordDemoKeys; varz.c::JE_doSpecialShot, JE_drawArmor, JE_drawShield, JE_portConfigs, JE_setupExplosion, JE_setupExplosionLarge, JE_wipeShieldArmorBars"
 
 [[fn]]
 c = "mainint.c::JE_mainGamePlayerFunctions"
@@ -2849,7 +2848,7 @@ c_sha = "46277c11a927"
 rust = "rustyrian_core::mainint::je_main_game_player_functions"
 status = "todo"
 verify = []
-notes = "blocked: varz/demo callees being ported in wave 4a"
+notes = "blocked: mainint.c::JE_playerMovement (todo; blocked on varz.c/demo.c)"
 
 [[fn]]
 c = "mainint.c::JE_getName"
@@ -2865,7 +2864,7 @@ c_sha = "aa7852698c7f"
 rust = "rustyrian_core::mainint::je_player_collide"
 status = "todo"
 verify = []
-notes = "blocked: varz/demo callees being ported in wave 4a"
+notes = "blocked: varz.c::JE_drawArmor, JE_drawOptions, JE_playerDamage, JE_setupExplosion, JE_setupExplosionLarge"
 
 [[fn]]
 c = "memreader.c::memReaderSplit"

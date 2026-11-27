@@ -493,13 +493,15 @@ fn hud_drawing_matches_c() {
 
 use mainint_support::script;
 
-/// A left click at screen (= window, scaler "None") coordinates.
+/// A click at screen (= window, scaler "None") coordinates; button 0 is a
+/// hover (a move only: `SDL_BUTTON(0)` shifts by -1 in C).
 fn click(ms: u32, x: i32, y: i32, button: u8) -> Vec<(u32, String)> {
-    vec![
-        (ms, format!("mouse-move {x} {y}")),
-        (ms + 20, format!("mouse-down {button}")),
-        (ms + 65, format!("mouse-up {button}")),
-    ]
+    let mut v = vec![(ms, format!("mouse-move {x} {y}"))];
+    if button != 0 {
+        v.push((ms + 20, format!("mouse-down {button}")));
+        v.push((ms + 65, format!("mouse-up {button}")));
+    }
+    v
 }
 
 /// Builds a script from key taps and clicks.
