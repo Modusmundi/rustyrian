@@ -18,8 +18,10 @@
 until_ms = 900000
 
 [demo-menu]
-# Select Demo on the title menu (at ~10 s) and watch 60 s of it.
-until_ms = 72000
+# Select Demo on the title menu (at ~10 s) and watch it to 60 s. The release
+# workflow's packaged smoke runs this script with `--until-ms 60000` and
+# compares its trace with tests/golden/demo-menu.jsonl (`--bless` writes it).
+until_ms = 60000
 
 [journey-new-game-shop]
 # New game, episode 1, Normal; buy and sell in each shop category; enter level 1

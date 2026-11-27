@@ -10,6 +10,7 @@ mod fuzz_seed;
 mod gen_oracle;
 mod inventory;
 mod manifest;
+mod package;
 mod parity;
 mod sanitize;
 mod scenario;
@@ -88,6 +89,28 @@ enum Cmd {
         #[arg(long)]
         release: bool,
     },
+    /// Release archive for a target (`universal-apple-darwin` for the macOS
+    /// app), in the layout of upstream's releases.
+    Package {
+        #[arg(long)]
+        target: String,
+        /// Prebuilt executable to package instead of building (twice for
+        /// `universal-apple-darwin`: the aarch64 and x86_64 binaries).
+        #[arg(long = "binary")]
+        binaries: Vec<std::path::PathBuf>,
+        /// Output directory (default `target/package`).
+        #[arg(long)]
+        out: Option<std::path::PathBuf>,
+    },
+    /// Compare a trace with an expected one as `parity` does (the header's
+    /// `engine` is ignored); exit 1 at the first difference.
+    TraceCmp {
+        expected: std::path::PathBuf,
+        actual: std::path::PathBuf,
+    },
+    /// Regenerate `CHANGELOG.md` from the Conventional Commits with git-cliff
+    /// (`cliff.toml`).
+    Changelog,
 }
 
 fn main() -> Result<()> {
@@ -132,6 +155,45 @@ fn main() -> Result<()> {
             rust_runner,
             release,
         } => crossplay::run(&root, runner_path(rust_runner)?.as_deref(), release),
+        Cmd::Package {
+            target,
+            binaries,
+            out,
+        } => package::run(
+            &root,
+            &package::Options {
+                target,
+                binaries: binaries
+                    .into_iter()
+                    .map(std::path::absolute)
+                    .collect::<Result<_, _>>()?,
+                out: out.map(std::path::absolute).transpose()?,
+            },
+        ),
+        Cmd::TraceCmp { expected, actual } => {
+            let (e, a) = (parity::read_trace(&expected)?, parity::read_trace(&actual)?);
+            match parity::first_difference(&e, &a) {
+                Some(d) => {
+                    eprintln!(
+                        "trace-cmp: {} differs from {} at frame {}: {}",
+                        actual.display(),
+                        expected.display(),
+                        d.frame,
+                        d.detail
+                    );
+                    std::process::exit(1);
+                }
+                None => {
+                    println!("trace-cmp: identical ({} lines)", e.len());
+                    Ok(())
+                }
+            }
+        }
+        Cmd::Changelog => tools::run_status(
+            std::process::Command::new("git-cliff")
+                .current_dir(&root)
+                .args(["--config", "cliff.toml", "--output", "CHANGELOG.md"]),
+        ),
     }
 }
 

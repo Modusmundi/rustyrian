@@ -22,6 +22,9 @@ regex = "1"
 rustyrian-core.workspace = true
 postcard.workspace = true
 png.workspace = true
+# `cargo xtask package`: release archives.
+tar = "0.4"
+flate2 = "1"
 
 [lints.rust]
 unsafe_code = "forbid"

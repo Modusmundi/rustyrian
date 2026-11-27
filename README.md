@@ -62,6 +62,25 @@ Until the Rust main loop lands (milestone M4), `parity`, `bench-ratio` and
 `crossplay` take `--rust-runner PATH`; pointing it at `ot-ref-run` checks the
 tooling C against C.
 
+## Releasing
+
+Pushing a tag `v<version>` (the workspace version in `Cargo.toml`) runs
+`.github/workflows/release.yml`: five archives (Linux x86_64 and aarch64,
+a universal macOS app, Windows x86_64 and aarch64), each smoke-tested on its
+own OS, plus `SHA256SUMS`, a CycloneDX SBOM and build-provenance attestations,
+in a draft GitHub release. Locally:
+
+```sh
+cargo xtask package --target x86_64-unknown-linux-gnu        # cargo auditable build + archive in target/package
+cargo xtask package --target universal-apple-darwin \
+  --binary arm64/rustyrian --binary x86_64/rustyrian         # lipo + Rustyrian.app
+cargo xtask trace-cmp tests/golden/demo-menu.jsonl t.jsonl  # packaged-smoke comparison
+cargo xtask changelog                                        # CHANGELOG.md via git-cliff (cliff.toml)
+```
+
+Before publishing, run [`docs/manual-test-checklist.md`](docs/manual-test-checklist.md)
+and record the results in the release issue.
+
 ## Process
 
 See [`porting/RULES.md`](porting/RULES.md) for the porting rules, the
