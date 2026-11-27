@@ -89,6 +89,14 @@ fn redact_arg(arg: &mut Arg, redact: &[(String, String)]) {
     }
 }
 
+/// Stops the run when an output file cannot be written: a truncated trace or
+/// log would otherwise pass for a short run.
+fn output_ok(what: &str, result: std::io::Result<()>) {
+    if let Err(e) = result {
+        panic!("cannot write {what}: {e}");
+    }
+}
+
 impl Recorder {
     fn rec(&mut self, name: &'static str, mut args: Vec<Arg>, mut ret: Arg) {
         if !self.redact.is_empty() {
@@ -96,11 +104,13 @@ impl Recorder {
             redact_arg(&mut ret, &self.redact);
         }
         let call = PlatformCall { name, args, ret };
-        let mut line = serde_json::to_vec(&call).unwrap_or_default();
+        let mut line = serde_json::to_vec(&call).expect(
+            "a PlatformCall holds only strings, integers, bytes and lists, which JSON encodes",
+        );
         line.push(b'\n');
         self.calls.update(&line);
         if let Some(w) = self.log_out.as_mut() {
-            let _ = w.write_all(&line);
+            output_ok("the log", w.write_all(&line));
         }
         if let Some(log) = &self.log {
             log.push(call);
@@ -269,13 +279,13 @@ impl<P: Platform + PlatformProbe> Instrumented<P> {
         };
         if let Some(t) = self.trace.as_mut() {
             let calls = std::mem::replace(&mut self.recorder.calls, Xxh3::new()).digest();
-            let _ = t.end(kind, code, &hex(calls));
+            output_ok("the trace", t.end(kind, code, &hex(calls)));
         }
         if let Some(w) = self.recorder.log_out.as_mut() {
-            let _ = w.flush();
+            output_ok("the log", w.flush());
         }
         if let Some(w) = self.perf.as_mut() {
-            let _ = w.flush();
+            output_ok("the perf log", w.flush());
         }
     }
 
@@ -720,27 +730,28 @@ impl<P: Platform + PlatformProbe> Platform for Instrumented<P> {
             },
         };
         if let Some(t) = self.trace.as_mut() {
-            let _ = t.frame(&line);
+            output_ok("the trace", t.frame(&line));
         }
-        let _ = self.dump_frame(view);
+        output_ok("a frame dump", self.dump_frame(view));
         if let Some((n, path)) = &self.config.snapshot_at
             && *n == self.frame
             && let Some(snap) = view.snapshot
         {
-            let _ = std::fs::write(path, snap());
+            output_ok("the snapshot", std::fs::write(path, snap()));
         }
         let now = Instant::now();
         if let Some(p) = self.perf.as_mut() {
             let render_start = self.render_start.unwrap_or(present_start);
             let sim = render_start.saturating_duration_since(self.frame_start);
             let render = now.saturating_duration_since(render_start);
-            let _ = writeln!(
+            let written = writeln!(
                 p,
                 "{},{},{}",
                 self.frame,
                 sim.as_micros(),
                 render.as_micros()
             );
+            output_ok("the perf log", written);
         }
         self.frame_start = now;
         self.render_start = None;

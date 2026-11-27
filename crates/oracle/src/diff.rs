@@ -123,3 +123,92 @@ pub fn argv(args: &[CString]) -> Vec<*mut c_char> {
     v.push(std::ptr::null_mut());
     v
 }
+
+/// A proptest runner that runs exactly `cases` cases, whatever
+/// `PROPTEST_CASES` says. The `proptest!` macro re-reads that variable and
+/// replaces an explicit `cases`, so tests that run a whole screen, game or
+/// script per case (nightly sets 10 000) use this instead:
+/// `capped_runner(32).run(&strategy, |args| { … Ok(()) })`.
+pub fn capped_runner(cases: u32) -> proptest::test_runner::TestRunner {
+    proptest::test_runner::TestRunner::new(proptest::test_runner::Config {
+        cases,
+        ..proptest::test_runner::Config::default()
+    })
+}
+
+/// The first field where two snapshots differ, as `path: c-value / rust-value`
+/// (values shortened), or `None` when they are equal. Snapshot assertions use
+/// it so a failing comparison names the field instead of printing two whole
+/// games. Equality is `Snapshot`'s own; the JSON walk only locates the field,
+/// skipping what that equality ignores (an open stream's path).
+pub fn first_difference(
+    c: &rustyrian_core::game::Snapshot,
+    rust: &rustyrian_core::game::Snapshot,
+) -> Option<String> {
+    if c == rust {
+        return None;
+    }
+    let cv = serde_json::to_value(c).expect("snapshots serialize to JSON (plain data)");
+    let rv = serde_json::to_value(rust).expect("snapshots serialize to JSON (plain data)");
+    Some(
+        first_value_difference(&cv, &rv, String::new())
+            .unwrap_or_else(|| "a field the JSON form does not show".to_owned()),
+    )
+}
+
+/// Whether a JSON object is a serialized `file::Stream`, whose equality
+/// ignores the path it was opened with.
+fn is_stream(o: &serde_json::Map<String, serde_json::Value>) -> bool {
+    ["path", "mode", "position", "pending", "error", "eof"]
+        .iter()
+        .all(|k| o.contains_key(*k))
+}
+
+fn first_value_difference(
+    c: &serde_json::Value,
+    r: &serde_json::Value,
+    path: String,
+) -> Option<String> {
+    use serde_json::Value;
+    if c == r {
+        return None;
+    }
+    match (c, r) {
+        (Value::Object(a), Value::Object(b)) => {
+            let skip_path = is_stream(a) && is_stream(b);
+            for (k, v) in a {
+                if skip_path && k == "path" {
+                    continue;
+                }
+                let sub = format!("{path}.{k}");
+                match b.get(k) {
+                    Some(w) => {
+                        if let Some(d) = first_value_difference(v, w, sub) {
+                            return Some(d);
+                        }
+                    }
+                    None => return Some(format!("{sub}: only in C")),
+                }
+            }
+            b.keys()
+                .find(|k| !a.contains_key(*k))
+                .map(|k| format!("{path}.{k}: only in Rust"))
+        }
+        (Value::Array(a), Value::Array(b)) if a.len() == b.len() => a
+            .iter()
+            .zip(b)
+            .enumerate()
+            .find_map(|(i, (v, w))| first_value_difference(v, w, format!("{path}[{i}]"))),
+        _ => {
+            let short = |v: &Value| {
+                let s = v.to_string();
+                if s.len() > 120 {
+                    format!("{}…", s.chars().take(120).collect::<String>())
+                } else {
+                    s
+                }
+            };
+            Some(format!("{path}: c {} / rust {}", short(c), short(r)))
+        }
+    }
+}
