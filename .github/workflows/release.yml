@@ -74,15 +74,19 @@ jobs:
 
       # Packaged smoke (plan step 11): the archive, unpacked into a clean
       # directory, plays demo-menu headless and must reproduce the C oracle's
-      # trace (tests/golden/demo-menu.jsonl, header aside).
+      # trace (tests/golden/demo-menu.jsonl, header aside). It runs as the
+      # oracle runner does (`cargo xtask shipped-trace`): the packaged data
+      # passed with `--data=`, the user directory from XDG_CONFIG_HOME/APPDATA
+      # rather than `--userdir`, which skips the base-path lookup the C trace
+      # records (D-PRODUCT-2). The windowed smoke finds the data on its own.
       - name: Smoke, headless, in debian:bookworm-slim without SDL (Linux)
         if: matrix.package && runner.os == 'Linux'
         run: |
           mkdir -p pkgtest smoke
           tar -xzf dist/rustyrian-*.tar.gz -C pkgtest
           docker run --rm -v "$PWD/pkgtest:/pkg:ro" -v "$PWD/tests/scenarios:/scenarios:ro" \
-            -v "$PWD/smoke:/smoke" -w /smoke debian:bookworm-slim \
-            /pkg/rustyrian/rustyrian --headless --userdir /smoke/headless \
+            -v "$PWD/smoke:/smoke" -w /smoke -e XDG_CONFIG_HOME=/smoke/headless debian:bookworm-slim \
+            /pkg/rustyrian/rustyrian --headless --data=/pkg/rustyrian/data \
             --input-script /scenarios/demo-menu.ots --until-ms 60000 --trace-out /smoke/t.jsonl
           cargo xtask trace-cmp tests/golden/demo-menu.jsonl smoke/t.jsonl
       - name: Smoke, windowed under xvfb (Linux)
@@ -106,8 +110,9 @@ jobs:
           Expand-Archive -Path (Get-Item dist/rustyrian-*.zip) -DestinationPath $pkg
           New-Item -ItemType Directory -Force $smoke | Out-Null
           $script = (Resolve-Path tests/scenarios/demo-menu.ots).Path
+          $env:APPDATA = Join-Path $smoke headless
           Push-Location $smoke
-          & (Join-Path $pkg rustyrian/rustyrian.exe) --headless --userdir headless `
+          & (Join-Path $pkg rustyrian/rustyrian.exe) --headless "--data=$(Join-Path $pkg rustyrian/data)" `
             --input-script $script --until-ms 60000 --trace-out t.jsonl
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Pop-Location
@@ -152,7 +157,8 @@ jobs:
           codesign --verify --deep "$pkg/Rustyrian.app"
           lipo -info "$pkg/Rustyrian.app/Contents/MacOS/rustyrian"
           script="$PWD/tests/scenarios/demo-menu.ots"
-          (cd "$smoke" && "$pkg/Rustyrian.app/Contents/MacOS/rustyrian" --headless --userdir headless \
+          (cd "$smoke" && XDG_CONFIG_HOME="$smoke/headless" "$pkg/Rustyrian.app/Contents/MacOS/rustyrian" --headless \
+            --data="$pkg/Rustyrian.app/Contents/Resources/data" \
             --input-script "$script" --until-ms 60000 --trace-out t.jsonl)
           cargo xtask trace-cmp tests/golden/demo-menu.jsonl "$smoke/t.jsonl"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

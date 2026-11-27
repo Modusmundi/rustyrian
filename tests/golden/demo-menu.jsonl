@@ -1,5 +1,5 @@
 {"engine":"c","scenario":"demo-menu","trace":1}
-{"frame":0,"ms":0,"rgb":"2d06800538d394c2","idx":"e102bb49ceeedefb","pal":"de5f15ab6daf7941","audio":"2d06800538d394c2","samples":0,"calls":"acb314cad06edd56"}
+{"frame":0,"ms":0,"rgb":"2d06800538d394c2","idx":"e102bb49ceeedefb","pal":"de5f15ab6daf7941","audio":"2d06800538d394c2","samples":0,"calls":"ca1d94fd95cdad5e"}
 {"frame":1,"ms":0,"rgb":"e994d2b45fe77ecd","idx":"e102bb49ceeedefb","pal":"2db4156f2f3f9ce9","audio":"2d06800538d394c2","samples":0,"calls":"858deec60f7eed1c"}
 {"frame":2,"ms":14,"rgb":"3898e9736f2dc7e2","idx":"e102bb49ceeedefb","pal":"4a5f3f6464ff98a3","audio":"7ee635b1399f93a9","samples":617,"calls":"996c574edc7a429b"}
 {"frame":3,"ms":29,"rgb":"c5d1d5b8ec45b5e6","idx":"e102bb49ceeedefb","pal":"fd892a2fc5e5c92f","audio":"316498a11e45eeb9","samples":661,"calls":"d4b5b10520e7e209"}

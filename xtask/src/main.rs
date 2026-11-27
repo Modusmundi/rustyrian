@@ -14,6 +14,7 @@ mod package;
 mod parity;
 mod sanitize;
 mod scenario;
+mod shipped;
 mod tools;
 
 use anyhow::Result;
@@ -108,6 +109,17 @@ enum Cmd {
         expected: std::path::PathBuf,
         actual: std::path::PathBuf,
     },
+    /// Run the shipped binary (`rustyrian --headless`) on a scenario as the
+    /// runners do; its traces compare with `ref-trace`'s via `trace-cmp`.
+    ShippedTrace {
+        scenario: String,
+        /// The `rustyrian` executable.
+        #[arg(long)]
+        binary: std::path::PathBuf,
+        /// Output directory (default `target/shipped/<scenario>`).
+        #[arg(long)]
+        out: Option<std::path::PathBuf>,
+    },
     /// Regenerate `CHANGELOG.md` from the Conventional Commits with git-cliff
     /// (`cliff.toml`).
     Changelog,
@@ -189,6 +201,16 @@ fn main() -> Result<()> {
                 }
             }
         }
+        Cmd::ShippedTrace {
+            scenario,
+            binary,
+            out,
+        } => shipped::run(
+            &root,
+            &scenario,
+            &std::path::absolute(binary)?,
+            out.map(std::path::absolute).transpose()?.as_deref(),
+        ),
         Cmd::Changelog => tools::run_status(
             std::process::Command::new("git-cliff")
                 .current_dir(&root)

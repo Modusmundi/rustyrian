@@ -23,26 +23,31 @@ const MIN_LOCKSTEP: usize = 500;
 const MIN_DISTINCT: usize = 300;
 
 pub fn run(root: &Path, rust_runner: Option<&Path>, release: bool) -> Result<()> {
-    let sc = scenario::load(root, SCENARIO)?;
-    let peers = sc.peer_runs(root);
-    if peers.len() != 2 {
-        bail!("{SCENARIO} needs two peers");
-    }
     let c_exe = scenario::build_runner(root, "ot-ref-run", release)?;
     let rust_exe: PathBuf = match rust_runner {
         Some(p) => p.to_path_buf(),
         None => scenario::build_runner(root, "rs-run", release)?,
     };
-    let dir = root.join("target/crossplay");
-    if dir.exists() {
-        std::fs::remove_dir_all(&dir)?;
+    play(root, &c_exe, &rust_exe, &root.join("target/crossplay"))
+}
+
+/// Plays the scenario with `c_exe` as player 1 and `rust_exe` as player 2,
+/// writing traces and logs into `dir`, and checks the pass conditions.
+pub fn play(root: &Path, c_exe: &Path, rust_exe: &Path, dir: &Path) -> Result<()> {
+    let sc = scenario::load(root, SCENARIO)?;
+    let peers = sc.peer_runs(root);
+    if peers.len() != 2 {
+        bail!("{SCENARIO} needs two peers");
     }
-    let exes = [&c_exe, &rust_exe];
+    if dir.exists() {
+        std::fs::remove_dir_all(dir)?;
+    }
+    let exes = [c_exe, rust_exe];
     let mut children = Vec::new();
     let mut outs = Vec::new();
     for (i, (spec, exe)) in peers.iter().zip(exes).enumerate() {
         let tag = format!("p{}", i + 1);
-        let userdir = scenario::fresh_userdir(root, SCENARIO, &dir, &tag)?;
+        let userdir = scenario::fresh_userdir(root, SCENARIO, dir, &tag)?;
         let trace = dir.join(format!("{tag}.jsonl"));
         let log = dir.join(format!("{tag}.log.jsonl"));
         let mut cmd = scenario::command(root, exe, spec, &userdir, &trace, Some(&log), &[]);

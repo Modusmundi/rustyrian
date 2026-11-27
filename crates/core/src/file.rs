@@ -96,7 +96,49 @@ impl OpenMode {
 
 /// `errno` of an I/O error (0 if it has none).
 fn errno_of(e: &std::io::Error) -> i32 {
-    e.raw_os_error().unwrap_or(0)
+    let code = e.raw_os_error().unwrap_or(0);
+    // std reports Win32 error codes; upstream's `fopen`/`fread` on Windows
+    // see the C runtime's `errno`, which the CRT derives from them.
+    #[cfg(windows)]
+    let code = if code == 0 { 0 } else { crt_errno(code) };
+    code
+}
+
+/// The C runtime's `errno` for a Win32 error code: the table of the
+/// Microsoft CRT's `_dosmaperr` (`EINVAL` for codes it does not list).
+#[cfg(any(windows, test))]
+fn crt_errno(win32: i32) -> i32 {
+    const ENOENT: i32 = 2;
+    const E2BIG: i32 = 7;
+    const ENOEXEC: i32 = 8;
+    const ECHILD: i32 = 10;
+    const EAGAIN: i32 = 11;
+    const EACCES: i32 = 13;
+    const EEXIST: i32 = 17;
+    const EXDEV: i32 = 18;
+    const EMFILE: i32 = 24;
+    const ENOSPC: i32 = 28;
+    const EPIPE: i32 = 32;
+    const ENOTEMPTY: i32 = 41;
+    match win32 {
+        2 | 3 | 15 | 18 | 53 | 67 | 161 | 206 => ENOENT,
+        4 => EMFILE,
+        5 | 16 | 65 | 82 | 83 | 108 | 132 | 158 | 167 => EACCES,
+        19..=36 => EACCES,
+        6 | 114 | 130 => EBADF,
+        7..=9 | 1816 => ENOMEM,
+        10 => E2BIG,
+        11 => ENOEXEC,
+        188..=202 => ENOEXEC,
+        17 => EXDEV,
+        80 | 183 => EEXIST,
+        89 | 164 | 215 => EAGAIN,
+        109 => EPIPE,
+        112 => ENOSPC,
+        128 | 129 => ECHILD,
+        145 => ENOTEMPTY,
+        _ => EINVAL,
+    }
 }
 
 /// A file path from C string bytes.
@@ -1038,6 +1080,7 @@ pub fn file_close(file: &mut File) {
 }
 
 /// `strerror(errnum)`: the OS message without std's ` (os error N)` suffix.
+#[cfg(not(windows))]
 pub fn strerror(errnum: i32) -> String {
     let s = std::io::Error::from_raw_os_error(errnum).to_string();
     match s.rfind(" (os error ") {
@@ -1046,11 +1089,112 @@ pub fn strerror(errnum: i32) -> String {
     }
 }
 
+/// `strerror(errnum)`: the C runtime's message for an `errno` value (see
+/// [`errno_of`]), not the Win32 one std would give.
+#[cfg(windows)]
+pub fn strerror(errnum: i32) -> String {
+    crt_strerror(errnum).to_owned()
+}
+
+/// The Microsoft CRT's `strerror` table (`_sys_errlist`).
+#[cfg(any(windows, test))]
+fn crt_strerror(errnum: i32) -> &'static str {
+    const MESSAGES: [&str; 43] = [
+        "No error",
+        "Operation not permitted",
+        "No such file or directory",
+        "No such process",
+        "Interrupted function call",
+        "Input/output error",
+        "No such device or address",
+        "Arg list too long",
+        "Exec format error",
+        "Bad file descriptor",
+        "No child processes",
+        "Resource temporarily unavailable",
+        "Not enough space",
+        "Permission denied",
+        "Bad address",
+        "Unknown error",
+        "Resource device",
+        "File exists",
+        "Improper link",
+        "No such device",
+        "Not a directory",
+        "Is a directory",
+        "Invalid argument",
+        "Too many open files in system",
+        "Too many open files",
+        "Inappropriate I/O control operation",
+        "Unknown error",
+        "File too large",
+        "No space left on device",
+        "Invalid seek",
+        "Read-only file system",
+        "Too many links",
+        "Broken pipe",
+        "Domain error",
+        "Result too large",
+        "Unknown error",
+        "Resource deadlock avoided",
+        "Unknown error",
+        "Filename too long",
+        "No locks available",
+        "Function not implemented",
+        "Directory not empty",
+        "Illegal byte sequence",
+    ];
+    usize::try_from(errnum)
+        .ok()
+        .and_then(|i| MESSAGES.get(i))
+        .copied()
+        .unwrap_or("Unknown error")
+}
+
 #[doc(alias = "fileGetError")]
 pub fn file_get_error(file: &File) -> String {
     match file.errnum {
         ERRNUM_EOF => "Unexpected end of file".to_owned(),
         0 if file.error => "Unknown error".to_owned(),
         n => strerror(n),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A missing file reports `ENOENT` and C's message on every OS
+    /// (on Windows through the CRT's mapping of the Win32 error).
+    #[test]
+    fn missing_file_errno_and_message_match_c() {
+        let dir = std::env::temp_dir().join(format!("rr-errno-{}", std::process::id()));
+        let missing = dir.join("absent").join("tyrian.cfg");
+        let file = file_open(missing.to_string_lossy().as_bytes(), "rb");
+        assert!(file.error);
+        assert_eq!(file.errnum, 2);
+        assert_eq!(file_get_error(&file), "No such file or directory");
+    }
+
+    #[test]
+    fn crt_tables_map_the_common_win32_errors() {
+        // ERROR_FILE_NOT_FOUND, ERROR_PATH_NOT_FOUND, ERROR_ACCESS_DENIED,
+        // ERROR_FILE_EXISTS, ERROR_DISK_FULL, ERROR_INVALID_PARAMETER.
+        let got: Vec<_> = [2, 3, 5, 80, 112, 87]
+            .map(|w| crt_strerror(crt_errno(w)))
+            .to_vec();
+        assert_eq!(
+            got,
+            [
+                "No such file or directory",
+                "No such file or directory",
+                "Permission denied",
+                "File exists",
+                "No space left on device",
+                "Invalid argument",
+            ]
+        );
+        assert_eq!(crt_strerror(-1), "Unknown error");
+        assert_eq!(crt_strerror(43), "Unknown error");
     }
 }

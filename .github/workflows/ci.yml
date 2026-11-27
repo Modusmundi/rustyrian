@@ -139,14 +139,77 @@ jobs:
             case "$name" in netplay-*) continue ;; esac
             cargo xtask ref-trace "$name" --release --out "target/ref1/$name"
             cargo xtask ref-trace "$name" --release --out "target/ref2/$name"
-            cmp "target/ref1/$name/c.jsonl" "target/ref2/$name/c.jsonl"
+            for t in "target/ref1/$name"/c.jsonl "target/ref1/$name"/c.[0-9].jsonl; do
+              [ -f "$t" ] || continue
+              cmp "$t" "target/ref2/$name/${t##*/}"
+            done
           done
+      - name: Parity (C oracle vs Rust port, every scenario)
+        run: |
+          for s in tests/scenarios/*.ots; do
+            name=$(basename "$s" .ots)
+            case "$name" in netplay-*) continue ;; esac
+            cargo xtask parity "$name" --release
+          done
+      - name: Parity diagnosis
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: parity-${{ runner.os }}
+          path: |
+            target/parity/*/*.png
+            target/parity/*/*.txt
+          if-no-files-found: ignore
       - name: C traces
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: c-traces-${{ runner.os }}
-          path: target/ref1/*/c.jsonl
+          # Run 1 of each scenario, then its `then` runs (`c.2.jsonl`, ...).
+          path: |
+            target/ref1/*/c.jsonl
+            target/ref1/*/c.[0-9].jsonl
           if-no-files-found: error
+
+  # The shipped binary, headless on Windows, against the Linux C traces: the
+  # Rust port on a third OS and compiler (MSVC CRT, x86-64), audio included.
+  # `xtask shipped-trace` runs it as the oracle runners run their engines.
+  windows-parity:
+    needs: oracle
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: data
+          key: tyrian21-7790d09a2a3addcd33c66ef063d5900eb81cc9c342f4807eb8356364dd1d9277
+      - run: cargo xtask fetch-data
+      - run: cargo build --release -p rustyrian
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: c-traces-Linux
+          path: c-traces
+      - name: Shipped binary traces equal the Linux C traces
+        shell: bash
+        run: |
+          status=0
+          for s in tests/scenarios/*.ots; do
+            name=$(basename "$s" .ots)
+            case "$name" in netplay-*) continue ;; esac
+            if [ ! -f "c-traces/$name/c.jsonl" ]; then
+              echo "no Linux C trace for $name"
+              status=1
+              continue
+            fi
+            cargo xtask shipped-trace "$name" --binary target/release/rustyrian.exe
+            for c in "c-traces/$name"/c.jsonl "c-traces/$name"/c.[0-9].jsonl; do
+              [ -f "$c" ] || continue
+              cargo xtask trace-cmp "$c" "target/shipped/$name/rust${c##*/c}" || status=1
+            done
+          done
+          exit "$status"
 
   oracle-xplat:
     needs: oracle

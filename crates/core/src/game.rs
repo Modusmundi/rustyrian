@@ -185,13 +185,13 @@ game_states!(
 ///
 /// Peer-local and UI state (menus, palette, screens, audio, network
 /// bookkeeping, the libc `rand()` stream) is deliberately left out.
-pub fn sim_digest(g: &Game) -> u64 {
-    let v = &g.varz;
+pub fn sim_digest(s: &States<'_>) -> u64 {
+    let v = s.varz;
     let state = (
-        &g.mtrand.mt_global,
-        &g.player.player,
-        &g.shots.player_shot_data[..],
-        &g.shots.shot_avail[..],
+        &s.mtrand.mt_global,
+        &s.player.player,
+        &s.shots.player_shot_data[..],
+        &s.shots.shot_avail[..],
         &v.enemy[..],
         &v.enemy_avail[..],
         &v.enemy_shot[..],

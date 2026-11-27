@@ -182,7 +182,6 @@ pub fn nn_16(g: &mut Game, src_surface: ScreenId, dst_texture: TextureId) {
 /// `scale2x_32` / `scale2x_16`.
 fn scale2x<const BPP: usize>(g: &mut Game, src_surface: ScreenId, dst_texture: TextureId) {
     let src_pitch = g.video.screen(src_surface).pitch as usize;
-    let dst_bpp = BPP;
     let height = VGA_HEIGHT as usize;
     let width = VGA_WIDTH as usize;
 
@@ -191,22 +190,25 @@ fn scale2x<const BPP: usize>(g: &mut Game, src_surface: ScreenId, dst_texture: T
     // D-UB-SCALER-LOCK: C writes through NULL when the lock fails.
     if let Some((dst, dst_pitch)) = g.platform.lock_texture(dst_texture, None) {
         let dst_pitch = dst_pitch as usize;
-        let p = |i: usize| px::<BPP>(palette[usize::from(src[i])]);
-        let mut s = 0usize;
-        let mut d = 0usize;
+        let p = |v: u8| px::<BPP>(palette[usize::from(v)]);
+        // C walks pointers; the same pixels by row slices (the edge rows and
+        // columns repeat themselves, as C's prevline/nextline and x bounds do).
+        let row = |y: usize| &src[y * src_pitch..y * src_pitch + width];
         for y in 0..height {
-            let src_temp = s;
-            let dst_temp = d;
+            let prev = row(if y > 0 { y - 1 } else { y });
+            let cur = row(y);
+            let next = row(if y < height - 1 { y + 1 } else { y });
+            let (top, bottom) = dst[2 * y * dst_pitch..].split_at_mut(dst_pitch);
+            let out = top[..2 * width * BPP]
+                .chunks_exact_mut(2 * BPP)
+                .zip(bottom[..2 * width * BPP].chunks_exact_mut(2 * BPP));
 
-            let prevline = |s: usize| if y > 0 { s - src_pitch } else { s };
-            let nextline = |s: usize| if y < height - 1 { s + src_pitch } else { s };
-
-            for x in 0..width {
-                let b = p(prevline(s));
-                let dd = p(if x > 0 { s - 1 } else { s });
-                let e = p(s);
-                let f = p(if x < width - 1 { s + 1 } else { s });
-                let h = p(nextline(s));
+            for (x, (top, bottom)) in out.enumerate() {
+                let b = p(prev[x]);
+                let dd = p(cur[if x > 0 { x - 1 } else { x }]);
+                let e = p(cur[x]);
+                let f = p(cur[if x < width - 1 { x + 1 } else { x }]);
+                let h = p(next[x]);
 
                 let (e0, e1, e2, e3);
                 if b != h && dd != f {
@@ -218,17 +220,11 @@ fn scale2x<const BPP: usize>(g: &mut Game, src_surface: ScreenId, dst_texture: T
                     (e0, e1, e2, e3) = (e, e, e, e);
                 }
 
-                put::<BPP>(dst, d, e0);
-                put::<BPP>(dst, d + dst_bpp, e1);
-                put::<BPP>(dst, d + dst_pitch, e2);
-                put::<BPP>(dst, d + dst_pitch + dst_bpp, e3);
-
-                s += 1;
-                d += 2 * dst_bpp;
+                put::<BPP>(top, 0, e0);
+                put::<BPP>(top, BPP, e1);
+                put::<BPP>(bottom, 0, e2);
+                put::<BPP>(bottom, BPP, e3);
             }
-
-            s = src_temp + src_pitch;
-            d = dst_temp + 2 * dst_pitch;
         }
     }
 

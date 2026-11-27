@@ -28,6 +28,14 @@ fn instrumented(o: &Options) -> bool {
         || o.perf_log.is_some()
 }
 
+/// The executable's directory, which `SDL_GetBasePath` reports (with a
+/// trailing separator).
+fn exe_dir() -> Option<String> {
+    std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.display().to_string()))
+}
+
 /// The instrumentation the options ask for.
 fn instrument_config(o: &Options) -> Result<InstrumentConfig, String> {
     let script = match &o.input_script {
@@ -54,6 +62,12 @@ fn instrument_config(o: &Options) -> Result<InstrumentConfig, String> {
         frames: o.frames,
         until_ms: o.until_ms,
         dump_frames: o.dump_frames.clone().map(|d| (d, o.dump_every)),
+        // The base path is recorded as `<base>`, as the oracle runners do,
+        // so traces do not depend on where the binary is installed.
+        redact: exe_dir()
+            .map(|d| (d, "<base>".to_owned()))
+            .into_iter()
+            .collect(),
         ..InstrumentConfig::default()
     })
 }
@@ -77,9 +91,7 @@ fn platform(o: &Options) -> Result<Box<dyn Platform>, String> {
     if o.headless {
         // The executable's directory, as SDL_GetBasePath reports it (portable
         // mode looks for `opentyrian.cfg` there).
-        let base_path = std::env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(|d| format!("{}/", d.display())));
+        let base_path = exe_dir().map(|d| format!("{d}/"));
         let fake = FakePlatform::new(FakeConfig {
             clock: if o.clock_real {
                 Clock::Real

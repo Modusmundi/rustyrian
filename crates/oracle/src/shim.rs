@@ -389,7 +389,9 @@ fn sim_c_game() -> Vec<u8> {
         g.player.load_from_c();
         g.shots.load_from_c();
         g.varz.load_from_c();
-        rustyrian_core::game::sim_digest(g).to_le_bytes().to_vec()
+        rustyrian_core::game::sim_digest(&g.split().1)
+            .to_le_bytes()
+            .to_vec()
     })
 }
 

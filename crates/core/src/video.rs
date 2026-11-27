@@ -591,10 +591,11 @@ fn present_frame(g: &mut Game, r: RendererId) {
     let (platform, states) = g.split();
     let snapshot =
         || postcard::to_stdvec(&states.snapshot()).expect("a snapshot always serialises");
+    let sim = || crate::game::sim_digest(&states).to_le_bytes().to_vec();
     let view = FrameView {
         screen: &states.video.vga().pixels,
         palette: &states.palette.rgb_palette,
-        sim: None,
+        sim: Some(&sim),
         snapshot: Some(&snapshot),
     };
     platform.render_present(r, &view);

@@ -1,5 +1,5 @@
 //! Smoke tests for the oracle itself: `exit()` capture through `guard_call`,
-//! and `ot-ref-run` trace determinism.
+//! `ot-ref-run` trace determinism, and the runners' `--sim-digest`.
 
 use rustyrian_harness::trace::Arg;
 use rustyrian_oracle::{bindings, guard_call, session};
@@ -49,22 +49,78 @@ fn root() -> PathBuf {
 }
 
 fn run_ref(dir: &Path) -> String {
+    run(
+        env!("CARGO_BIN_EXE_ot-ref-run"),
+        dir,
+        "demo-cycle",
+        &["--frames", "60"],
+    )
+}
+
+/// Runs a runner binary on `tests/scenarios/<scenario>.ots` and returns its
+/// trace.
+fn run(exe: &str, dir: &Path, scenario: &str, extra: &[&str]) -> String {
     let root = root();
     let trace = dir.join("trace.jsonl");
-    let status = Command::new(env!("CARGO_BIN_EXE_ot-ref-run"))
+    let status = Command::new(exe)
         .arg("--data")
         .arg(root.join("data"))
         .arg("--userdir")
         .arg(dir.join("user"))
         .arg("--input")
-        .arg(root.join("tests/scenarios/demo-cycle.ots"))
+        .arg(root.join(format!("tests/scenarios/{scenario}.ots")))
         .arg("--trace-out")
         .arg(&trace)
-        .args(["--frames", "60"])
+        .args(extra)
         .status()
-        .expect("spawn ot-ref-run");
-    assert!(status.success(), "ot-ref-run exited with {status}");
+        .unwrap_or_else(|e| panic!("spawn {exe}: {e}"));
+    assert!(status.success(), "{exe} exited with {status}");
     std::fs::read_to_string(trace).expect("trace")
+}
+
+/// The `sim` value of every frame line of a trace (`None` where absent).
+fn sims(trace: &str) -> Vec<Option<String>> {
+    trace
+        .lines()
+        .map(|l| serde_json::from_str::<serde_json::Value>(l).expect("JSON line"))
+        .filter(|l| l.get("frame").is_some())
+        .map(|l| l.get("sim").and_then(|s| s.as_str()).map(str::to_owned))
+        .collect()
+}
+
+/// `--sim-digest` (what `xtask crossplay` compares) is written by both
+/// runners on every frame, and equal frame by frame through a demo, where
+/// the simulation state it covers changes.
+#[test]
+fn sim_digest_is_written_by_both_runners_and_matches() {
+    let tmp = std::env::temp_dir().join(format!("ot-sim-{}", std::process::id()));
+    let args = ["--until-ms", "16000", "--sim-digest"];
+    let c = run(
+        env!("CARGO_BIN_EXE_ot-ref-run"),
+        &tmp.join("c"),
+        "demo-menu",
+        &args,
+    );
+    let rust = run(
+        env!("CARGO_BIN_EXE_rs-run"),
+        &tmp.join("rust"),
+        "demo-menu",
+        &args,
+    );
+    let _ = std::fs::remove_dir_all(&tmp);
+    let (c, rust) = (sims(&c), sims(&rust));
+    assert!(c.iter().all(Option::is_some), "a C frame without `sim`");
+    assert!(
+        rust.iter().all(Option::is_some),
+        "a Rust frame without `sim`"
+    );
+    assert_eq!(c, rust, "the sim digests differ");
+    let distinct: std::collections::BTreeSet<_> = c.iter().collect();
+    assert!(
+        distinct.len() > 100,
+        "only {} distinct digests: the demo did not run",
+        distinct.len()
+    );
 }
 
 #[test]

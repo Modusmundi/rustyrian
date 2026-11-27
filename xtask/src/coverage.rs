@@ -1,6 +1,6 @@
 //! `cargo xtask coverage`: C line coverage of every upstream function from the
-//! differential tests and the scenario runs, written to `porting/coverage.json`
-//! for `check-trace`'s 95% rule.
+//! differential tests, the scenario runs and `netplay-crossplay` (the C peer),
+//! written to `porting/coverage.json` for `check-trace`'s 95% rule.
 //!
 //! The oracle is built with `OT_REF_COVERAGE=1` (clang `--coverage`, gcov
 //! format) into `target/cov`. The counters are read with `llvm-cov gcov
@@ -122,6 +122,16 @@ pub fn run(root: &Path) -> Result<()> {
         scenario::run(root, &exe, name, &sc, &out.join(name), "c", &[])?;
     }
 
+    // The netplay code runs only against a live peer: the instrumented C
+    // engine is player 1 of `netplay-crossplay`, the Rust runner player 2.
+    eprintln!("coverage: netplay-crossplay (C player 1, Rust player 2)");
+    let rs_run = root
+        .join(TARGET_DIR)
+        .join(format!("debug/rs-run{}", std::env::consts::EXE_SUFFIX));
+    let crossplay = crate::crossplay::play(root, &exe, &rs_run, &out.join("netplay-crossplay"));
+    if let Err(e) = &crossplay {
+        eprintln!("coverage: crossplay failed: {e:#}");
+    }
     eprintln!("coverage: collecting with llvm-cov gcov");
     let lines = collect_gcov(root, &objdir)?;
 
@@ -163,6 +173,7 @@ pub fn run(root: &Path) -> Result<()> {
     if !tests_ok {
         bail!("some differential tests failed under coverage");
     }
+    crossplay.context("netplay-crossplay failed under coverage")?;
     Ok(())
 }
 
