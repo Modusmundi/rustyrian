@@ -16,9 +16,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct State {}
 
-/// `ENOMEM` (12 on every platform the port supports).
-const ENOMEM: i32 = 12;
-
 /// Width × height of the full-screen pictures.
 pub const IMAGE_SIZE: usize = 320 * 200;
 
@@ -99,7 +96,7 @@ pub fn je_load_pcx(g: &mut Game, filename: &str) -> Flow {
         file::file_read_exactly(&mut file, &mut data);
     } else {
         file.error = true;
-        file.errnum = ENOMEM;
+        file.errnum = file::ENOMEM;
     }
 
     if file.error {

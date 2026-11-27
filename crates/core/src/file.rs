@@ -28,6 +28,10 @@ const EINVAL: i32 = 22;
 /// `EBADF` (identical on every supported OS).
 const EBADF: i32 = 9;
 
+/// `ENOMEM` (12 on every supported OS): the `errnum` of a read whose buffer
+/// cannot be allocated (`D-UB-PCX-1`, `D-UB-SPRITE-2`).
+pub const ENOMEM: i32 = 12;
+
 /// The installation data directory configured at build time (`TYRIAN_DIR`
 /// in upstream's Makefile); unset unless the build sets it.
 pub const TYRIAN_DIR: Option<&str> = option_env!("TYRIAN_DIR");

@@ -736,19 +736,38 @@ fn je_load_comp_shapes_error_paths_match() {
     assert_eq!(diff::load::<State>(), d.game.sprite);
     assert_eq!(d.c_calls(), d.rust_calls());
 
-    // A directory named like the file opens but cannot be read.
+    // A directory named like the file opens but cannot be read. Where its
+    // SEEK_END length is huge (ext4 reports LLONG_MAX), C's `malloc` returns
+    // NULL and it reads into it (UF-22), so only Rust runs: the allocation
+    // guard makes it a read error (`D-UB-SPRITE-2`).
     let dir = tmp("dir-comp");
     std::fs::create_dir(dir.join("newsh1.shp")).expect("mkdir");
     let mut d = setup(&dir);
-    // SAFETY: as above.
-    let c = unsafe {
-        rustyrian_oracle::guard_call(|| {
-            b::JE_loadCompShapes(&raw mut b::shopSpriteSheet, b'1' as _)
-        })
+    let dir_len = {
+        use std::io::Seek;
+        std::fs::File::open(dir.join("newsh1.shp"))
+            .and_then(|mut f| f.seek(std::io::SeekFrom::End(0)))
+            .unwrap_or(0)
     };
     let r = s::je_load_comp_shapes(&mut d.game, Sprite2Ref::ShopSpriteSheet, b'1');
-    assert_eq!(c.map(|code| Halt { code }), r.err());
-    assert_eq!(d.c_calls(), d.rust_calls());
+    if dir_len < 1 << 32 {
+        // SAFETY: as above.
+        let c = unsafe {
+            rustyrian_oracle::guard_call(|| {
+                b::JE_loadCompShapes(&raw mut b::shopSpriteSheet, b'1' as _)
+            })
+        };
+        assert_eq!(c.map(|code| Halt { code }), r.err());
+        assert_eq!(d.c_calls(), d.rust_calls());
+    } else {
+        assert_eq!(r, Err(Halt { code: 1 }));
+        let calls = format!("{:?}", d.rust_calls());
+        assert!(
+            calls.contains("Failed to read from file 'newsh1.shp': Cannot allocate memory"),
+            "{calls}"
+        );
+        assert_eq!(d.game.sprite.shop_sprite_sheet.data, None);
+    }
 }
 
 #[test]

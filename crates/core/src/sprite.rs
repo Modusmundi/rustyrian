@@ -496,12 +496,28 @@ pub fn je_load_comp_shapes(g: &mut Game, sprite2s: Sprite2Ref, s: u8) -> Flow {
 
 /// Reads `sprite2s.size` bytes into a new block. Upstream asserts the sheet
 /// holds no block (and would leak it); here it is replaced. Callers bound
-/// `size` by the file length.
+/// `size` by the file length. A size no allocation can hold (a directory on
+/// ext4 reports a length of `LLONG_MAX`) leaves no block and is a read error
+/// with `ENOMEM`, where upstream reads into a NULL `malloc` result
+/// (`D-UB-SPRITE-2`).
 #[doc(alias = "JE_loadCompShapesB")]
+#[allow(
+    clippy::slow_vector_initialization,
+    reason = "`vec![0; n]` aborts where this must fail softly"
+)]
 pub fn je_load_comp_shapes_b(sprite2s: &mut Sprite2Array, file: &mut File) {
-    let mut data = vec![0; sprite2s.size];
-    file::file_read_exactly(file, &mut data);
-    sprite2s.data = Some(data);
+    let mut data = Vec::new();
+    if data.try_reserve_exact(sprite2s.size).is_ok() {
+        data.resize(sprite2s.size, 0);
+        file::file_read_exactly(file, &mut data);
+        sprite2s.data = Some(data);
+    } else {
+        sprite2s.data = None;
+        if !file.error {
+            file.error = true;
+            file.errnum = file::ENOMEM;
+        }
+    }
 }
 
 pub fn free_sprite2s(sprite2s: &mut Sprite2Array) {
