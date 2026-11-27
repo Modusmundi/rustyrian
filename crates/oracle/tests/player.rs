@@ -1,8 +1,85 @@
 //! Differential tests for `player.c` / `player.h`.
 
-use rustyrian_core::player::{Player, PlayerItems, PlayerItemsWeapon, PlayerSidekick, State};
+use proptest::prelude::*;
+use rustyrian_core::player::{
+    self as pl, Player, PlayerItems, PlayerItemsWeapon, PlayerSidekick, State,
+};
+use rustyrian_oracle::bindings as b;
 use rustyrian_oracle::diff::{self, Diff};
 use rustyrian_oracle::mirror::Mirror;
+
+/// A player whose `lives` points at one of its weapons' power (0..=11, the
+/// range upstream keeps it in).
+fn any_player() -> impl Strategy<Value = Player> {
+    (
+        any::<[u8; 2]>(),
+        prop::array::uniform2(0u8..=12),
+        0usize..2,
+        0u32..4,
+        any::<bool>(),
+        any::<u64>(),
+    )
+        .prop_map(|(ids, powers, w, balls, dragon, cash)| {
+            let mut p = Player::default();
+            for i in 0..2 {
+                p.items.weapon[i].id = ids[i] % 3;
+                p.items.weapon[i].power = powers[i];
+            }
+            p.items.weapon[w].power = p.items.weapon[w].power.min(11);
+            p.lives = Some(w);
+            p.purple_balls_needed = balls;
+            p.is_dragonwing = dragon;
+            p.cash = cash;
+            p
+        })
+}
+
+fn setup(players: [Player; 2], multi: [u8; 11]) -> Diff {
+    let mut d = Diff::new();
+    d.game.player.player = players;
+    d.game.config.shot_multi_pos = multi;
+    d.store_to_c();
+    d
+}
+
+fn check(d: &Diff) -> Result<(), TestCaseError> {
+    prop_assert_eq!(diff::load::<State>(), d.game.player.clone());
+    prop_assert_eq!(
+        diff::load::<rustyrian_core::config::State>(),
+        d.game.config.clone()
+    );
+    prop_assert!(d.c_calls().is_empty() && d.rust_calls().is_empty());
+    Ok(())
+}
+
+proptest! {
+    #[test]
+    fn calc_purple_balls_needed_matches(p0 in any_player(), p1 in any_player(), which in 0usize..2, multi: [u8; 11]) {
+        let mut d = setup([p0, p1], multi);
+        // SAFETY: `player[which]` with `lives` pointing into it.
+        unsafe { b::calc_purple_balls_needed(&raw mut b::player[which]) };
+        pl::calc_purple_balls_needed(&mut d.game, which);
+        check(&d)?;
+    }
+
+    #[test]
+    fn power_up_weapon_matches(p0 in any_player(), p1 in any_player(), which in 0usize..2, port in 0u32..2, multi: [u8; 11]) {
+        let mut d = setup([p0, p1], multi);
+        // SAFETY: as above.
+        let c = unsafe { b::power_up_weapon(&raw mut b::player[which], port) };
+        prop_assert_eq!(c, pl::power_up_weapon(&mut d.game, which, port));
+        check(&d)?;
+    }
+
+    #[test]
+    fn handle_got_purple_ball_matches(p0 in any_player(), p1 in any_player(), which in 0usize..2, multi: [u8; 11]) {
+        let mut d = setup([p0, p1], multi);
+        // SAFETY: as above.
+        unsafe { b::handle_got_purple_ball(&raw mut b::player[which]) };
+        pl::handle_got_purple_ball(&mut d.game, which);
+        check(&d)?;
+    }
+}
 
 #[test]
 fn initial_state_matches_c() {

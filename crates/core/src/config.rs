@@ -4,7 +4,16 @@
 
 //! Port of upstream `config.c` / `config.h`.
 
-use crate::config_file::Config;
+use crate::Game;
+use crate::config_file::{self as cf, Config};
+use crate::episodes::je_init_episode;
+use crate::file;
+use crate::game::Flow;
+use crate::memreader::{self as mr, MemReader};
+use crate::memwriter::{self as mw, MemWriter};
+use crate::mtrand::mt_rand;
+use crate::player::{FRONT_WEAPON, LEFT_SIDEKICK, PlayerItems, REAR_WEAPON, RIGHT_SIDEKICK};
+use crate::varz::{SA_ARCADE, SA_NONE, SA_NORTSHIPZ, SA_SUPERTYRIAN};
 use serde::{Deserialize, Serialize};
 
 pub const SAVE_FILES_NUM: usize = 11 * 2;
@@ -403,4 +412,600 @@ impl Default for State {
             dos_key_settings: [0; 8],
         }
     }
+}
+
+/// `defaultDosKeySettings` (FKA `defaultKeySettings`).
+pub const DEFAULT_DOS_KEY_SETTINGS: [u8; 8] = [72, 80, 75, 77, 57, 28, 29, 56];
+
+const OPENTYRIAN_CONFIG_FILENAME: &str = "opentyrian.cfg";
+const TYRIAN_CONFIG_FILENAME: &str = "tyrian.cfg";
+const TYRIAN_SAVE_FILENAME: &str = "tyrian.sav";
+
+/// `SDL_LOG_CATEGORY_APPLICATION` (upstream's `logWarn`/`logError`).
+const LOG_CATEGORY: i32 = 0;
+
+/// `strlen` of a C string held in `b` (its length if it has no NUL).
+fn strlen(b: &[u8]) -> usize {
+    b.iter().position(|&c| c == 0).unwrap_or(b.len())
+}
+
+/// `strcmp(a, s) == 0` for the C string in `a`.
+fn c_str_eq(a: &[u8], s: &[u8]) -> bool {
+    &a[..strlen(a)] == s
+}
+
+#[doc(alias = "saveOpenTyrianConfig")]
+pub fn save_open_tyrian_config(g: &mut Game) {
+    let config = &mut g.config.opentyrian_config;
+
+    // Upstream exits when adding a section runs out of memory; Rust aborts
+    // on allocation failure instead.
+    let section = cf::config_find_or_add_section(config, b"video", None);
+
+    cf::config_set_int_option(section, b"fullscreen", g.video.fullscreen_display);
+
+    let scaler_name = crate::video_scale::SCALERS[g.video_scale.scaler as usize].name;
+    cf::config_set_string_option(section, b"scaler", Some(scaler_name.as_bytes()));
+
+    let mode_name = crate::video::SCALING_MODE_NAMES[g.video.scaling_mode.to_c() as usize];
+    cf::config_set_string_option(section, b"scaling_mode", Some(mode_name.as_bytes()));
+
+    let section = cf::config_find_or_add_section(config, b"keyboard", None);
+
+    for (i, name) in KEY_SETTING_NAMES.iter().enumerate() {
+        let key_name = g
+            .platform
+            .get_scancode_name(g.config.key_settings[i] as i32);
+        let key_name = (!key_name.is_empty()).then_some(key_name.as_bytes());
+        cf::config_set_string_option(section, name.as_bytes(), key_name);
+    }
+
+    let mut file = file::user_file_open(g, OPENTYRIAN_CONFIG_FILENAME, "w");
+    if file.error {
+        let message = format!(
+            "Failed to open '{}': {}",
+            OPENTYRIAN_CONFIG_FILENAME,
+            file::file_get_error(&file)
+        );
+        g.platform.log_error(LOG_CATEGORY, &message);
+
+        return;
+    }
+
+    let stream = file.f.as_mut().expect("open file has a stream");
+    cf::config_write(&g.config.opentyrian_config, stream);
+    file.error |= stream.ferror();
+
+    file::file_flush(&mut file);
+
+    if file.error {
+        let message = format!(
+            "Failed to write to '{}': {}",
+            OPENTYRIAN_CONFIG_FILENAME,
+            file::file_get_error(&file)
+        );
+        g.platform.log_error(LOG_CATEGORY, &message);
+    }
+
+    file::file_close(&mut file);
+}
+
+pub fn playeritems_to_pitems(
+    p_items: &mut JePItemsType,
+    items: &PlayerItems,
+    initial_episode_num: u8,
+) {
+    p_items[0] = items.weapon[FRONT_WEAPON].id;
+    p_items[1] = items.weapon[REAR_WEAPON].id;
+    p_items[2] = items.super_arcade_mode;
+    p_items[3] = items.sidekick[LEFT_SIDEKICK];
+    p_items[4] = items.sidekick[RIGHT_SIDEKICK];
+    p_items[5] = items.generator;
+    p_items[6] = items.sidekick_level;
+    p_items[7] = items.sidekick_series;
+    p_items[8] = initial_episode_num;
+    p_items[9] = items.shield;
+    p_items[10] = items.special;
+    p_items[11] = items.ship;
+}
+
+pub fn pitems_to_playeritems(
+    items: &mut PlayerItems,
+    p_items: &JePItemsType,
+    initial_episode_num: Option<&mut u8>,
+) {
+    items.weapon[FRONT_WEAPON].id = p_items[0];
+    items.weapon[REAR_WEAPON].id = p_items[1];
+    items.super_arcade_mode = p_items[2];
+    items.sidekick[LEFT_SIDEKICK] = p_items[3];
+    items.sidekick[RIGHT_SIDEKICK] = p_items[4];
+    items.generator = p_items[5];
+    items.sidekick_level = p_items[6];
+    items.sidekick_series = p_items[7];
+    if let Some(initial_episode_num) = initial_episode_num {
+        *initial_episode_num = p_items[8];
+    }
+    items.shield = p_items[9];
+    items.special = p_items[10];
+    items.ship = p_items[11];
+}
+
+/// `JE_saveGame(slot, name)`: `name` holds at least 14 bytes.
+#[doc(alias = "JE_saveGame")]
+pub fn je_save_game(g: &mut Game, slot: u8, name: &[u8]) {
+    let s = usize::from(slot) - 1;
+    let c = &mut g.config;
+    let players = &mut g.player.player;
+
+    c.save_files[s].initial_difficulty = c.initial_difficulty as u8;
+    c.save_files[s].game_has_repeated = c.game_has_repeated;
+    c.save_files[s].level = u16::from(c.save_level);
+
+    players[0].items.super_arcade_mode = if c.super_tyrian {
+        SA_SUPERTYRIAN
+    } else if c.super_arcade_mode == SA_NONE && c.one_player_action {
+        SA_ARCADE
+    } else {
+        c.super_arcade_mode
+    };
+
+    let initial_episode_num = g.episodes.initial_episode_num;
+    playeritems_to_pitems(
+        &mut c.save_files[s].items,
+        &players[0].items,
+        initial_episode_num,
+    );
+
+    if c.two_player_mode {
+        playeritems_to_pitems(&mut c.save_files[s].last_items, &players[1].items, 0);
+    } else {
+        playeritems_to_pitems(&mut c.save_files[s].last_items, &players[0].last_items, 0);
+    }
+
+    c.save_files[s].score = players[0].cash as i32;
+    c.save_files[s].score2 = players[1].cash as i32;
+
+    c.save_files[s].level_name = c.last_level_name;
+    c.save_files[s].cubes = c.last_cube_max as u8;
+
+    if c_str_eq(&c.last_level_name, b"Completed") {
+        g.varz.temp = g.episodes.episode_num.wrapping_sub(1);
+        if g.varz.temp < 1 {
+            // JE: {Episodemax is 4 for completion purposes}
+            g.varz.temp = crate::episodes::EPISODE_AVAILABLE as u8;
+        }
+        c.save_files[s].episode = g.varz.temp;
+    } else {
+        c.save_files[s].episode = g.episodes.episode_num;
+    }
+
+    c.save_files[s].difficulty = c.difficulty_level as u8;
+    c.save_files[s].secret_hint = c.secret_hint;
+    c.save_files[s].input1 = c.input_device[0];
+    c.save_files[s].input2 = c.input_device[1];
+
+    c.save_files[s].name[..14].copy_from_slice(&name[..14]);
+    c.save_files[s].name[14] = 0;
+
+    for port in 0..2 {
+        // if two-player, use first player's front and second player's rear weapon
+        let p = if c.two_player_mode { port } else { 0 };
+        c.save_files[s].power[port] = players[p].items.weapon[port].power;
+    }
+
+    save_saves(g);
+}
+
+#[doc(alias = "JE_loadGame")]
+pub fn je_load_game(g: &mut Game, slot: u8) -> Flow {
+    let s = usize::from(slot) - 1;
+    let c = &mut g.config;
+    let players = &mut g.player.player;
+
+    c.super_tyrian = false;
+    c.one_player_action = false;
+    c.two_player_mode = false;
+    c.extra_game = false;
+    c.galaga_mode = false;
+
+    c.initial_difficulty = c.save_files[s].initial_difficulty as i8;
+    c.game_has_repeated = c.save_files[s].game_has_repeated;
+    c.two_player_mode = s > 10;
+    c.difficulty_level = c.save_files[s].difficulty as i8;
+
+    pitems_to_playeritems(
+        &mut players[0].items,
+        &c.save_files[s].items,
+        Some(&mut g.episodes.initial_episode_num),
+    );
+
+    c.super_arcade_mode = players[0].items.super_arcade_mode;
+
+    if c.super_arcade_mode == SA_SUPERTYRIAN {
+        c.super_tyrian = true;
+    }
+    if c.super_arcade_mode != SA_NONE {
+        c.one_player_action = true;
+    }
+    if c.super_arcade_mode > SA_NORTSHIPZ {
+        c.super_arcade_mode = SA_NONE;
+    }
+
+    if c.two_player_mode {
+        c.one_player_action = false;
+
+        pitems_to_playeritems(&mut players[1].items, &c.save_files[s].last_items, None);
+    } else {
+        pitems_to_playeritems(
+            &mut players[0].last_items,
+            &c.save_files[s].last_items,
+            None,
+        );
+    }
+
+    // Compatibility with old version
+    if players[1].items.sidekick_level < 101 {
+        players[1].items.sidekick_level = 101;
+        players[1].items.sidekick_series = players[1].items.sidekick[LEFT_SIDEKICK];
+    }
+
+    players[0].cash = i64::from(c.save_files[s].score) as u64;
+    players[1].cash = i64::from(c.save_files[s].score2) as u64;
+
+    c.main_level = c.save_files[s].level as u8;
+    c.cube_max = u16::from(c.save_files[s].cubes);
+    c.last_cube_max = c.cube_max;
+
+    c.secret_hint = c.save_files[s].secret_hint;
+    c.input_device[0] = c.save_files[s].input1;
+    c.input_device[1] = c.save_files[s].input2;
+
+    for port in 0..2 {
+        // if two-player, use first player's front and second player's rear weapon
+        let p = if c.two_player_mode { port } else { 0 };
+        players[p].items.weapon[port].power = c.save_files[s].power[port];
+    }
+
+    let mut episode = i32::from(c.save_files[s].episode);
+
+    c.level_name = c.save_files[s].level_name;
+
+    if c_str_eq(&c.level_name, b"Completed") {
+        // Increment episode.  Episode EPISODE_AVAILABLE goes to 1.
+        let available = crate::episodes::EPISODE_AVAILABLE as i32;
+        if episode == available {
+            episode = 1;
+        } else if episode < available {
+            episode += 1;
+        }
+    }
+
+    je_init_episode(g, episode as u8)?;
+    g.config.save_level = g.config.main_level;
+    g.config.last_level_name = g.config.level_name;
+    Ok(())
+}
+
+#[doc(alias = "JE_initProcessorType")]
+pub fn je_init_processor_type(g: &mut Game) {
+    // SYN: Originally this proc looked at your hardware specs and chose
+    // appropriate options. We don't care, so I'll just set decent defaults
+    // here.
+    let c = &mut g.config;
+
+    c.wild = false;
+    c.super_wild = false;
+    c.smooth_scroll = true;
+    c.explosion_transparent = true;
+    c.filtration_avail = false;
+    c.background2 = true;
+    c.display_score = true;
+
+    match c.processor_type {
+        // 386
+        1 => {
+            c.background2 = false;
+            c.display_score = false;
+            c.explosion_transparent = false;
+        }
+        // 486 - Default
+        2 => {}
+        // High Detail
+        3 => c.smooth_scroll = false,
+        // Pentium
+        4 => {
+            c.wild = true;
+            c.filtration_avail = true;
+        }
+        // Nonstandard VGA
+        5 => c.smooth_scroll = false,
+        // SuperWild
+        6 => {
+            c.wild = true;
+            c.super_wild = true;
+            c.filtration_avail = true;
+        }
+        _ => {}
+    }
+
+    match c.game_speed {
+        1 => c.fast_play = 3, // Slug Mode
+        2 => c.fast_play = 4, // Slower
+        3 => c.fast_play = 5, // Slow
+        4 => c.fast_play = 0, // Normal
+        5 => c.fast_play = 1, // Pentium Hyper
+        _ => {}
+    }
+}
+
+#[doc(alias = "saveConfiguration")]
+pub fn save_configuration(g: &mut Game) {
+    let mut data = [0u8; 28];
+
+    let mut writer = MemWriter::new(&mut data);
+    let c = &g.config;
+
+    mw::mem_write_bool(&mut writer, c.background2);
+    mw::mem_write_u8(&mut writer, c.game_speed);
+    mw::mem_write_u8(&mut writer, c.input_device_);
+    mw::mem_write_u8(&mut writer, c.j_configure);
+    mw::mem_write_u8(&mut writer, c.version_num);
+    mw::mem_write_u8(&mut writer, c.processor_type);
+    mw::mem_write_u8(&mut writer, c.midi_port);
+    mw::mem_write_u8(&mut writer, c.sound_effects);
+    mw::mem_write_u8(&mut writer, c.gamma_correction);
+    mw::mem_write_s8(&mut writer, c.difficulty_level);
+    mw::mem_write_u8_array(&mut writer, &c.joy_button_assign);
+    mw::mem_write_u16(&mut writer, g.nortsong.tyr_music_volume);
+    mw::mem_write_u16(&mut writer, g.nortsong.fx_volume);
+    mw::mem_write_u8(&mut writer, c.input_device1);
+    mw::mem_write_u8(&mut writer, c.input_device2);
+    mw::mem_write_u8_array(&mut writer, &c.dos_key_settings);
+
+    debug_assert!(writer.size() == 0 && !writer.error);
+
+    let mut file = file::user_file_open(g, TYRIAN_CONFIG_FILENAME, "wb");
+    if file.error {
+        let message = format!(
+            "Failed to open '{}': {}",
+            TYRIAN_CONFIG_FILENAME,
+            file::file_get_error(&file)
+        );
+        g.platform.log_error(LOG_CATEGORY, &message);
+    } else {
+        file::file_write(&mut file, &data);
+        file::file_flush(&mut file);
+
+        if file.error {
+            let message = format!(
+                "Failed to write to '{}': {}",
+                TYRIAN_CONFIG_FILENAME,
+                file::file_get_error(&file)
+            );
+            g.platform.log_error(LOG_CATEGORY, &message);
+        }
+
+        file::file_close(&mut file);
+    }
+
+    save_open_tyrian_config(g);
+}
+
+#[doc(alias = "loadSaves")]
+pub fn load_saves(g: &mut Game) {
+    let mut invalid = false;
+
+    let mut file = file::user_file_open(g, TYRIAN_SAVE_FILENAME, "rb");
+    if file.error {
+        let message = format!(
+            "Failed to open '{}': {}",
+            TYRIAN_SAVE_FILENAME,
+            file::file_get_error(&file)
+        );
+        g.platform.log_warn(LOG_CATEGORY, &message);
+
+        invalid = true;
+    } else {
+        let mut data = [0u8; SAVE_FILE_SIZE + 4];
+        file::file_read_exactly(&mut file, &mut data);
+
+        invalid |= file.error;
+
+        if file.error {
+            let message = format!(
+                "Failed to read from '{}': {}",
+                TYRIAN_SAVE_FILENAME,
+                file::file_get_error(&file)
+            );
+            g.platform.log_error(LOG_CATEGORY, &message);
+        }
+
+        file::file_close(&mut file);
+
+        invalid |= !decrypt_save_data(&mut data);
+
+        let mut reader = MemReader::new(&data);
+        let r = &mut reader;
+        let c = &mut g.config;
+
+        for f in c.save_files.iter_mut() {
+            f.encode = mr::mem_read_u16(r);
+            f.level = mr::mem_read_u16(r);
+            mr::mem_read_u8_array(r, &mut f.items);
+            f.score = mr::mem_read_u32(r) as i32;
+            f.score2 = mr::mem_read_u32(r) as i32;
+            let level_name_len = mr::mem_read_u8(r);
+            mr::mem_read_char_array(r, &mut f.level_name[..9]);
+            f.level_name[usize::from(level_name_len.min(9))] = 0;
+            mr::mem_read_char_array(r, &mut f.name[..14]);
+            f.name[14] = 0;
+            f.cubes = mr::mem_read_u8(r);
+            mr::mem_read_u8_array(r, &mut f.power);
+            f.episode = mr::mem_read_u8(r);
+            mr::mem_read_u8_array(r, &mut f.last_items);
+            f.difficulty = mr::mem_read_u8(r);
+            f.secret_hint = mr::mem_read_u8(r);
+            f.input1 = mr::mem_read_u8(r);
+            f.input2 = mr::mem_read_u8(r);
+            f.game_has_repeated = mr::mem_read_bool(r);
+            f.initial_difficulty = mr::mem_read_u8(r);
+            f.high_score1 = mr::mem_read_s32(r);
+            f.high_score2 = mr::mem_read_s32(r);
+            let high_score_name_len = mr::mem_read_u8(r);
+            mr::mem_read_char_array(r, &mut f.high_score_name[..29]);
+            f.high_score_name[usize::from(high_score_name_len.min(29))] = 0;
+            f.high_score_diff = mr::mem_read_u8(r);
+        }
+
+        mr::mem_read_u8_array(r, &mut c.editor_item_avail);
+
+        c.editor_level =
+            (u16::from(c.editor_item_avail[98]) << 8) | u16::from(c.editor_item_avail[99]);
+
+        debug_assert!(reader.size() == 4 || reader.error);
+        invalid |= reader.error;
+    }
+
+    if invalid {
+        let message = format!("'{TYRIAN_SAVE_FILENAME}' is invalid or missing.");
+        g.platform.log_warn(LOG_CATEGORY, &message);
+
+        g.config.save_files = [JeSaveFileType::default(); SAVE_FILES_NUM];
+
+        for i in 0..SAVE_FILES_NUM {
+            g.config.save_files[i].level = 0;
+
+            g.config.save_files[i].name[..14].fill(b' ');
+            g.config.save_files[i].name[14] = 0;
+
+            g.config.save_files[i].high_score1 = ((mt_rand(g) % 20 + 1) * 1000) as i32;
+            let name: &[u8] = if i % 6 < 3 {
+                g.config.save_files[i].high_score2 = 0;
+                let k = (mt_rand(g) % DEFAULT_HIGH_SCORE_NAMES.len() as u64) as usize;
+                &DEFAULT_HIGH_SCORE_NAMES[k]
+            } else {
+                g.config.save_files[i].high_score2 = ((mt_rand(g) % 20 + 1) * 1000) as i32;
+                let k = (mt_rand(g) % DEFAULT_TEAM_NAMES.len() as u64) as usize;
+                &DEFAULT_TEAM_NAMES[k]
+            };
+            let n = strlen(name);
+            g.config.save_files[i].high_score_name[..=n].copy_from_slice(&name[..=n]);
+            g.config.save_files[i].high_score_diff = 0;
+        }
+
+        g.config.editor_item_avail = INITIAL_EDITOR_ITEM_AVAIL;
+
+        g.config.editor_level = 800;
+    }
+}
+
+#[doc(alias = "saveSaves")]
+pub fn save_saves(g: &mut Game) {
+    let mut data = [0u8; SAVE_FILE_SIZE + 4];
+
+    let mut writer = MemWriter::new(&mut data);
+    let w = &mut writer;
+    let c = &mut g.config;
+
+    for f in c.save_files.iter() {
+        mw::mem_write_u16(w, f.encode);
+        mw::mem_write_u16(w, f.level);
+        mw::mem_write_u8_array(w, &f.items);
+        mw::mem_write_u32(w, f.score as u32);
+        mw::mem_write_u32(w, f.score2 as u32);
+        mw::mem_write_u8(w, strlen(&f.level_name) as u8);
+        mw::mem_write_char_array(w, &f.level_name[..9]);
+        mw::mem_write_char_array(w, &f.name[..14]);
+        mw::mem_write_u8(w, f.cubes);
+        mw::mem_write_u8_array(w, &f.power);
+        mw::mem_write_u8(w, f.episode);
+        mw::mem_write_u8_array(w, &f.last_items);
+        mw::mem_write_u8(w, f.difficulty);
+        mw::mem_write_u8(w, f.secret_hint);
+        mw::mem_write_u8(w, f.input1);
+        mw::mem_write_u8(w, f.input2);
+        mw::mem_write_bool(w, f.game_has_repeated);
+        mw::mem_write_u8(w, f.initial_difficulty);
+        mw::mem_write_s32(w, f.high_score1);
+        mw::mem_write_s32(w, f.high_score2);
+        mw::mem_write_u8(w, strlen(&f.high_score_name) as u8);
+        mw::mem_write_char_array(w, &f.high_score_name[..29]);
+        mw::mem_write_u8(w, f.high_score_diff);
+    }
+
+    c.editor_item_avail[98] = (c.editor_level >> 8) as u8;
+    c.editor_item_avail[99] = c.editor_level as u8;
+
+    mw::mem_write_u8_array(w, &c.editor_item_avail);
+
+    debug_assert!(writer.size() == 4 && !writer.error);
+
+    encrypt_save_data(&mut data);
+
+    let mut file = file::user_file_open(g, TYRIAN_SAVE_FILENAME, "wb");
+    if file.error {
+        let message = format!(
+            "Failed to open '{}': {}",
+            TYRIAN_SAVE_FILENAME,
+            file::file_get_error(&file)
+        );
+        g.platform.log_error(LOG_CATEGORY, &message);
+    } else {
+        file::file_write(&mut file, &data);
+        file::file_flush(&mut file);
+
+        if file.error {
+            let message = format!(
+                "Failed to write to '{}': {}",
+                TYRIAN_SAVE_FILENAME,
+                file::file_get_error(&file)
+            );
+            g.platform.log_error(LOG_CATEGORY, &message);
+        }
+
+        file::file_close(&mut file);
+    }
+}
+
+/// The four check bytes over `data[..SAVE_FILE_SIZE]`: sum, negated sum,
+/// `y * d + 1` chain, xor.
+fn save_checksums(data: &[u8]) -> [u8; 4] {
+    let body = &data[..SAVE_FILE_SIZE];
+    let sum = body.iter().fold(0u8, |y, &d| y.wrapping_add(d));
+    let neg = body.iter().fold(0u8, |y, &d| y.wrapping_sub(d));
+    let mul = body
+        .iter()
+        .fold(1u8, |y, &d| y.wrapping_mul(d).wrapping_add(1));
+    let xor = body.iter().fold(0u8, |y, &d| y ^ d);
+    [sum, neg, mul, xor]
+}
+
+/// `encryptSaveData(data)`; `data` holds `SAVE_FILE_SIZE + 4` bytes.
+#[doc(alias = "encryptSaveData")]
+pub fn encrypt_save_data(data: &mut [u8]) {
+    let check = save_checksums(data);
+    data[SAVE_FILE_SIZE..SAVE_FILE_SIZE + 4].copy_from_slice(&check);
+
+    for i in 0..SAVE_FILE_SIZE {
+        data[i] ^= CRYPT_KEY[(i + 1) % 10];
+        if i > 0 {
+            data[i] ^= data[i - 1];
+        }
+    }
+}
+
+/// `decryptSaveData(data)`; `data` holds `SAVE_FILE_SIZE + 4` bytes.
+#[doc(alias = "decryptSaveData")]
+pub fn decrypt_save_data(data: &mut [u8]) -> bool {
+    for i in (0..SAVE_FILE_SIZE).rev() {
+        data[i] ^= CRYPT_KEY[(i + 1) % 10];
+        if i > 0 {
+            data[i] ^= data[i - 1];
+        }
+    }
+
+    let check = save_checksums(data);
+    // C compares the four bytes in order and stops at the first mismatch;
+    // the result is the same.
+    data[SAVE_FILE_SIZE..SAVE_FILE_SIZE + 4] == check
 }
