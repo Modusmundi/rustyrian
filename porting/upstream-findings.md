@@ -50,3 +50,7 @@ through `porting/advisories/` and are not disclosed here until coordinated.
 |UF-42|`mainint.c:3836-3849`|Linked player 2's turret marker y, `player.y + roundf(cosf(dir) * 26)`, is negative at the top of the screen and is converted to `JE_word` (out-of-range float-to-unsigned conversion is undefined; UBSan flags it).|read|reproduced in port (D-UB-MAININT-FLOAT)|
 |UF-43|`mainint.c:3453-3459`|`inputDevice` from `tyrian.sav` is used as a joystick index (`inputDevice - 3`) without checking `joysticks`.|read|guarded in port (R10, D-UB-MAININT-JOYSTICK)|
 |UF-44|`mainint.c:4748`|`shotAvail[z] = 0` uses the enemy index `z` (0..99) on the 81-entry `shotAvail`.|read|guarded in port (R10, D-UB-MAININT-SHOTAVAIL)|
+
+|UF-45|`varz.c:377-381` with `game_menu.c:1883-1885`|A custom ship whose graphic number is 6 maps to sprite 0 (`GR[5] == 0`); `blit_sprite2x2` then reads the sheet's offset table at index -1, before the sheet (crashed the oracle in a test).|differential test (oracle crash)|guarded in port (D-UB-SPRITE-1)|
+|UF-46|`game_menu.c:192-291`|`temp_weapon_power[7]` assumes at most 6 weapons per shop; a shop listing more (plus "Done") writes past the stack array.|read|guarded in port (D-UB-GAMEMENU-2)|
+|UF-47|`game_menu.c:207-210`|Adding the player's item to a shop row that already holds 10 items writes `itemAvail[row][10]`, the first item of the next row.|read|reproduced (flat table) in port|

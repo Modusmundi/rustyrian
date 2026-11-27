@@ -1055,8 +1055,16 @@ pub fn je_weapon_view_frame(g: &mut Game) {
             } else {
                 0
             };
-            let wp =
-                g.episodes.weapon_port[item as usize].op[item_mode as usize][item_power as usize];
+            // D-UB-GAMEMENU-2: item numbers, modes and powers from damaged
+            // saves read a zero entry outside the tables.
+            let wp = g
+                .episodes
+                .weapon_port
+                .get(item as usize)
+                .and_then(|w| w.op.get(item_mode as usize))
+                .and_then(|m| m.get(item_power as usize))
+                .copied()
+                .unwrap_or_default();
             let (x, y, mx, my) = (p.x as u16, p.y as u16, p.mouse_x, p.mouse_y);
 
             g.varz.b = player_shot_create(g, item as u16, i, x, y, mx, my, wp, 1);
@@ -1071,21 +1079,24 @@ pub fn je_weapon_view_frame(g: &mut Game) {
             let item = usize::from(p.items.sidekick[side]);
             let (x, y) = (p.sidekick[side].x as u16, p.sidekick[side].y as u16);
             let (mx, my) = (p.mouse_x, p.mouse_y);
-            let o = &g.episodes.options[item];
+            // D-UB-GAMEMENU-2, as above.
+            let o = g.episodes.options.get(item).copied().unwrap_or_default();
             let (wport, wpnum) = (u16::from(o.wport), o.wpnum);
 
             g.varz.b = player_shot_create(g, wport, bay as u32, x, y, mx, my, wpnum, 1);
         }
     };
 
+    let option = |g: &Game, i: usize| g.episodes.options.get(i).copied().unwrap_or_default();
     let left = usize::from(g.player.player[0].items.sidekick[LEFT_SIDEKICK]);
-    if g.episodes.options[left].wport > 0 {
+    if option(g, left).wport > 0 {
         sidekick_shot(g, LEFT_SIDEKICK, SHOT_LEFT_SIDEKICK);
     }
 
     let right = usize::from(g.player.player[0].items.sidekick[RIGHT_SIDEKICK]);
+    let right_option = option(g, right);
     let p = &mut g.player.player[0];
-    if g.episodes.options[right].tr == 2 {
+    if right_option.tr == 2 {
         p.sidekick[RIGHT_SIDEKICK].x = p.x;
         p.sidekick[RIGHT_SIDEKICK].y = 10.max(p.y - 20);
     } else {
@@ -1093,7 +1104,7 @@ pub fn je_weapon_view_frame(g: &mut Game) {
         p.sidekick[RIGHT_SIDEKICK].y = 120;
     }
 
-    if g.episodes.options[right].wport > 0 {
+    if right_option.wport > 0 {
         sidekick_shot(g, RIGHT_SIDEKICK, SHOT_RIGHT_SIDEKICK);
     }
 

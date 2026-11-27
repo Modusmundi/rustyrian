@@ -1106,6 +1106,22 @@ fn items_outside_the_tables_draw_nothing() {
     g.game_menu.menu_choices[usize::from(gm::MENU_UPGRADE_SUB)] = 5;
     g.player.player[0].items.ship = 1;
     gm::je_weapon_sim_update(g);
+    // The weapon simulator with items outside their tables (damaged saves;
+    // D-UB-GAMEMENU-2): no panic, the zero entries fire nothing.
+    gm::je_init_weapon_view(g);
+    let p = &mut g.player.player[0];
+    p.items.weapon[0].id = 250;
+    p.items.weapon[1].id = 251;
+    p.items.weapon[0].power = 0;
+    p.items.weapon[1].power = 200;
+    p.weapon_mode = 0;
+    p.items.sidekick = [200, 255];
+    g.config.shot_repeat = [0; 11];
+    gm::je_weapon_view_frame(g);
+    assert_eq!(
+        g.config.shot_repeat[0], 0,
+        "a zero weapon entry sets no repeat"
+    );
 }
 
 // ---------------------------------------------------------------------------
