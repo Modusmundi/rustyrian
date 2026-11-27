@@ -28,6 +28,12 @@ pub fn rand(s: &mut State) -> i32 {
     ((s.next / 65_536) % 32_768) as i32
 }
 
+/// `rand()` on the shared stream (`Game::crand`), holding the lock only for
+/// the draw.
+pub fn rand_shared(s: &std::sync::Mutex<State>) -> i32 {
+    rand(&mut s.lock().unwrap_or_else(|e| e.into_inner()))
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

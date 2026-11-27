@@ -90,7 +90,7 @@ pub mod xmas;
 
 /// Loads every module state of `g` (not the platform) from C.
 pub fn load_game(g: &mut Game) {
-    g.crand = crate::session::crand_state();
+    *g.crand.lock().unwrap_or_else(|e| e.into_inner()) = crate::session::crand_state();
     g.animlib.load_from_c();
     g.arg_parse.load_from_c();
     g.backgrnd.load_from_c();
@@ -148,7 +148,7 @@ pub fn load_game(g: &mut Game) {
 
 /// Stores every module state of `g` (not the platform) into C.
 pub fn store_game(g: &Game) {
-    crate::session::set_crand_state(g.crand.clone());
+    crate::session::set_crand_state(g.crand.lock().unwrap_or_else(|e| e.into_inner()).clone());
     g.animlib.store_to_c();
     g.arg_parse.store_to_c();
     g.backgrnd.store_to_c();

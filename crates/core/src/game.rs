@@ -30,8 +30,12 @@ macro_rules! game_states {
             /// State shared with the audio callback (`loudness.c`), which runs on
             /// the platform's audio thread.
             pub audio: Arc<Mutex<loudness::AudioState>>,
-            /// The libc `rand()` stream (rule R7).
-            pub crand: crand::State,
+            /// The libc `rand()` stream (rule R7). Shared because the audio
+            /// callback draws from it too (`opl.c:317`, under `audio`), as do
+            /// main-thread callers (`destruct.c`, `xmas.c`); C has one stream.
+            /// Lock order: `audio` before `crand`; never hold `crand` across
+            /// another call.
+            pub crand: Arc<Mutex<crand::State>>,
             $(pub $m: $m::State,)*
         }
 
@@ -42,7 +46,7 @@ macro_rules! game_states {
                 Box::new(Game {
                     platform,
                     audio: Arc::new(Mutex::new(loudness::AudioState::default())),
-                    crand: crand::State::default(),
+                    crand: Arc::new(Mutex::new(crand::State::default())),
                     $($m: $m::State::default(),)*
                 })
             }
@@ -60,7 +64,7 @@ macro_rules! game_states {
         impl Game {
             pub fn snapshot(&self) -> Snapshot {
                 Snapshot {
-                    crand: self.crand.clone(),
+                    crand: self.crand.lock().unwrap_or_else(|e| e.into_inner()).clone(),
                     audio: self.audio.lock().unwrap_or_else(|e| e.into_inner()).clone(),
                     $($m: self.$m.clone(),)*
                 }
@@ -68,7 +72,7 @@ macro_rules! game_states {
 
             /// Replaces every module state with `s` (the platform is kept).
             pub fn restore(&mut self, s: Snapshot) {
-                self.crand = s.crand;
+                *self.crand.lock().unwrap_or_else(|e| e.into_inner()) = s.crand;
                 *self.audio.lock().unwrap_or_else(|e| e.into_inner()) = s.audio;
                 $(self.$m = s.$m;)*
             }
