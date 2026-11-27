@@ -928,7 +928,10 @@ fn list_options_match() {
         // SAFETY: a valid config.
         assert_eq!(unsafe { config_from_c(&c) }, r, "{op:?}");
     }
-    assert!(cf::config_is_value_list(&r.sections[0].options[0]), "a list option");
+    assert!(
+        cf::config_is_value_list(&r.sections[0].options[0]),
+        "a list option"
+    );
     // SAFETY: as above.
     unsafe { b::config_deinit(&raw mut c) };
     cf::config_deinit(&mut r);
