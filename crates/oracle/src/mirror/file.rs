@@ -59,6 +59,8 @@ fn fd_path(fd: i32) -> Option<PathBuf> {
 
 /// Converts a C `File`: an open `FILE *` becomes an independent stream on the
 /// same file at the same position, with the same `ferror`/`feof` indicators.
+/// The C stream is flushed first, since its buffered writes cannot be read
+/// portably; a flush failure shows in its `ferror`.
 ///
 /// # Safety
 /// `c.f` is `NULL` or an open stream.
@@ -69,6 +71,7 @@ pub unsafe fn file_from_c(c: &b::File) -> File {
         let fp = c.f.cast::<libc::FILE>();
         // SAFETY: `fp` is an open stream per the caller.
         let (fd, position, error, eof) = unsafe {
+            libc::fflush(fp);
             (
                 libc::fileno(fp),
                 libc::ftell(fp),
@@ -107,8 +110,9 @@ pub unsafe fn file_from_c(c: &b::File) -> File {
 }
 
 /// Writes `r` into `c`: an open stream becomes a new `FILE *` on the same
-/// file at the same position (the previous `c.f` is not closed). The `ferror`
-/// and `feof` indicators of the new stream start clear.
+/// file at the same position, holding the same buffered writes (the previous
+/// `c.f` is not closed). The `ferror` and `feof` indicators of the new stream
+/// start clear.
 ///
 /// # Safety
 /// `c` is writable.
@@ -135,7 +139,10 @@ pub unsafe fn file_to_c(r: &File, c: &mut b::File) {
                 assert!(fd >= 0, "reopen {}", s.path().display());
                 let fp = libc::fdopen(fd, mode.as_ptr());
                 assert!(!fp.is_null(), "fdopen");
-                libc::fseek(fp, s.tell().unwrap_or(0) as libc::c_long, libc::SEEK_SET);
+                let pending = s.pending();
+                let os_position = s.tell().unwrap_or(0) - pending.len() as i64;
+                libc::fseek(fp, os_position as libc::c_long, libc::SEEK_SET);
+                libc::fwrite(pending.as_ptr().cast(), 1, pending.len(), fp);
                 fp.cast()
             }
         }
