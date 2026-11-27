@@ -3,14 +3,16 @@
 //! for `check-trace`'s 95% rule.
 //!
 //! The oracle is built with `OT_REF_COVERAGE=1` (clang `--coverage`, gcov
-//! format) into `target/cov`; `gcovr` reads the counters through
-//! `llvm-cov gcov` (`OT_REF_GCOV` overrides the command).
+//! format) into `target/cov`. The counters are read with `llvm-cov gcov
+//! --stdout` (`OT_REF_GCOV` overrides the command) and parsed here: gcovr's
+//! parser rejects counts wider than the gcov column (ten or more digits, which
+//! the scaler tests reach).
 
 use crate::inventory;
 use crate::scenario;
 use crate::tools::{run_capture, run_status};
 use anyhow::{Context, Result, bail};
-use serde_json::{Value, json};
+use serde_json::json;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -77,11 +79,22 @@ pub fn run(root: &Path) -> Result<()> {
         }
     }
 
-    eprintln!("coverage: differential tests");
+    // Long tests are `#[ignore]`d for the per-push CI run; coverage runs them.
+    // Local-only advisory reproductions (git-ignored) need the sanitizer
+    // build and are left out.
+    eprintln!("coverage: differential tests (including ignored ones)");
     let mut tests = Command::new("cargo");
-    tests
-        .current_dir(root)
-        .args(["nextest", "run", "-p", "rustyrian-oracle", "--no-fail-fast"]);
+    tests.current_dir(root).args([
+        "nextest",
+        "run",
+        "-p",
+        "rustyrian-oracle",
+        "--no-fail-fast",
+        "--run-ignored",
+        "all",
+        "-E",
+        "not binary(/^advisory_/)",
+    ]);
     cov_env(&mut tests);
     let tests_ok = tests.status()?.success();
 
@@ -104,43 +117,8 @@ pub fn run(root: &Path) -> Result<()> {
         scenario::run(root, &exe, name, &sc, &out.join(name), "c", &[])?;
     }
 
-    eprintln!("coverage: collecting with gcovr");
-    let report = root.join(TARGET_DIR).join("gcovr.json");
-    // Sources are recorded relative to the repository root (the oracle's
-    // build.rs compiles from there); keep only upstream's.
-    run_capture(
-        Command::new("gcovr")
-            .current_dir(root)
-            .arg("--root")
-            .arg(root)
-            .arg("--filter")
-            .arg("vendor/opentyrian/src/")
-            .arg("--object-directory")
-            .arg(&objdir)
-            .arg("--gcov-executable")
-            .arg(gcov_command())
-            .arg("--json")
-            .arg("--output")
-            .arg(&report)
-            .arg(&objdir),
-    )?;
-    let gcovr: Value = serde_json::from_str(&std::fs::read_to_string(&report)?)?;
-
-    // file name -> line -> hit count
-    let mut lines: BTreeMap<String, BTreeMap<u64, u64>> = BTreeMap::new();
-    for f in gcovr["files"].as_array().into_iter().flatten() {
-        let name = Path::new(f["file"].as_str().unwrap_or_default())
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default();
-        let entry = lines.entry(name).or_default();
-        for l in f["lines"].as_array().into_iter().flatten() {
-            let (Some(n), Some(c)) = (l["line_number"].as_u64(), l["count"].as_u64()) else {
-                continue;
-            };
-            *entry.entry(n).or_default() += c;
-        }
-    }
+    eprintln!("coverage: collecting with llvm-cov gcov");
+    let lines = collect_gcov(root, &objdir)?;
 
     let inv = inventory::load(root)?;
     let mut functions = serde_json::Map::new();
@@ -181,4 +159,100 @@ pub fn run(root: &Path) -> Result<()> {
         bail!("some differential tests failed under coverage");
     }
     Ok(())
+}
+
+/// Upstream source file name -> line -> hit count, summed over every
+/// translation unit (headers are compiled into several).
+fn collect_gcov(root: &Path, objdir: &Path) -> Result<BTreeMap<String, BTreeMap<u64, u64>>> {
+    let gcov = gcov_command();
+    let mut words = gcov.split_whitespace();
+    let program = words.next().context("empty OT_REF_GCOV")?;
+    let pre_args: Vec<&str> = words.collect();
+    let mut gcdas: Vec<PathBuf> = std::fs::read_dir(objdir)?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().is_some_and(|x| x == "gcda"))
+        .collect();
+    gcdas.sort();
+    let mut lines: BTreeMap<String, BTreeMap<u64, u64>> = BTreeMap::new();
+    for gcda in &gcdas {
+        // Sources are recorded relative to the repository root (the oracle's
+        // build.rs compiles from there), so run from it.
+        let out = run_capture(
+            Command::new(program)
+                .current_dir(root)
+                .args(&pre_args)
+                .arg("--stdout")
+                .arg("-o")
+                .arg(objdir)
+                .arg(gcda),
+        )?;
+        // Upstream sources are ASCII; anything else only occurs in comments.
+        parse_gcov(&String::from_utf8_lossy(&out), &mut lines);
+    }
+    Ok(lines)
+}
+
+/// Adds the executable lines of `llvm-cov gcov --stdout` output for upstream
+/// sources to `lines`. Each line is `COUNT:LINE:SOURCE`; `COUNT` is `-` for a
+/// non-executable line, `#####`/`=====` for zero, otherwise the hit count
+/// (possibly wider than its column). `Source:` headers (line 0) start a file.
+fn parse_gcov(out: &str, lines: &mut BTreeMap<String, BTreeMap<u64, u64>>) {
+    let mut current: Option<String> = None;
+    for l in out.lines() {
+        let mut parts = l.splitn(3, ':');
+        let (Some(count), Some(line), Some(rest)) = (parts.next(), parts.next(), parts.next())
+        else {
+            continue;
+        };
+        let (count, line) = (count.trim(), line.trim());
+        if line == "0" {
+            if let Some(src) = rest.strip_prefix("Source:") {
+                current = src
+                    .strip_prefix("vendor/opentyrian/src/")
+                    .map(str::to_owned);
+            }
+            continue;
+        }
+        let (Some(file), Ok(line)) = (current.as_ref(), line.parse::<u64>()) else {
+            continue;
+        };
+        let hits = match count {
+            "-" => continue,
+            "#####" | "=====" => 0,
+            c => match c.trim_end_matches('*').parse::<u64>() {
+                Ok(n) => n,
+                Err(_) => continue,
+            },
+        };
+        *lines
+            .entry(file.clone())
+            .or_default()
+            .entry(line)
+            .or_default() += hits;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_wide_counts_headers_and_zero_markers() {
+        let out = "        -:    0:Source:vendor/opentyrian/src/video_scale.c\n\
+                   6676414800:  195:\t\tfor (int x = 0; x < width; x++)\n\
+                   \x20   #####:  196:\t\t\tx++;\n\
+                   \x20       -:  197:}\n\
+                   \x20       3:  198:return;\n\
+                   \x20       -:    0:Source:crates/oracle/generated/tu/video_scale.c\n\
+                   \x20       9:    1:#include \"x\"\n";
+        let mut lines = BTreeMap::new();
+        parse_gcov(out, &mut lines);
+        parse_gcov(out, &mut lines);
+        let vs = &lines["video_scale.c"];
+        assert_eq!(vs.get(&195), Some(&(2 * 6_676_414_800)));
+        assert_eq!(vs.get(&196), Some(&0));
+        assert_eq!(vs.get(&197), None);
+        assert_eq!(vs.get(&198), Some(&6));
+        assert_eq!(lines.len(), 1, "only upstream sources are kept");
+    }
 }

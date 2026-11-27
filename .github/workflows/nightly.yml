@@ -53,8 +53,6 @@ jobs:
           submodules: true
           persist-credentials: false
       - run: sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list && sudo apt-get update && sudo apt-get install -y libsdl2-dev libclang-18-dev clang-18 llvm-18
-      # Ubuntu's gcovr 7 cannot parse llvm-cov's block ids above 9999 (video_scale_hqNx.c).
-      - run: pipx install gcovr==8.8
       - uses: taiki-e/install-action@073e1fd0bc889c9aee68dbaaa927cde1b5653a83 # v2.90.11
         with:
           tool: cargo-nextest
@@ -95,7 +93,7 @@ jobs:
           key: tyrian21-7790d09a2a3addcd33c66ef063d5900eb81cc9c342f4807eb8356364dd1d9277
       - run: cargo xtask fetch-data
       - run: cargo xtask fixtures
-      - run: cargo nextest run --workspace --no-fail-fast
+      - run: cargo nextest run --workspace --no-fail-fast --run-ignored all
 
   fuzz-targets:
     runs-on: ubuntu-24.04
