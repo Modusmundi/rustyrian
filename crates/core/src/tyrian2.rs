@@ -4107,9 +4107,11 @@ fn main_level_loop(g: &mut Game, old_weapon_bar: &mut [u32; 2]) -> Flow<MainLabe
     // ---------------------------EVENTS-------------------------
     // D-UB-TYRIAN2-4: after `JE_eventJump` to the first event (from a
     // return, the level timer or enemy 254), `eventLoc` is 0 and upstream
-    // reads `eventRec[-1]`; no event is due then.
-    while g.varz.event_loc >= 1
-        && g.tyrian2.event_rec[usize::from(g.varz.event_loc) - 1].eventtime <= g.varz.cur_loc
+    // reads `eventRec[-1]` (then moves on past it); start from event 1.
+    if g.varz.event_loc == 0 {
+        g.varz.event_loc = 1;
+    }
+    while g.tyrian2.event_rec[usize::from(g.varz.event_loc) - 1].eventtime <= g.varz.cur_loc
         && g.varz.event_loc <= g.varz.max_event
     {
         je_event_system(g)?;
