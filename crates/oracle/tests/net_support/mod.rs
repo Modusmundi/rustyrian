@@ -231,7 +231,9 @@ impl Rig {
         mirror::load_game(&mut c);
         c.file.user_dir_path = self.g.file.user_dir_path.clone();
         c.file.user_dir_path_len = self.g.file.user_dir_path_len;
-        assert!(c.snapshot() == self.g.snapshot(), "states differ");
+        if let Some(d) = diff::first_difference(&c.snapshot(), &self.g.snapshot()) {
+            panic!("states differ at {d}");
+        }
     }
 
     /// After a run that exited through `JE_tyrianHalt` (C's freed surfaces

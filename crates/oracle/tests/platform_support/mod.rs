@@ -8,7 +8,7 @@ use rustyrian_core::game::{Halt, Snapshot};
 use rustyrian_core::platform::{JoystickChange, Platform, PlatformProbe};
 use rustyrian_harness::trace::PlatformCall;
 use rustyrian_harness::{CallLog, Session, test_session};
-use rustyrian_oracle::{bindings as b, guard_call, mirror, session};
+use rustyrian_oracle::{bindings as b, diff, guard_call, mirror, session};
 
 /// A C engine and a Rust engine whose fake platforms fail the next call to
 /// each of the given SDL functions.
@@ -70,7 +70,9 @@ impl Both {
     /// Asserts equal platform calls and equal states.
     pub fn assert_same(&self) {
         assert_eq!(self.c_calls(), self.rust_calls(), "platform calls differ");
-        assert_eq!(self.c_state(), self.game.snapshot(), "states differ");
+        if let Some(d) = diff::first_difference(&self.c_state(), &self.game.snapshot()) {
+            panic!("states differ at {d}");
+        }
     }
 
     /// Runs the same platform call on both fake platforms (recorded; use
