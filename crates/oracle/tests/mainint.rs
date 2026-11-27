@@ -73,7 +73,10 @@ fn run_on_rig<S: Strategy>(
         cases: 16,
         ..RunnerConfig::default()
     };
-    let mut runner = TestRunner::new(config);
+    // Deterministic draws: with only 16 cases, a fixed seed keeps these
+    // functions' C line coverage reproducible across runs and machines.
+    let rng = proptest::test_runner::TestRng::deterministic_rng(config.rng_algorithm);
+    let mut runner = TestRunner::new_with_rng(config, rng);
     runner
         .run(&strategy, |v| {
             let mut rig = rig.borrow_mut();
