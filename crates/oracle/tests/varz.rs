@@ -642,3 +642,85 @@ fn out_of_table_item_reads_are_zero() {
     assert_eq!(d.game.player.player[0].armor, 0);
     assert_eq!(d.game.config.power_add, 0);
 }
+
+/// Each function once from the frame-500 fixture, comparing the whole game
+/// state (every module), so a write outside the modules `check` loads is
+/// caught too.
+#[test]
+fn every_function_leaves_the_whole_state_equal() {
+    /// A plain C call on fixture state.
+    macro_rules! c {
+        ($call:expr) => {
+            // SAFETY: plain C call on the test thread; pointer arguments
+            // point into C's `player` array.
+            unsafe { $call }
+        };
+    }
+    type Call = (fn(), fn(&mut Game));
+    let calls: [Call; 14] = [
+        (|| c!(b::JE_getShipInfo()), vz::je_get_ship_info),
+        (|| c!(b::JE_drawOptions()), vz::je_draw_options),
+        (|| c!(b::JE_drawOptionLevel()), vz::je_draw_option_level),
+        (
+            || c!(b::JE_specialComplete(1, 17)),
+            |g| vz::je_special_complete(g, 1, 17),
+        ),
+        (
+            || {
+                c!(b::JE_doSpecialShot(
+                    1,
+                    &raw mut b::player[0].armor,
+                    &raw mut b::player[0].shield
+                ))
+            },
+            |g| vz::je_do_special_shot(g, 1, 0),
+        ),
+        (
+            || c!(b::JE_setupExplosion(100, 50, 1, 6, false, true)),
+            |g| vz::je_setup_explosion(g, 100, 50, 1, 6, false, true),
+        ),
+        (
+            || c!(b::JE_setupExplosionLarge(true, 13, 100, 50)),
+            |g| vz::je_setup_explosion_large(g, true, 13, 100, 50),
+        ),
+        (
+            || c!(b::JE_wipeShieldArmorBars()),
+            vz::je_wipe_shield_armor_bars,
+        ),
+        (
+            || {
+                c!(b::JE_playerDamage(5, &raw mut b::player[0]));
+            },
+            |g| {
+                vz::je_player_damage(g, 5, 0);
+            },
+        ),
+        (
+            || {
+                c!(b::JE_portConfigs());
+            },
+            |g| {
+                vz::je_port_configs(g);
+            },
+        ),
+        (|| c!(b::JE_drawShield()), vz::je_draw_shield),
+        (|| c!(b::JE_drawArmor()), vz::je_draw_armor),
+        (
+            || c!(b::JE_doSP(120, 80, 20, 9, 32)),
+            |g| vz::je_do_sp(g, 120, 80, 20, 9, 32),
+        ),
+        (|| c!(b::JE_drawSP()), vz::je_draw_sp),
+    ];
+    for (k, (c, r)) in calls.into_iter().enumerate() {
+        let mut d = Diff::from_fixture("demo-cycle", 500);
+        d.c_calls();
+        d.rust_calls();
+        c();
+        r(&mut d.game);
+        assert!(
+            d.c_game_state() == d.game.snapshot(),
+            "call {k}: state differs"
+        );
+        assert_eq!(d.c_calls(), d.rust_calls(), "call {k}");
+    }
+}
