@@ -2,7 +2,8 @@
 // Copyright (C) The OpenTyrian Development Team
 // Copyright (C) rustyrian contributors
 
-//! Port of upstream `jukebox.c` / `jukebox.h`.
+//! Port of upstream `jukebox.c` / `jukebox.h`. The file has no mutable
+//! globals.
 
 use serde::{Deserialize, Serialize};
 

@@ -122,6 +122,10 @@ pub fn load_game(g: &mut Game) {
     g.musmast.load_from_c();
     g.network.load_from_c();
     g.nortsong.load_from_c();
+    g.audio
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .load_from_c();
     g.nortvars.load_from_c();
     g.opentyr.load_from_c();
     g.opl.load_from_c();
@@ -182,6 +186,10 @@ pub fn store_game(g: &Game) {
     g.musmast.store_to_c();
     g.network.store_to_c();
     g.nortsong.store_to_c();
+    g.audio
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .store_to_c();
     g.nortvars.store_to_c();
     g.opentyr.store_to_c();
     g.opl.store_to_c();

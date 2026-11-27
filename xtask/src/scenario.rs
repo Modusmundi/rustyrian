@@ -48,8 +48,8 @@ pub fn build_runner(root: &Path, bin: &str, release: bool) -> Result<PathBuf> {
     run_status(&mut cmd)?;
     let exe = format!("{bin}{}", std::env::consts::EXE_SUFFIX);
     // `root.join` keeps an absolute CARGO_TARGET_DIR as is.
-    let target = std::env::var_os("CARGO_TARGET_DIR")
-        .map_or_else(|| root.join("target"), |d| root.join(d));
+    let target =
+        std::env::var_os("CARGO_TARGET_DIR").map_or_else(|| root.join("target"), |d| root.join(d));
     Ok(target
         .join(if release { "release" } else { "debug" })
         .join(exe))

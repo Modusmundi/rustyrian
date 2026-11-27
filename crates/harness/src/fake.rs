@@ -957,7 +957,10 @@ impl Platform for FakePlatform {
                         // SDL_net enables broadcasts and joins 224.0.0.1,
                         // ignoring failures.
                         let _ = s.set_broadcast(true);
-                        let _ = s.join_multicast_v4(&Ipv4Addr::new(224, 0, 0, 1), &Ipv4Addr::UNSPECIFIED);
+                        let _ = s.join_multicast_v4(
+                            &Ipv4Addr::new(224, 0, 0, 1),
+                            &Ipv4Addr::UNSPECIFIED,
+                        );
                         Some(s)
                     }
                     Err(_) => {
@@ -980,7 +983,12 @@ impl Platform for FakePlatform {
         if self.fails("SDLNet_UDP_Bind") {
             return -1;
         }
-        let bound = |c: i32| self.sockets.channels.get(&(socket.0, c)).map_or(0, Vec::len);
+        let bound = |c: i32| {
+            self.sockets
+                .channels
+                .get(&(socket.0, c))
+                .map_or(0, Vec::len)
+        };
         let channel = if channel == -1 {
             // The first channel with room (SDL_net leaves `channel` at
             // SDLNET_MAX_UDPCHANNELS when none has room; that binding is out
@@ -1231,7 +1239,10 @@ mod tests {
 
         // A failed resolve still stores the port and sets the host to INADDR_NONE.
         let mut a = IpAddress::default();
-        assert_eq!(p.net_resolve_host(&mut a, Some("no.such.host.invalid"), 1333), -1);
+        assert_eq!(
+            p.net_resolve_host(&mut a, Some("no.such.host.invalid"), 1333),
+            -1
+        );
         assert_eq!((a.host, a.port), (u32::MAX, 1333u16.to_be()));
     }
 }

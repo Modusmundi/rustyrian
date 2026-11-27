@@ -25,7 +25,11 @@ fn gcov_command() -> String {
         return "xcrun llvm-cov gcov".to_owned();
     }
     for v in ["llvm-cov-18", "llvm-cov"] {
-        if Command::new(v).arg("--version").output().is_ok_and(|o| o.status.success()) {
+        if Command::new(v)
+            .arg("--version")
+            .output()
+            .is_ok_and(|o| o.status.success())
+        {
             return format!("{v} gcov");
         }
     }
@@ -33,7 +37,8 @@ fn gcov_command() -> String {
 }
 
 fn cov_env(cmd: &mut Command) {
-    cmd.env("OT_REF_COVERAGE", "1").env("CARGO_TARGET_DIR", TARGET_DIR);
+    cmd.env("OT_REF_COVERAGE", "1")
+        .env("CARGO_TARGET_DIR", TARGET_DIR);
 }
 
 /// The oracle build's object directory (holds `.gcno`/`.gcda`).
@@ -49,7 +54,8 @@ fn object_dir(root: &Path) -> Result<PathBuf> {
             }
         }
     }
-    best.map(|(_, p)| p).context("no oracle object directory under target/cov")
+    best.map(|(_, p)| p)
+        .context("no oracle object directory under target/cov")
 }
 
 pub fn run(root: &Path) -> Result<()> {
