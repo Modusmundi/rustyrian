@@ -2,32 +2,32 @@
 c = "animlib.c::readFileHeader"
 c_sha = "d846388443c3"
 rust = "rustyrian_core::animlib::read_file_header"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:animlib::headers_match_on_real_data_and_truncated_files"]
 notes = ""
 
 [[fn]]
 c = "animlib.c::readPalette"
 c_sha = "22e4c373aec1"
 rust = "rustyrian_core::animlib::read_palette"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:animlib::headers_match_on_real_data_and_truncated_files"]
 notes = ""
 
 [[fn]]
 c = "animlib.c::readPageDescriptors"
 c_sha = "cf6891d88425"
 rust = "rustyrian_core::animlib::read_page_descriptors"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:animlib::headers_match_on_real_data_and_truncated_files"]
 notes = ""
 
 [[fn]]
 c = "animlib.c::decodeRunSkipDump"
 c_sha = "ff6743080e8d"
 rust = "rustyrian_core::animlib::decode_run_skip_dump"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:animlib::decode_run_skip_dump_matches_every_record", "diff:animlib::decode_run_skip_dump_matches_random", "diff:animlib::decode_run_skip_dump_matches_ops"]
 notes = ""
 
 [[fn]]
@@ -36,7 +36,7 @@ c_sha = "dfde81e9444b"
 rust = "rustyrian_core::animlib::play_anim"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: calls video.c::JE_clr256/JE_showVGA, nortsong.c::setFrameCount, keyboard.c::waitUntilGetInputOrElapsed (not verified on main)"
 
 [[fn]]
 c = "arg_parse.c::parse_args"
@@ -1696,144 +1696,144 @@ notes = ""
 c = "font.c::drawFontHvShadow"
 c_sha = "d41b47fd6214"
 rust = "rustyrian_core::font::draw_font_hv_shadow"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:font::draw_font_functions_match_on_all_glyphs", "diff:font::draw_font_functions_match_random"]
 notes = ""
 
 [[fn]]
 c = "font.c::drawFontHvShadowAligned"
 c_sha = "b132f3a29d1c"
 rust = "rustyrian_core::font::draw_font_hv_shadow_aligned"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:font::draw_font_functions_match_on_all_glyphs", "diff:font::draw_font_functions_match_random"]
 notes = ""
 
 [[fn]]
 c = "font.c::drawFontHvFullShadow"
 c_sha = "60caa33b0773"
 rust = "rustyrian_core::font::draw_font_hv_full_shadow"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:font::draw_font_functions_match_on_all_glyphs", "diff:font::draw_font_functions_match_random"]
 notes = ""
 
 [[fn]]
 c = "font.c::drawFontHvFullShadowAligned"
 c_sha = "6ceb7c6f5349"
 rust = "rustyrian_core::font::draw_font_hv_full_shadow_aligned"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:font::draw_font_functions_match_on_all_glyphs", "diff:font::draw_font_functions_match_random"]
 notes = ""
 
 [[fn]]
 c = "font.c::drawFontHv"
 c_sha = "d533a33a3929"
 rust = "rustyrian_core::font::draw_font_hv"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:font::draw_font_functions_match_on_all_glyphs", "diff:font::draw_font_functions_match_random"]
 notes = ""
 
 [[fn]]
 c = "font.c::drawFontHvAligned"
 c_sha = "2be402a25be3"
 rust = "rustyrian_core::font::draw_font_hv_aligned"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:font::draw_font_functions_match_on_all_glyphs", "diff:font::draw_font_functions_match_random"]
 notes = ""
 
 [[fn]]
 c = "font.c::drawFontHvBlend"
 c_sha = "3e499b6fde40"
 rust = "rustyrian_core::font::draw_font_hv_blend"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:font::draw_font_functions_match_on_all_glyphs", "diff:font::draw_font_functions_match_random"]
 notes = ""
 
 [[fn]]
 c = "font.c::drawFontHvBlendAligned"
 c_sha = "5528d20c3468"
 rust = "rustyrian_core::font::draw_font_hv_blend_aligned"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:font::draw_font_functions_match_on_all_glyphs", "diff:font::draw_font_functions_match_random"]
 notes = ""
 
 [[fn]]
 c = "font.c::drawFontDark"
 c_sha = "c7165d75c00b"
 rust = "rustyrian_core::font::draw_font_dark"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:font::draw_font_functions_match_on_all_glyphs", "diff:font::draw_font_functions_match_random"]
 notes = ""
 
 [[fn]]
 c = "font.c::drawFontDarkAligned"
 c_sha = "b926f011032c"
 rust = "rustyrian_core::font::draw_font_dark_aligned"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:font::draw_font_functions_match_on_all_glyphs", "diff:font::draw_font_functions_match_random"]
 notes = ""
 
 [[fn]]
 c = "fonthand.c::JE_dString"
 c_sha = "f50159a5c01e"
 rust = "rustyrian_core::fonthand::je_d_string"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:fonthand::text_functions_match_on_all_glyphs", "diff:fonthand::text_functions_match_random"]
 notes = ""
 
 [[fn]]
 c = "fonthand.c::JE_fontCenter"
 c_sha = "9503e2ed7209"
 rust = "rustyrian_core::fonthand::je_font_center"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:fonthand::text_functions_match_on_all_glyphs", "diff:fonthand::text_functions_match_random"]
 notes = ""
 
 [[fn]]
 c = "fonthand.c::JE_textWidth"
 c_sha = "0f8898701cfc"
 rust = "rustyrian_core::fonthand::je_text_width"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:fonthand::text_functions_match_on_all_glyphs", "diff:fonthand::text_functions_match_random"]
 notes = ""
 
 [[fn]]
 c = "fonthand.c::JE_textShade"
 c_sha = "8bec3b7f5a06"
 rust = "rustyrian_core::fonthand::je_text_shade"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:fonthand::text_functions_match_on_all_glyphs", "diff:fonthand::text_functions_match_random"]
 notes = ""
 
 [[fn]]
 c = "fonthand.c::JE_outText"
 c_sha = "a44e534af6fa"
 rust = "rustyrian_core::fonthand::je_out_text"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:fonthand::text_functions_match_on_all_glyphs", "diff:fonthand::text_functions_match_random"]
 notes = ""
 
 [[fn]]
 c = "fonthand.c::JE_outTextModify"
 c_sha = "f4e78d7e1f8f"
 rust = "rustyrian_core::fonthand::je_out_text_modify"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:fonthand::text_functions_match_on_all_glyphs", "diff:fonthand::text_functions_match_random"]
 notes = ""
 
 [[fn]]
 c = "fonthand.c::JE_outTextAdjust"
 c_sha = "caf6d20222d1"
 rust = "rustyrian_core::fonthand::je_out_text_adjust"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:fonthand::text_functions_match_on_all_glyphs", "diff:fonthand::text_functions_match_random"]
 notes = ""
 
 [[fn]]
 c = "fonthand.c::JE_outTextAndDarken"
 c_sha = "ed344211ce24"
 rust = "rustyrian_core::fonthand::je_out_text_and_darken"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:fonthand::text_functions_match_on_all_glyphs", "diff:fonthand::text_functions_match_random"]
 notes = ""
 
 [[fn]]
@@ -1842,7 +1842,7 @@ c_sha = "9ec43433fec1"
 rust = "rustyrian_core::fonthand::je_update_warning"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: calls nortsong.c::getFrameCount2Ticks/setFrameCount2/JE_playSampleNum and video.c::JE_showVGA (not verified on main)"
 
 [[fn]]
 c = "fonthand.c::JE_outTextGlow"
@@ -1850,7 +1850,7 @@ c_sha = "11bd44c5447b"
 rust = "rustyrian_core::fonthand::je_out_text_glow"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: calls nortsong.c::setFrameCount, video.c::JE_showVGA, keyboard.c::waitUntilGetInputOrElapsed (not verified on main)"
 
 [[fn]]
 c = "game_menu.c::playeritem_map"
@@ -3585,16 +3585,16 @@ notes = ""
 c = "nortvars.c::JE_dBar3"
 c_sha = "8e8738ae2863"
 rust = "rustyrian_core::nortvars::je_d_bar3"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:nortvars::je_d_bar3_matches", "diff:nortvars::typical_calls_match"]
 notes = ""
 
 [[fn]]
 c = "nortvars.c::JE_barDrawShadow"
 c_sha = "6cbe078e9871"
 rust = "rustyrian_core::nortvars::je_bar_draw_shadow"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:nortvars::je_bar_draw_shadow_matches", "diff:nortvars::typical_calls_match"]
 notes = ""
 
 [[fn]]
@@ -3865,48 +3865,49 @@ notes = ""
 c = "palette.c::loadPals"
 c_sha = "d4f07d05f444"
 rust = "rustyrian_core::palette::load_pals"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:palette::load_pals_matches_on_real_data", "diff:palette::load_pals_other_files_match"]
+waived_lines = [{ line = 78, reason = "unreachable with a regular file: palettesCount = length / 768, so every read fits; only an OS read error fails it" }, { line = 79, reason = "as line 78" }]
 notes = ""
 
 [[fn]]
 c = "palette.c::set_palette"
 c_sha = "514eac564173"
 rust = "rustyrian_core::palette::set_palette"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:palette::set_palette_and_set_colors_match", "diff:picload::je_load_pic_matches_on_real_data"]
 notes = ""
 
 [[fn]]
 c = "palette.c::set_colors"
 c_sha = "557a22b44724"
 rust = "rustyrian_core::palette::set_colors"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:palette::set_palette_and_set_colors_match"]
 notes = ""
 
 [[fn]]
 c = "palette.c::init_step_fade_palette"
 c_sha = "6e4297dda632"
 rust = "rustyrian_core::palette::init_step_fade_palette"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:palette::step_fade_palette_matches"]
 notes = ""
 
 [[fn]]
 c = "palette.c::init_step_fade_solid"
 c_sha = "8261949e3364"
 rust = "rustyrian_core::palette::init_step_fade_solid"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:palette::step_fade_palette_matches"]
 notes = ""
 
 [[fn]]
 c = "palette.c::step_fade_palette"
 c_sha = "eadccec0cfb6"
 rust = "rustyrian_core::palette::step_fade_palette"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:palette::step_fade_palette_matches", "diff:palette::step_fade_palette_matches_any_diff"]
 notes = ""
 
 [[fn]]
@@ -3915,7 +3916,7 @@ c_sha = "689f8eb01272"
 rust = "rustyrian_core::palette::fade_palette"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: calls nortsong.c::setFrameCount/waitUntilElapsed, video.c::JE_showVGA, keyboard.c::keyboardClearInput, mouse.c::mouseClearInput (not verified on main)"
 
 [[fn]]
 c = "palette.c::fade_solid"
@@ -3923,7 +3924,7 @@ c_sha = "86b6e5f4bf14"
 rust = "rustyrian_core::palette::fade_solid"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: calls nortsong.c::setFrameCount/waitUntilElapsed, video.c::JE_showVGA, keyboard.c::keyboardClearInput, mouse.c::mouseClearInput (not verified on main)"
 
 [[fn]]
 c = "palette.c::fade_black"
@@ -3931,7 +3932,7 @@ c_sha = "f9640314e57d"
 rust = "rustyrian_core::palette::fade_black"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: calls palette.c::fade_solid (blocked)"
 
 [[fn]]
 c = "palette.c::fade_white"
@@ -3939,14 +3940,14 @@ c_sha = "336191a4665f"
 rust = "rustyrian_core::palette::fade_white"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: calls palette.c::fade_solid (blocked)"
 
 [[fn]]
 c = "palette.c::rgb_to_yuv"
 c_sha = "53c6fe21cd50"
 rust = "rustyrian_core::palette::rgb_to_yuv"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:palette::rgb_to_yuv_matches", "diff:palette::rgb_to_yuv_matches_ramps"]
 notes = ""
 
 [[fn]]
@@ -3962,16 +3963,16 @@ notes = ""
 c = "pcxload.c::JE_loadPCX"
 c_sha = "9f14b8171d48"
 rust = "rustyrian_core::pcxload::je_load_pcx"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:pcxload::je_load_pcx_matches_on_every_pcx", "diff:pcxload::je_load_pcx_other_files_match"]
 notes = ""
 
 [[fn]]
 c = "picload.c::JE_loadPic"
 c_sha = "0b5e6b4925a9"
 rust = "rustyrian_core::picload::je_load_pic"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:picload::je_load_pic_matches_on_real_data", "diff:picload::je_load_pic_missing_file_matches", "diff:picload::je_load_pic_damaged_files_match"]
 notes = ""
 
 [[fn]]
@@ -4050,240 +4051,240 @@ notes = ""
 c = "sprite.c::load_sprites_file"
 c_sha = "b365b92682d8"
 rust = "rustyrian_core::sprite::load_sprites_file"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::load_sprites_file_matches"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::load_sprites"
 c_sha = "17df7fd61700"
 rust = "rustyrian_core::sprite::load_sprites"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::load_sprites_file_matches", "diff:sprite::je_load_main_shape_tables_matches_on_real_data", "diff:sprite::je_load_main_shape_tables_truncated_files_match"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::free_sprites"
 c_sha = "28241da79789"
 rust = "rustyrian_core::sprite::free_sprites"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::load_sprites_file_matches", "diff:sprite::je_load_main_shape_tables_matches_on_real_data"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::blit_sprite"
 c_sha = "3c822653d92e"
 rust = "rustyrian_core::sprite::blit_sprite"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::blit_sprite_variants_match_on_all_tables", "diff:sprite::blit_sprite_variants_match_random"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::blit_sprite_blend"
 c_sha = "02232dcf1c58"
 rust = "rustyrian_core::sprite::blit_sprite_blend"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::blit_sprite_variants_match_on_all_tables", "diff:sprite::blit_sprite_variants_match_random"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::blit_sprite_hv_unsafe"
 c_sha = "ffb68d644550"
 rust = "rustyrian_core::sprite::blit_sprite_hv_unsafe"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::blit_sprite_variants_match_on_all_tables", "diff:sprite::blit_sprite_variants_match_random"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::blit_sprite_hv"
 c_sha = "938de5b25f19"
 rust = "rustyrian_core::sprite::blit_sprite_hv"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::blit_sprite_variants_match_on_all_tables", "diff:sprite::blit_sprite_variants_match_random"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::blit_sprite_hv_blend"
 c_sha = "ba926a73ba3c"
 rust = "rustyrian_core::sprite::blit_sprite_hv_blend"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::blit_sprite_variants_match_on_all_tables", "diff:sprite::blit_sprite_variants_match_random"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::blit_sprite_dark"
 c_sha = "53cbc2d7b003"
 rust = "rustyrian_core::sprite::blit_sprite_dark"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::blit_sprite_variants_match_on_all_tables", "diff:sprite::blit_sprite_variants_match_random"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::JE_loadCompShapes"
 c_sha = "8ce117474b59"
 rust = "rustyrian_core::sprite::je_load_comp_shapes"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::je_load_comp_shapes_and_blits_match_on_every_sheet_file", "diff:sprite::je_load_comp_shapes_error_paths_match"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::JE_loadCompShapesB"
 c_sha = "b39cb8eca73d"
 rust = "rustyrian_core::sprite::je_load_comp_shapes_b"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::je_load_comp_shapes_and_blits_match_on_every_sheet_file", "diff:sprite::je_load_main_shape_tables_matches_on_real_data", "diff:sprite::je_load_main_shape_tables_truncated_files_match"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::free_sprite2s"
 c_sha = "80831ad837e1"
 rust = "rustyrian_core::sprite::free_sprite2s"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::free_sprite2s_matches", "diff:sprite::je_load_comp_shapes_and_blits_match_on_every_sheet_file"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::blit_sprite2"
 c_sha = "bc3fb2b609f4"
 rust = "rustyrian_core::sprite::blit_sprite2"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::blit_sprite2_variants_match_on_main_sheets", "diff:sprite::je_load_comp_shapes_and_blits_match_on_every_sheet_file", "diff:sprite::blit_sprite2_variants_match_random"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::blit_sprite2_clip"
 c_sha = "a95cdeb9a566"
 rust = "rustyrian_core::sprite::blit_sprite2_clip"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::blit_sprite2_variants_match_on_main_sheets", "diff:sprite::je_load_comp_shapes_and_blits_match_on_every_sheet_file", "diff:sprite::blit_sprite2_variants_match_random"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::blit_sprite2_blend"
 c_sha = "cc566ea78fdd"
 rust = "rustyrian_core::sprite::blit_sprite2_blend"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::blit_sprite2_variants_match_on_main_sheets", "diff:sprite::je_load_comp_shapes_and_blits_match_on_every_sheet_file", "diff:sprite::blit_sprite2_variants_match_random"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::blit_sprite2_darken"
 c_sha = "e0332e2df85d"
 rust = "rustyrian_core::sprite::blit_sprite2_darken"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::blit_sprite2_variants_match_on_main_sheets", "diff:sprite::je_load_comp_shapes_and_blits_match_on_every_sheet_file", "diff:sprite::blit_sprite2_variants_match_random"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::blit_sprite2_filter"
 c_sha = "5e7a07b28bfc"
 rust = "rustyrian_core::sprite::blit_sprite2_filter"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::blit_sprite2_variants_match_on_main_sheets", "diff:sprite::je_load_comp_shapes_and_blits_match_on_every_sheet_file", "diff:sprite::blit_sprite2_variants_match_random"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::blit_sprite2_filter_clip"
 c_sha = "77bf13607005"
 rust = "rustyrian_core::sprite::blit_sprite2_filter_clip"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::blit_sprite2_variants_match_on_main_sheets", "diff:sprite::je_load_comp_shapes_and_blits_match_on_every_sheet_file", "diff:sprite::blit_sprite2_variants_match_random"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::blit_sprite2x2"
 c_sha = "84f07402516d"
 rust = "rustyrian_core::sprite::blit_sprite2x2"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::blit_sprite2_variants_match_on_main_sheets", "diff:sprite::je_load_comp_shapes_and_blits_match_on_every_sheet_file", "diff:sprite::blit_sprite2_variants_match_random"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::blit_sprite2x2_clip"
 c_sha = "7ef9efea06e7"
 rust = "rustyrian_core::sprite::blit_sprite2x2_clip"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::blit_sprite2_variants_match_on_main_sheets", "diff:sprite::je_load_comp_shapes_and_blits_match_on_every_sheet_file", "diff:sprite::blit_sprite2_variants_match_random"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::blit_sprite2x2_blend"
 c_sha = "5d6ad94c601e"
 rust = "rustyrian_core::sprite::blit_sprite2x2_blend"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::blit_sprite2_variants_match_on_main_sheets", "diff:sprite::je_load_comp_shapes_and_blits_match_on_every_sheet_file", "diff:sprite::blit_sprite2_variants_match_random"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::blit_sprite2x2_darken"
 c_sha = "3163782efc86"
 rust = "rustyrian_core::sprite::blit_sprite2x2_darken"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::blit_sprite2_variants_match_on_main_sheets", "diff:sprite::je_load_comp_shapes_and_blits_match_on_every_sheet_file", "diff:sprite::blit_sprite2_variants_match_random"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::blit_sprite2x2_filter"
 c_sha = "02a03761cb43"
 rust = "rustyrian_core::sprite::blit_sprite2x2_filter"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::blit_sprite2_variants_match_on_main_sheets", "diff:sprite::je_load_comp_shapes_and_blits_match_on_every_sheet_file", "diff:sprite::blit_sprite2_variants_match_random"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::blit_sprite2x2_filter_clip"
 c_sha = "3516a17e5d90"
 rust = "rustyrian_core::sprite::blit_sprite2x2_filter_clip"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::blit_sprite2_variants_match_on_main_sheets", "diff:sprite::je_load_comp_shapes_and_blits_match_on_every_sheet_file", "diff:sprite::blit_sprite2_variants_match_random"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::JE_loadMainShapeTables"
 c_sha = "5ea952a7aa2a"
 rust = "rustyrian_core::sprite::je_load_main_shape_tables"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::je_load_main_shape_tables_matches_on_real_data", "diff:sprite::je_load_main_shape_tables_missing_file_matches", "diff:sprite::je_load_main_shape_tables_truncated_files_match"]
 notes = ""
 
 [[fn]]
 c = "sprite.c::free_main_shape_tables"
 c_sha = "564c48803c4e"
 rust = "rustyrian_core::sprite::free_main_shape_tables"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::je_load_main_shape_tables_matches_on_real_data"]
 notes = ""
 
 [[fn]]
 c = "sprite.h::sprite"
 c_sha = "4e3ef1c91f3a"
 rust = "rustyrian_core::sprite::sprite"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::je_load_main_shape_tables_matches_on_real_data"]
 notes = ""
 
 [[fn]]
 c = "sprite.h::sprite_exists"
 c_sha = "7d89b145514b"
 rust = "rustyrian_core::sprite::sprite_exists"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::je_load_main_shape_tables_matches_on_real_data"]
 notes = ""
 
 [[fn]]
 c = "sprite.h::get_sprite_width"
 c_sha = "06e654b7b206"
 rust = "rustyrian_core::sprite::get_sprite_width"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::je_load_main_shape_tables_matches_on_real_data"]
 notes = ""
 
 [[fn]]
 c = "sprite.h::get_sprite_height"
 c_sha = "b51c5ebb7d28"
 rust = "rustyrian_core::sprite::get_sprite_height"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:sprite::je_load_main_shape_tables_matches_on_real_data"]
 notes = ""
 
 [[fn]]
@@ -4658,64 +4659,64 @@ notes = ""
 c = "vga256d.c::JE_pix"
 c_sha = "49a5666f1791"
 rust = "rustyrian_core::vga256d::je_pix"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:vga256d::je_pix_and_je_pix3_match"]
 notes = ""
 
 [[fn]]
 c = "vga256d.c::JE_pix3"
 c_sha = "92005e47f066"
 rust = "rustyrian_core::vga256d::je_pix3"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:vga256d::je_pix_and_je_pix3_match"]
 notes = ""
 
 [[fn]]
 c = "vga256d.c::JE_rectangle"
 c_sha = "bc5f4a4e6db2"
 rust = "rustyrian_core::vga256d::je_rectangle"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:vga256d::je_rectangle_matches", "diff:vga256d::edge_cases_match"]
 notes = ""
 
 [[fn]]
 c = "vga256d.c::fill_rectangle_xy"
 c_sha = "1d678ae3bfb4"
 rust = "rustyrian_core::vga256d::fill_rectangle_xy"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:vga256d::fill_rectangles_match"]
 notes = ""
 
 [[fn]]
 c = "vga256d.c::JE_barShade"
 c_sha = "e173f39d72c9"
 rust = "rustyrian_core::vga256d::je_bar_shade"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:vga256d::je_bar_shade_and_bright_match", "diff:vga256d::edge_cases_match"]
 notes = ""
 
 [[fn]]
 c = "vga256d.c::JE_barBright"
 c_sha = "6a22413afaf4"
 rust = "rustyrian_core::vga256d::je_bar_bright"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:vga256d::je_bar_shade_and_bright_match", "diff:vga256d::edge_cases_match"]
 notes = ""
 
 [[fn]]
 c = "vga256d.c::draw_segmented_gauge"
 c_sha = "96b9fbb9a980"
 rust = "rustyrian_core::vga256d::draw_segmented_gauge"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:vga256d::draw_segmented_gauge_matches", "diff:vga256d::edge_cases_match"]
 notes = ""
 
 [[fn]]
 c = "vga256d.h::fill_rectangle_wh"
 c_sha = "fc9866b10501"
 rust = "rustyrian_core::vga256d::fill_rectangle_wh"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:vga256d::fill_rectangles_match", "diff:vga256d::draw_segmented_gauge_matches"]
 notes = ""
 
 [[fn]]

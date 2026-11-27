@@ -1,8 +1,15 @@
 //! Differential tests for `pcxload.c` / `pcxload.h` (no mutable globals).
 
-use rustyrian_core::pcxload::State;
+use rustyrian_core::game::Halt;
+use rustyrian_core::palette;
+use rustyrian_core::pcxload::{self as pcx, State};
+use rustyrian_core::sdl::Surface;
+use rustyrian_core::video::{self, ScreenId};
+use rustyrian_oracle::bindings as b;
 use rustyrian_oracle::diff::{self, Diff};
 use rustyrian_oracle::mirror::Mirror;
+use std::ffi::CString;
+use std::path::{Path, PathBuf};
 
 #[test]
 fn initial_state_matches_c() {
@@ -16,4 +23,117 @@ fn mirror_round_trip() {
     let s = State::default();
     s.store_to_c();
     assert_eq!(diff::load::<State>(), s);
+}
+
+fn data_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../data")
+        .canonicalize()
+        .expect("data/ (run `cargo xtask fetch-data`)")
+}
+
+fn tmp(name: &str) -> PathBuf {
+    let d = std::env::temp_dir()
+        .join(format!("rustyrian-pcxload-{}", std::process::id()))
+        .join(name);
+    let _ = std::fs::remove_dir_all(&d);
+    std::fs::create_dir_all(&d).expect("scratch dir");
+    d
+}
+
+/// Loads `name` from `dir` into `VGAScreen` (`vga`) in both engines and
+/// compares surfaces, `colors` and the log.
+fn check(dir: &Path, name: &str, vga: ScreenId) -> (Option<i32>, Result<(), Halt>) {
+    use std::os::unix::ffi::OsStrExt;
+    let mut d = Diff::new();
+    let vs = &mut d.game.video;
+    for (i, slot) in vs.screens.iter_mut().enumerate() {
+        let mut s = Surface::new_8bit(320, 200);
+        s.pixels
+            .iter_mut()
+            .enumerate()
+            .for_each(|(k, p)| *p = (k * 3 + i) as u8);
+        *slot = Some(s);
+    }
+    vs.vga_screen = Some(vga);
+    vs.vga_screen_seg = Some(ScreenId::VgaScreenSeg);
+    vs.vga_screen2 = Some(ScreenId::VgaScreen2);
+    vs.game_screen = Some(ScreenId::GameScreen);
+    d.game.file.custom_data_dir_path = Some(dir.as_os_str().as_bytes().to_vec());
+    d.store_to_c();
+    let cname = CString::new(name).expect("no NUL");
+    // SAFETY: a valid C string; exit is caught by the guard.
+    let c = unsafe { rustyrian_oracle::guard_call(|| b::JE_loadPCX(cname.as_ptr())) };
+    let r = pcx::je_load_pcx(&mut d.game, name);
+    assert_eq!(diff::load::<palette::State>(), d.game.palette, "{name}");
+    assert!(
+        diff::load::<video::State>().screens == d.game.video.screens,
+        "{name}: surfaces differ"
+    );
+    assert_eq!(d.c_calls(), d.rust_calls(), "{name}");
+    (c, r)
+}
+
+/// Every PCX picture in the freeware data.
+#[test]
+fn je_load_pcx_matches_on_every_pcx() {
+    let mut names: Vec<String> = std::fs::read_dir(data_dir())
+        .expect("data/")
+        .filter_map(|e| e.ok()?.file_name().into_string().ok())
+        .filter(|n| n.ends_with(".pcx"))
+        .collect();
+    names.sort();
+    assert!(names.len() >= 8, "{names:?}");
+    for (k, name) in names.iter().enumerate() {
+        let vga = [
+            ScreenId::VgaScreenSeg,
+            ScreenId::VgaScreen2,
+            ScreenId::GameScreen,
+        ][k % 3];
+        assert_eq!(check(&data_dir(), name, vga), (None, Ok(())), "{name}");
+    }
+}
+
+/// Missing, too short (logged, nothing loaded), minimal and truncated files.
+#[test]
+fn je_load_pcx_other_files_match() {
+    let (c, r) = check(&tmp("missing"), "tshp2.pcx", ScreenId::VgaScreenSeg);
+    assert_eq!(c, Some(1));
+    assert_eq!(r, Err(Halt { code: 1 }));
+
+    let full = std::fs::read(data_dir().join("tshp2.pcx")).expect("tshp2.pcx");
+    let mut runs = vec![0u8; 128];
+    runs.extend((0..2000).map(|i| {
+        if i % 2 == 0 {
+            0xC0 | (i % 64) as u8
+        } else {
+            i as u8
+        }
+    }));
+    runs.extend((0..768).map(|i| i as u8));
+    for (k, contents) in [
+        full[..0].to_vec(),
+        full[..895].to_vec(),
+        full[..896].to_vec(),
+        full[..5000].to_vec(),
+        full[..full.len() - 1].to_vec(),
+        runs,
+    ]
+    .iter()
+    .enumerate()
+    {
+        let dir = tmp(&format!("case{k}"));
+        std::fs::write(dir.join("tshp2.pcx"), contents).expect("write");
+        assert_eq!(
+            check(&dir, "tshp2.pcx", ScreenId::VgaScreenSeg),
+            (None, Ok(())),
+            "case {k}"
+        );
+    }
+
+    // A directory named like the file opens but cannot be read.
+    let dir = tmp("dir");
+    std::fs::create_dir(dir.join("tshp2.pcx")).expect("mkdir");
+    let (c, r) = check(&dir, "tshp2.pcx", ScreenId::VgaScreenSeg);
+    assert_eq!(c.map(|code| Halt { code }), r.err());
 }
