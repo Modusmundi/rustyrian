@@ -118,7 +118,9 @@ fn any_shot() -> impl Strategy<Value = PlayerShotDataType> {
             0i16..12,
         ),
         (
-            prop_oneof![1u16..500, 501u16..900, 1001u16..1600, 59990u16..=65535],
+            // Not drawn: 60000 and up, without wrapping past 65535 (a wrap
+            // gives frame 0; see the mapping in the test).
+            prop_oneof![1u16..500, 501u16..900, 1001u16..1600, 60000u16..=65530],
             0u16..6,
             1u16..7,
         ),
@@ -162,8 +164,10 @@ proptest! {
     ) {
         let mut d = Diff::new();
         d.game.restore(diff::fixture("demo-cycle", frame));
-        // Sprite indices past a sheet's offset table make C read outside the
-        // sheet, so each drawn frame is mapped into its sheet's real range.
+        // Every drawn frame stays inside its sheet's offset table (304
+        // entries in the freeware data): frames outside it are D-UB-SPRITE-1
+        // territory (`shots.c:101-108` → `sprite.c:550`), where C's behaviour
+        // is undefined, so only in-table frames are compared.
         let count = |s: &rustyrian_core::sprite::Sprite2Array| {
             let data = s.data.as_deref().expect("sheet loaded by the fixture");
             u16::from_le_bytes([data[0], data[1]]) / 2
