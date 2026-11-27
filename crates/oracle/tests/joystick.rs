@@ -339,8 +339,14 @@ proptest! {
     }
 
     #[test]
-    fn reset_and_load_assignments_match_c(pads in any_pads(), config in any_config(), j in 0usize..4) {
-        prop_assume!(j < pads.len());
+    fn reset_and_load_assignments_match_c(
+        (pads, j) in prop::collection::vec((0i32..4, 0i32..10, 0i32..3), 1..4)
+            .prop_flat_map(|pads| {
+                let n = pads.len();
+                (Just(pads), 0..n)
+            }),
+        config in any_config(),
+    ) {
         let mut d = with_pads(&pads, &[]);
         d.store();
         init_both(&mut d);
@@ -368,14 +374,21 @@ proptest! {
     #[test]
     fn axis_helpers_match_c(
         threshold in prop_oneof![0i32..10, any::<i32>()],
-        sensitivity in prop_oneof![0i32..15, 16i32..30, any::<i32>()],
+        // A sensitivity of 15 (or one that wraps to the same divisor)
+        // divides by zero in C (D-UB-JOYSTICK-SENSITIVITY); those are
+        // nudged to a neighbour.
+        sensitivity in prop_oneof![0i32..15, 16i32..30, any::<i32>()].prop_map(|s| {
+            if 3000i32.wrapping_sub(200i32.wrapping_mul(s)) == 0 {
+                s.wrapping_add(1)
+            } else {
+                s
+            }
+        }),
         x: i32,
         y: i32,
         value in prop_oneof![-40000i32..40000, any::<i32>()],
         angle in -10.0f32..10.0,
     ) {
-        // A sensitivity of 15 divides by zero in C (D-UB-JOYSTICK-SENSITIVITY).
-        prop_assume!(3000i32.wrapping_sub(200i32.wrapping_mul(sensitivity)) != 0);
         let mut d = with_pads(&[(2, 2, 1)], &[]);
         d.store();
         init_both(&mut d);
