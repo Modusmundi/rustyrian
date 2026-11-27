@@ -1,0 +1,39 @@
+[package]
+name = "rustyrian-fuzz"
+version = "0.0.0"
+edition = "2024"
+license = "GPL-2.0-or-later"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+rustyrian-core = { path = "../crates/core" }
+rustyrian-harness = { path = "../crates/harness" }
+
+# Not part of the main workspace (cargo-fuzz needs nightly and its own profile).
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+overflow-checks = true
+
+[[bin]]
+name = "cfg_text"
+path = "fuzz_targets/cfg_text.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "helptext"
+path = "fuzz_targets/helptext.rs"
+test = false
+doc = false
+bench = false
+
+[lib]
+path = "src/lib.rs"

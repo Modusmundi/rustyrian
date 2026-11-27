@@ -4,6 +4,7 @@ mod ast;
 mod check_trace;
 mod coverage;
 mod fetch_data;
+mod fuzz_seed;
 mod gen_oracle;
 mod inventory;
 mod manifest;
@@ -42,6 +43,8 @@ enum Cmd {
     Fixtures,
     /// Per-function C line coverage into `porting/coverage.json`.
     Coverage,
+    /// Copy the freeware data files into fuzz/corpus/<target>/.
+    FuzzSeed,
     /// Run the C oracle on a scenario and write its trace.
     RefTrace {
         scenario: String,
@@ -65,6 +68,7 @@ fn main() -> Result<()> {
         Cmd::Sanitize => sanitize::run(&root),
         Cmd::Fixtures => scenario::fixtures(&root),
         Cmd::Coverage => coverage::run(&root),
+        Cmd::FuzzSeed => fuzz_seed::run(&root),
         Cmd::RefTrace {
             scenario,
             out,

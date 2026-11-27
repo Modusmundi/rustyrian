@@ -9,13 +9,17 @@ use crate::mirror::{self, Mirror};
 use crate::session;
 use rustyrian_core::Game;
 use rustyrian_harness::trace::PlatformCall;
-use rustyrian_harness::{CallLog, test_session};
+use rustyrian_harness::{CallLog, FakeHandle, test_session, test_session_with_handle};
 use std::ffi::{CString, c_char};
 
 /// The two engines of one differential test.
 pub struct Diff {
     /// The Rust engine.
     pub game: Box<Game>,
+    /// Controls of the C side's fake platform (failures, loopback datagrams).
+    pub c_fake: FakeHandle,
+    /// Controls of the Rust side's fake platform.
+    pub rust_fake: FakeHandle,
     c_log: CallLog,
     rust_log: CallLog,
 }
@@ -24,14 +28,22 @@ impl Diff {
     /// Installs a fresh C session and builds a fresh Rust game. Both start in
     /// the state of a freshly started process.
     pub fn new() -> Diff {
-        let (c, c_log) = test_session();
+        let (c, c_log, c_fake) = test_session_with_handle();
         session::install(c);
-        let (r, rust_log) = test_session();
+        let (r, rust_log, rust_fake) = test_session_with_handle();
         Diff {
             game: Game::new(Box::new(r)),
+            c_fake,
+            rust_fake,
             c_log,
             rust_log,
         }
+    }
+
+    /// Injects the same failure into both sides (see `FakeHandle::fail_after`).
+    pub fn fail_after(&self, sdl_name: &str, successes: u32) {
+        self.c_fake.fail_after(sdl_name, successes);
+        self.rust_fake.fail_after(sdl_name, successes);
     }
 
     /// Platform calls made by C since the last call to this method.
