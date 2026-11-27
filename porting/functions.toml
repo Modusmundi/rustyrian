@@ -1872,49 +1872,50 @@ notes = ""
 c = "game_menu.c::JE_cashLeft"
 c_sha = "7e0deec4bf1b"
 rust = "rustyrian_core::game_menu::je_cash_left"
-status = "todo"
-verify = []
-notes = "blocked: calls mainint.c::JE_getCost (not verified on main)"
+status = "verified"
+verify = ["diff:game_menu::je_cash_left_and_draw_score_match", "diff:game_menu::je_menu_function_matches_every_action", "diff:game_menu::je_item_screen_shop_matches"]
+notes = ""
 
 [[fn]]
 c = "game_menu.c::JE_itemScreen"
 c_sha = "430d104f1ebc"
 rust = "rustyrian_core::game_menu::je_item_screen"
-status = "todo"
-verify = []
-notes = "blocked: calls mainint.c::JE_getCost/JE_drawCube/JE_helpSystem, varz.c::JE_getShipInfo, and game_menu functions blocked on those"
+status = "verified"
+verify = ["diff:game_menu::je_item_screen_next_level_matches", "diff:game_menu::je_item_screen_shop_matches", "diff:game_menu::je_item_screen_options_matches", "diff:game_menu::je_item_screen_data_cubes_matches", "diff:game_menu::je_item_screen_quit_and_help_match", "diff:game_menu::je_item_screen_arcade_modes_match", "diff:game_menu::je_item_screen_mouse_matches", "diff:game_menu::je_item_screen_poor_shop_matches", "diff:game_menu::je_item_screen_two_player_details_match", "diff:game_menu::je_item_screen_joystick_menu_matches", "diff:game_menu::je_item_screen_volumes_match", "diff:game_menu::je_item_screen_cube_details_match", "diff:game_menu::je_item_screen_help_in_menus_matches", "diff:game_menu::je_item_screen_mouse_menus_match", "diff:game_menu::je_item_screen_network_game_matches"]
+waived_lines = [{ line = 907, reason = "unreachable: newPal is applied and zeroed in the drawing part of each pass, and nothing in the animation loop sets it" }, { line = 908, reason = "unreachable: newPal is applied and zeroed in the drawing part of each pass, and nothing in the animation loop sets it" }, { line = 909, reason = "unreachable: newPal is applied and zeroed in the drawing part of each pass, and nothing in the animation loop sets it" }, { line = 910, reason = "unreachable: newPal is applied and zeroed in the drawing part of each pass, and nothing in the animation loop sets it" }, { line = 939, reason = "unreachable: newPal is applied and zeroed in the drawing part of each pass, and nothing in the animation loop sets it" }, { line = 940, reason = "unreachable: newPal is applied and zeroed in the drawing part of each pass, and nothing in the animation loop sets it" }, { line = 941, reason = "unreachable: newPal is applied and zeroed in the drawing part of each pass, and nothing in the animation loop sets it" }, { line = 942, reason = "unreachable: newPal is applied and zeroed in the drawing part of each pass, and nothing in the animation loop sets it" }, { line = 916, reason = "unreachable: paletteChanged is set only by the data cube face (menus 7/8), never in the weapon simulator's menu 4" }, { line = 917, reason = "unreachable: paletteChanged is set only by the data cube face (menus 7/8), never in the weapon simulator's menu 4" }, { line = 918, reason = "unreachable: paletteChanged is set only by the data cube face (menus 7/8), never in the weapon simulator's menu 4" }]
+notes = ""
 
 [[fn]]
 c = "game_menu.c::draw_ship_illustration"
 c_sha = "10dce864108e"
 rust = "rustyrian_core::game_menu::draw_ship_illustration"
-status = "todo"
-verify = []
-notes = "blocked: calls game_menu.c::JE_drawItem (blocked on varz.c::JE_SGr)"
+status = "verified"
+verify = ["diff:game_menu::draw_ship_illustration_matches"]
+notes = ""
 
 [[fn]]
 c = "game_menu.c::load_cubes"
 c_sha = "5db56d25190c"
 rust = "rustyrian_core::game_menu::load_cubes"
-status = "todo"
-verify = []
-notes = "blocked: calls game_menu.c::load_cube (blocked on mainint.c::str_pop_int)"
+status = "verified"
+verify = ["diff:game_menu::load_cube_and_load_cubes_match_on_every_cube_file", "diff:game_menu::je_item_screen_data_cubes_matches"]
+notes = ""
 
 [[fn]]
 c = "game_menu.c::load_cube"
 c_sha = "9ef81733f079"
 rust = "rustyrian_core::game_menu::load_cube"
-status = "todo"
-verify = []
-notes = "blocked: calls mainint.c::str_pop_int (not verified on main)"
+status = "verified"
+verify = ["diff:game_menu::load_cube_and_load_cubes_match_on_every_cube_file"]
+notes = ""
 
 [[fn]]
 c = "game_menu.c::JE_drawItem"
 c_sha = "65d7d6aa4621"
 rust = "rustyrian_core::game_menu::je_draw_item"
-status = "todo"
-verify = []
-notes = "blocked: calls varz.c::JE_SGr (not verified on main)"
+status = "verified"
+verify = ["diff:game_menu::je_draw_item_matches", "diff:game_menu::draw_ship_illustration_matches", "diff:game_menu::je_weapon_sim_update_matches"]
+notes = ""
 
 [[fn]]
 c = "game_menu.c::JE_drawMenuHeader"
@@ -2048,17 +2049,17 @@ notes = ""
 c = "game_menu.c::JE_drawScore"
 c_sha = "285886c602d0"
 rust = "rustyrian_core::game_menu::je_draw_score"
-status = "todo"
-verify = []
-notes = "blocked: calls game_menu.c::JE_cashLeft (blocked on mainint.c::JE_getCost)"
+status = "verified"
+verify = ["diff:game_menu::je_cash_left_and_draw_score_match", "diff:game_menu::je_item_screen_shop_matches"]
+notes = ""
 
 [[fn]]
 c = "game_menu.c::JE_menuFunction"
 c_sha = "af1c3eb6dc9d"
 rust = "rustyrian_core::game_menu::je_menu_function"
-status = "todo"
-verify = []
-notes = "blocked: calls mainint.c::JE_operation and game_menu.c::JE_cashLeft (blocked on mainint.c::JE_getCost)"
+status = "verified"
+verify = ["diff:game_menu::je_menu_function_matches_every_action", "diff:game_menu::je_item_screen_next_level_matches", "diff:game_menu::je_item_screen_shop_matches", "diff:game_menu::je_item_screen_options_matches", "diff:game_menu::je_item_screen_data_cubes_matches", "diff:game_menu::je_item_screen_quit_and_help_match", "diff:game_menu::je_item_screen_arcade_modes_match", "diff:game_menu::je_item_screen_mouse_matches"]
+notes = ""
 
 [[fn]]
 c = "game_menu.c::JE_drawShipSpecs"
@@ -2073,9 +2074,9 @@ notes = ""
 c = "game_menu.c::JE_weaponSimUpdate"
 c_sha = "a658e66e5b3b"
 rust = "rustyrian_core::game_menu::je_weapon_sim_update"
-status = "todo"
-verify = []
-notes = "blocked: calls game_menu.c::JE_drawItem (blocked on varz.c::JE_SGr)"
+status = "verified"
+verify = ["diff:game_menu::je_weapon_sim_update_matches"]
+notes = ""
 
 [[fn]]
 c = "game_menu.c::JE_weaponViewFrame"
@@ -2829,9 +2830,9 @@ notes = ""
 c = "mainint.c::JE_mainKeyboardInput"
 c_sha = "2e5845f8e9e9"
 rust = "rustyrian_core::mainint::je_main_keyboard_input"
-status = "todo"
-verify = []
-notes = "blocked: varz.c::JE_drawArmor, JE_drawOptions, JE_drawShield, JE_getShipInfo, JE_portConfigs, JE_wipeShieldArmorBars"
+status = "verified"
+verify = ["diff:mainint::main_keyboard_input_matches_c", "diff:mainint::main_keyboard_input_combinations_match_c", "diff:mainint::main_keyboard_input_help_matches_c", "diff:mainint::player_functions_follow_demo_500_match_c", "diff:mainint::player_functions_follow_demo_2000_match_c"]
+notes = ""
 
 [[fn]]
 c = "mainint.c::JE_pauseGame"
@@ -2845,17 +2846,18 @@ notes = ""
 c = "mainint.c::JE_playerMovement"
 c_sha = "109a2c331abc"
 rust = "rustyrian_core::mainint::je_player_movement"
-status = "todo"
-verify = []
-notes = "blocked: demo.c::playDemoKeys, recordDemoKeys; varz.c::JE_doSpecialShot, JE_drawArmor, JE_drawShield, JE_portConfigs, JE_setupExplosion, JE_setupExplosionLarge, JE_wipeShieldArmorBars"
+status = "verified"
+verify = ["diff:mainint::player_movement_matches_c", "diff:mainint::player_movement_edge_cases_match_c", "diff:mainint::player_movement_joystick_matches_c", "diff:mainint::player_movement_netplay_matches_c", "diff:mainint::player_movement_net_session_matches_c", "diff:mainint::player_movement_records_demo_matches_c", "diff:mainint::player_movement_demo_end_matches_c", "diff:mainint::link_gun_above_the_screen_matches_c", "diff:mainint::player_functions_follow_demo_500_match_c", "diff:mainint::player_functions_follow_demo_2000_match_c", "diff:mainint::movement_and_collision_guards_hold"]
+waived_lines = [{ line = 3435, reason = "unreachable: inside `if (!endLevel)` with no assignment of endLevel in between, `if (endLevel)` is never true" }, { line = 3436, reason = "unreachable: closing brace of the dead `if (endLevel)` body (line 3435)" }, { line = 4160, reason = "unreachable: playerNum_ is 1 or 2 (JE_mainGamePlayerFunctions is the only caller)" }]
+notes = ""
 
 [[fn]]
 c = "mainint.c::JE_mainGamePlayerFunctions"
 c_sha = "46277c11a927"
 rust = "rustyrian_core::mainint::je_main_game_player_functions"
-status = "todo"
-verify = []
-notes = "blocked: mainint.c::JE_playerMovement (todo; blocked on varz.c/demo.c)"
+status = "verified"
+verify = ["diff:mainint::player_movement_matches_c", "diff:mainint::player_movement_edge_cases_match_c", "diff:mainint::player_movement_net_session_matches_c", "diff:mainint::player_functions_follow_demo_500_match_c", "diff:mainint::player_functions_follow_demo_2000_match_c"]
+notes = ""
 
 [[fn]]
 c = "mainint.c::JE_getName"
@@ -2869,9 +2871,9 @@ notes = ""
 c = "mainint.c::JE_playerCollide"
 c_sha = "aa7852698c7f"
 rust = "rustyrian_core::mainint::je_player_collide"
-status = "todo"
-verify = []
-notes = "blocked: varz.c::JE_drawArmor, JE_drawOptions, JE_playerDamage, JE_setupExplosion, JE_setupExplosionLarge"
+status = "verified"
+verify = ["diff:mainint::player_collide_matches_c", "diff:mainint::player_collide_edge_cases_match_c", "diff:mainint::player_functions_follow_demo_500_match_c", "diff:mainint::player_functions_follow_demo_2000_match_c", "diff:mainint::movement_and_collision_guards_hold"]
+notes = ""
 
 [[fn]]
 c = "memreader.c::memReaderSplit"

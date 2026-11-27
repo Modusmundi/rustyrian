@@ -1892,3 +1892,1551 @@ fn in_game_displays_special_graphic_zero_draws_nothing() {
     assert!(!g.config.one_player_action && !g.config.two_player_mode);
     assert_eq!(g.video.vga().pixels, without);
 }
+
+// ---------------------------------------------------------------------------
+// Gameplay: `JE_mainKeyboardInput`, `JE_playerMovement`,
+// `JE_mainGamePlayerFunctions` and `JE_playerCollide` on gameplay fixtures.
+// ---------------------------------------------------------------------------
+
+use rustyrian_core::varz::Sprite2Ref;
+use rustyrian_oracle::mirror::varz::sprite2_ref_to_c;
+
+/// C's `&player[p]`.
+fn c_player(p: usize) -> *mut b::Player {
+    // SAFETY: an in-bounds element address of the C array; no reference.
+    unsafe { (&raw mut b::player).cast::<b::Player>().add(p) }
+}
+
+/// One game frame of the player functions, as `JE_main` calls them:
+/// keyboard commands, movement of every player, then collisions.
+fn player_frame_both(rig: &mut Rig) -> mainint_support::Outcome<()> {
+    let two = rig.g.config.two_player_mode;
+    rig.run(
+        || {
+            // SAFETY: plain C calls on the stored game state.
+            unsafe {
+                b::JE_mainKeyboardInput();
+                b::JE_mainGamePlayerFunctions();
+                b::JE_playerCollide(c_player(0), 1);
+                if two {
+                    b::JE_playerCollide(c_player(1), 2);
+                }
+            }
+        },
+        |g| {
+            mi::je_main_keyboard_input(g)?;
+            mi::je_main_game_player_functions(g)?;
+            mi::je_player_collide(g, 0, 1)?;
+            if two {
+                mi::je_player_collide(g, 1, 2)?;
+            }
+            Ok(())
+        },
+    )
+}
+
+/// Runs `frames` player frames from a demo fixture (the demo drives player
+/// 1 through `playDemoKeys`), comparing the players every frame and the
+/// whole game at the end.
+fn demo_frames(frame: u64, frames: usize) {
+    let mut rig = Rig::from_fixture("ots 1\n", frame);
+    assert!(rig.g.demo.play_demo, "the fixture plays a demo");
+    for step in 0..frames {
+        player_frame_both(&mut rig).expect("no exit");
+        assert_eq!(
+            diff::load::<rustyrian_core::player::State>(),
+            rig.g.player,
+            "frame {step}"
+        );
+    }
+    rig.check();
+}
+
+#[test]
+fn player_functions_follow_demo_500_match_c() {
+    demo_frames(500, 300);
+}
+
+#[test]
+fn player_functions_follow_demo_2000_match_c() {
+    demo_frames(2000, 300);
+}
+
+/// Equal platform calls and whole games, naming the first differing field.
+fn same_game(rig: &mut Rig) -> Result<(), TestCaseError> {
+    prop_assert_eq!(rig.c_calls(), rig.rust_calls(), "platform calls differ");
+    if let Some(d) = diff::first_difference(&rig.c_state(), &rig.g.snapshot()) {
+        return Err(TestCaseError::fail(format!("states differ at {d}")));
+    }
+    Ok(())
+}
+
+/// One player's setup for the movement tests.
+#[derive(Clone, Debug)]
+struct Pilot {
+    alive: bool,
+    exploding: u32,
+    pos: (i32, i32),
+    mouse: (u16, u16),
+    vel: (i32, i32),
+    friction: (u32, u32),
+    invulnerable: u32,
+    /// `(id, power)` of the front and rear weapons; `power` of weapon `p`
+    /// is also player `p`'s lives (`mainint.c:1053`).
+    weapons: [(u8, u8); 2],
+    mode: u32,
+    /// Sidekick items; their style is the option's `tr`, as `JE_drawOptions`
+    /// sets it (another style draws the graphics from the other sheet,
+    /// past its end).
+    sidekicks: [u8; 2],
+    /// `(ammo_max, ammo, refill ticks, refill ticks max)`.
+    ammo: [(i32, i32, u32, u32); 2],
+    /// `(animation enabled, frame, charge, charge ticks)`; the frame and the
+    /// charge are reduced below the option's `ani` and `pwr`.
+    anim: [(bool, u32, u32, u32); 2],
+    superbombs: u32,
+    /// `(shield, shield_max, armor, initial_armor)`.
+    hull: (u32, u32, u32, u32),
+}
+
+/// A pilot; `rear` bounds the rear weapon (player 2's indexes
+/// `linkGunWeapons`/`chargeGunWeapons[id-1]`, 38 entries).
+fn any_pilot(rear: std::ops::RangeInclusive<u8>) -> impl Strategy<Value = Pilot> {
+    let side = 0u8..=OPTION_NUM as u8;
+    let ammo = (0i32..=12).prop_flat_map(|max| (Just(max), 0..=max, 0u32..=2, 0u32..=3));
+    let anim = (any::<bool>(), any::<u32>(), any::<u32>(), 0u32..=2);
+    (
+        (
+            prop::bool::weighted(0.8),
+            0u32..=2,
+            (30i32..=270, 0i32..=175),
+            (30u16..=270, 0u16..=175),
+            (-6i32..=6, -6i32..=6),
+            (0u32..=2, 0u32..=2),
+            prop_oneof![3 => Just(0u32), 1 => 1u32..=2],
+        ),
+        (
+            ((0u8..=PORT_NUM as u8, 1u8..=11), (rear, 1u8..=11)),
+            1u32..=2,
+        ),
+        (
+            prop::array::uniform2(side),
+            prop::array::uniform2(ammo),
+            prop::array::uniform2(anim),
+        ),
+        (0u32..=2, (0u32..=14, 10u32..=14, 0u32..=28, 1u32..=28)),
+    )
+        .prop_map(
+            |(
+                (alive, exploding, pos, mouse, vel, friction, invulnerable),
+                ((front, rear), mode),
+                (sidekicks, ammo, anim),
+                (superbombs, hull),
+            )| Pilot {
+                alive,
+                exploding,
+                pos,
+                mouse,
+                vel,
+                friction,
+                invulnerable,
+                weapons: [front, rear],
+                mode,
+                sidekicks,
+                ammo,
+                anim,
+                superbombs,
+                hull,
+            },
+        )
+}
+
+fn apply_pilot(g: &mut rustyrian_core::Game, p: usize, s: &Pilot) {
+    let options = g.episodes.options;
+    let pl = &mut g.player.player[p];
+    pl.is_alive = s.alive;
+    pl.exploding_ticks = s.exploding;
+    (pl.x, pl.y) = s.pos;
+    (pl.mouse_x, pl.mouse_y) = s.mouse;
+    (pl.x_velocity, pl.y_velocity) = s.vel;
+    (pl.x_friction_ticks, pl.y_friction_ticks) = s.friction;
+    pl.invulnerable_ticks = s.invulnerable;
+    for (w, &(id, power)) in s.weapons.iter().enumerate() {
+        pl.items.weapon[w].id = id;
+        pl.items.weapon[w].power = power;
+    }
+    pl.lives = Some(p);
+    pl.weapon_mode = s.mode;
+    for i in 0..2 {
+        let item = s.sidekicks[i];
+        let option = options[usize::from(item)];
+        pl.items.sidekick[i] = item;
+        let sk = &mut pl.sidekick[i];
+        sk.style = u32::from(option.tr);
+        (
+            sk.ammo_max,
+            sk.ammo,
+            sk.ammo_refill_ticks,
+            sk.ammo_refill_ticks_max,
+        ) = s.ammo[i];
+        let (enabled, frame, charge, ticks) = s.anim[i];
+        sk.animation_enabled = enabled;
+        // Frames past `ani` would draw unused (zero) graphics, which C
+        // reads before the sheet (D-UB-SPRITE-1).
+        sk.animation_frame = frame % u32::from(option.ani.max(1));
+        sk.charge = charge % (u32::from(option.pwr) + 1);
+        sk.charge_ticks = ticks;
+    }
+    pl.superbombs = s.superbombs;
+    (pl.shield, pl.shield_max, pl.armor, pl.initial_armor) = s.hull;
+}
+
+/// Has mouse, three buttons, buttons down, relative motion x and y.
+type MouseSetup = (bool, bool, u8, i32, i32);
+/// Charge level, max, wait, graphic, graphic wait.
+type ChargeSetup = (u8, u8, u8, u8, u8);
+
+/// The rest of a movement scene.
+#[derive(Clone, Debug)]
+struct Scene {
+    /// two players, galaga, linked, one-player arcade, super arcade mode
+    mode: (bool, bool, bool, bool, u8),
+    /// end level, levelEnd, levelEndWarp, levelEndFxWait, allPlayersGone
+    level: (bool, u8, i8, u16, bool),
+    /// constantDie, constantPlay, constantLastX
+    cheats: (bool, bool, i8),
+    /// playDemo, game keys, input devices, mouse
+    input: (bool, [bool; 8], [u8; 2], MouseSetup),
+    /// smoothie 9, background2, superWild, mapX2Ofs, ship graphics,
+    /// background3x1
+    look: (bool, bool, bool, u16, [u8; 2], bool),
+    /// portConfigDone, shotRepeat, charge, difficulty, special
+    weapons: (bool, [u8; 11], ChargeSetup, i8, u8),
+    /// optionAttachmentMove, -Linked, -Return, optionSatelliteRotate,
+    /// linkGunDirec
+    attach: (i16, bool, bool, f32, f32),
+    pilots: [Pilot; 2],
+    frames: usize,
+}
+
+fn any_scene() -> impl Strategy<Value = Scene> {
+    (
+        (
+            any::<bool>(),
+            prop::bool::weighted(0.2),
+            any::<bool>(),
+            any::<bool>(),
+            prop_oneof![3 => Just(0u8), 1 => 1u8..=8],
+        ),
+        (
+            prop::bool::weighted(0.25),
+            prop_oneof![Just(0u8), 1u8..=45],
+            -3i8..=8,
+            0u16..=2,
+            any::<bool>(),
+        ),
+        (
+            prop::bool::weighted(0.15),
+            prop::bool::weighted(0.15),
+            -2i8..=2,
+        ),
+        (
+            prop::bool::weighted(0.3),
+            prop::array::uniform8(any::<bool>()),
+            prop::array::uniform2(0u8..=2),
+            (
+                any::<bool>(),
+                any::<bool>(),
+                0u8..8,
+                -60i32..=60,
+                -60i32..=60,
+            ),
+        ),
+        (
+            prop::bool::weighted(0.2),
+            any::<bool>(),
+            any::<bool>(),
+            0u16..=72,
+            prop::array::uniform2(0u8..=6),
+            any::<bool>(),
+        ),
+        (
+            any::<bool>(),
+            prop::array::uniform11(prop_oneof![2 => Just(0u8), 1 => 1u8..=3]),
+            (0u8..=5, 0u8..=5, 0u8..=2, 0u8..=3, 0u8..=1),
+            1i8..=6,
+            0u8..=SPECIAL_NUM as u8,
+        ),
+        (
+            -25i16..=8,
+            any::<bool>(),
+            any::<bool>(),
+            0f32..7.0,
+            0f32..6.3,
+        ),
+        (any_pilot(0..=PORT_NUM as u8), any_pilot(1..=38)),
+        1usize..=3,
+    )
+        .prop_map(
+            |(mode, level, cheats, input, look, weapons, attach, (p0, p1), frames)| Scene {
+                mode,
+                level,
+                cheats,
+                input,
+                look,
+                weapons,
+                attach,
+                pilots: [p0, p1],
+                frames,
+            },
+        )
+}
+
+fn apply_scene(g: &mut rustyrian_core::Game, s: &Scene) {
+    for p in 0..2 {
+        apply_pilot(g, p, &s.pilots[p]);
+    }
+    let c = &mut g.config;
+    (
+        c.two_player_mode,
+        c.galaga_mode,
+        c.two_player_linked,
+        c.one_player_action,
+        c.super_arcade_mode,
+    ) = s.mode;
+    let v = &mut g.varz;
+    (
+        v.end_level,
+        v.level_end,
+        v.level_end_warp,
+        v.level_end_fx_wait,
+        v.all_players_gone,
+    ) = s.level;
+    (
+        g.params.constant_die,
+        g.params.constant_play,
+        g.mainint.constant_last_x,
+    ) = s.cheats;
+
+    let (play_demo, keys, devices, (has_mouse, three, buttons, rx, ry)) = s.input;
+    // Without a demo, `playDemoKeys` would read a closed file.
+    g.demo.play_demo &= play_demo;
+    for (i, &down) in keys.iter().enumerate() {
+        let k = g.config.key_settings[i] as usize;
+        g.keyboard.keysactive[k] = down;
+    }
+    g.config.input_device = devices;
+    g.mouse.has_mouse = has_mouse;
+    g.mouse.mouse_has_three_buttons = three;
+    g.keyboard.mouse_buttons_down = buttons;
+    g.keyboard.mouse_window_x_relative = rx;
+    g.keyboard.mouse_window_y_relative = ry;
+
+    let (smoothie, background2, wild, map_x2_ofs, ships, bg3x1) = s.look;
+    g.config.smoothies[8] = smoothie;
+    g.config.background2 = background2;
+    g.config.super_wild = wild;
+    g.backgrnd.map_x2_ofs = map_x2_ofs;
+    g.varz.background3x1 = bg3x1;
+    let graphic = |g: &rustyrian_core::Game, k: u8| match k {
+        0 | 1 => u16::from(k),
+        k => g.episodes.ships[usize::from(k)].shipgraphic,
+    };
+    g.varz.ship_gr = graphic(g, ships[0]);
+    g.varz.ship_gr2 = graphic(g, ships[1]);
+    g.varz.ship_gr_ptr = Some(Sprite2Ref::SpriteSheet9);
+    g.varz.ship_gr2ptr = Some(Sprite2Ref::SpriteSheet9);
+
+    let (done, repeat, (level, max, wait, gr, gr_wait), difficulty, special) = s.weapons;
+    g.config.port_config_done = done;
+    g.config.shot_repeat = repeat;
+    let v = &mut g.varz;
+    (
+        v.charge_level,
+        v.charge_max,
+        v.charge_wait,
+        v.charge_gr,
+        v.charge_gr_wait,
+    ) = (level, max, wait, gr, gr_wait);
+    g.config.difficulty_level = difficulty;
+    g.player.player[0].items.special = special;
+
+    let (attach_move, linked, ret, rotate, direc) = s.attach;
+    let v = &mut g.varz;
+    (
+        v.option_attachment_move,
+        v.option_attachment_linked,
+        v.option_attachment_return,
+        v.option_satellite_rotate,
+    ) = (attach_move, linked, ret, rotate);
+    g.config.link_gun_direc = direc;
+}
+
+/// Hard-capped fixture runner: `cases` cases from a fixed seed (the
+/// coverage of these functions must be reproducible).
+fn run_scenes<S: Strategy>(
+    strategy: S,
+    frame: u64,
+    cases: u32,
+    test: impl Fn(&mut Rig, S::Value) -> Result<(), TestCaseError>,
+) where
+    S::Value: std::fmt::Debug,
+{
+    let rig = RefCell::new(Rig::from_fixture("ots 1\n", frame));
+    let base = rig.borrow().g.snapshot();
+    let config = RunnerConfig {
+        cases,
+        ..RunnerConfig::default()
+    };
+    let rng = proptest::test_runner::TestRng::deterministic_rng(config.rng_algorithm);
+    TestRunner::new_with_rng(config, rng)
+        .run(&strategy, |v| {
+            let mut rig = rig.borrow_mut();
+            rig.g.restore(base.clone());
+            rig.store();
+            rig.clear();
+            test(&mut rig, v)
+        })
+        .unwrap();
+}
+
+/// Movement of one or two players over a few frames from a wide range of
+/// situations: alive, exploding, respawning, dying for ever, at the level
+/// end, linked, every input device without joysticks, every ship graphic
+/// kind, sidekick styles, charge and super bomb weapons.
+#[test]
+fn player_movement_matches_c() {
+    run_scenes(any_scene(), 500, 48, |rig, scene| {
+        apply_scene(&mut rig.g, &scene);
+        rig.store();
+        for _ in 0..scene.frames {
+            let out = player_frame_both(rig);
+            prop_assert_eq!(out, Ok(()));
+        }
+        same_game(rig)
+    });
+}
+
+/// A living player at rest with a front and rear weapon and no sidekicks.
+fn quiet_pilot() -> Pilot {
+    Pilot {
+        alive: true,
+        exploding: 0,
+        pos: (150, 100),
+        mouse: (150, 100),
+        vel: (0, 0),
+        friction: (0, 0),
+        invulnerable: 0,
+        weapons: [(1, 2), (1, 2)],
+        mode: 1,
+        sidekicks: [0, 0],
+        ammo: [(0, 0, 0, 0); 2],
+        anim: [(false, 0, 0, 20); 2],
+        superbombs: 0,
+        hull: (5, 10, 10, 10),
+    }
+}
+
+/// One player in a level with the keyboard as the input device.
+fn quiet_scene() -> Scene {
+    Scene {
+        mode: (false, false, false, false, 0),
+        level: (false, 0, 0, 0, false),
+        cheats: (false, false, 0),
+        input: (false, [false; 8], [1, 1], (false, false, 0, 0, 0)),
+        look: (false, false, false, 0, [2, 2], false),
+        weapons: (false, [0; 11], (0, 0, 0, 0, 0), 2, 0),
+        attach: (0, false, false, 0.0, 0.0),
+        pilots: [quiet_pilot(), quiet_pilot()],
+        frames: 2,
+    }
+}
+
+/// Game keys, by `KEY_SETTING_*` index.
+const UP: usize = 0;
+const DOWN: usize = 1;
+const RIGHT: usize = 3;
+const FIRE: usize = 4;
+const CHANGE_FIRE: usize = 5;
+const LEFT_SIDEKICK: usize = 6;
+
+/// The first option with `pred`.
+fn option_where(
+    g: &rustyrian_core::Game,
+    pred: impl Fn(&rustyrian_core::episodes::JeOptionType) -> bool,
+) -> u8 {
+    let i = g
+        .episodes
+        .options
+        .iter()
+        .position(pred)
+        .expect("such an option");
+    i as u8
+}
+
+/// Gives player 1 sidekick `item` on side `i` as `JE_drawOptions` sets it
+/// up, with `charge`.
+fn give_sidekick(g: &mut rustyrian_core::Game, i: usize, item: u8, charge: u32) {
+    let option = g.episodes.options[usize::from(item)];
+    let pl = &mut g.player.player[0];
+    pl.items.sidekick[i] = item;
+    let sk = &mut pl.sidekick[i];
+    sk.style = u32::from(option.tr);
+    sk.ammo_max = i32::from(option.ammo);
+    sk.ammo = sk.ammo_max;
+    sk.charge = charge;
+}
+
+type SceneEdit = fn(&mut Scene);
+type GameEdit = fn(&mut rustyrian_core::Game);
+
+/// Situations the generated scenes reach rarely: the last life (galaga,
+/// network), dying for ever with no armor, mouse motion past the clamp,
+/// the linked gun wrapping past 2π, a respawn that leaves every player
+/// dead at the level end, the Nort ship's sparks, the super-arcade special
+/// swap, orbiting and charged sidekicks.
+#[test]
+fn player_movement_edge_cases_match_c() {
+    let cases: [(&str, SceneEdit, GameEdit); 11] = [
+        (
+            "last life, galaga",
+            |s| {
+                s.mode = (true, true, false, false, 0);
+                s.pilots[0].alive = false;
+                s.pilots[0].weapons[0].1 = 1;
+            },
+            |_| {},
+        ),
+        (
+            "last life, network, all gone",
+            |s| {
+                s.mode = (true, false, false, false, 0);
+                s.level.4 = true;
+                s.pilots[0].alive = false;
+                s.pilots[0].weapons[0].1 = 1;
+            },
+            |g| {
+                g.network.is_network_game = true;
+                g.network.this_player_num = 2;
+                g.network.last_state_out_sync = 0;
+            },
+        ),
+        (
+            "dying for ever without armor",
+            |s| {
+                s.cheats.0 = true;
+                s.pilots[0].hull.2 = 0;
+            },
+            |_| {},
+        ),
+        (
+            "mouse past the clamp",
+            |s| s.input.3 = (true, false, 0, -200, -200),
+            |g| g.config.input_device = [0, 0],
+        ),
+        (
+            "linked gun wraps",
+            |s| {
+                s.mode = (true, false, true, false, 0);
+                s.attach.4 = 6.2;
+                s.input.1[DOWN] = true;
+                s.input.1[FIRE] = true;
+                s.pilots[1].weapons[1].0 = 5;
+            },
+            |_| {},
+        ),
+        (
+            "respawn leaves all dead at the level end",
+            |s| {
+                s.mode = (true, true, false, false, 0);
+                s.level.1 = 5;
+                s.pilots[0].alive = false;
+                s.pilots[0].exploding = 2;
+                s.pilots[1].alive = false;
+                s.pilots[1].weapons[1].1 = 3;
+            },
+            |_| {},
+        ),
+        (
+            "nort ship banking hard",
+            |s| {
+                s.look.4 = [1, 2];
+                s.pilots[0].vel = (6, 0);
+                s.input.1[RIGHT] = true;
+            },
+            |_| {},
+        ),
+        (
+            "super arcade special swap",
+            |s| {
+                s.mode.4 = 2;
+                s.weapons.0 = true;
+                s.input.1[CHANGE_FIRE] = true;
+            },
+            |g| g.player.player[0].items.special = rustyrian_core::varz::SA_SPECIAL_WEAPON[1] as u8,
+        ),
+        (
+            "two orbiting sidekicks",
+            |s| s.input.1[UP] = true,
+            |g| {
+                let orbit = option_where(g, |o| o.tr == 4);
+                give_sidekick(g, 0, orbit, 0);
+                give_sidekick(g, 1, orbit, 0);
+            },
+        ),
+        (
+            "charged limited-ammo sidekick fires, right one orbits",
+            |s| s.input.1[LEFT_SIDEKICK] = true,
+            |g| {
+                let orbit = option_where(g, |o| o.tr == 4);
+                // No freeware limited-ammo option charges (`pwr` 0): the
+                // charge comes from the test.
+                let limited = option_where(g, |o| o.ammo > 0 && o.wport > 0);
+                give_sidekick(g, 0, limited, 1);
+                give_sidekick(g, 1, orbit, 0);
+            },
+        ),
+        (
+            "charged unlimited sidekick fires",
+            |s| s.input.1[FIRE] = true,
+            |g| {
+                let unlimited = option_where(g, |o| o.ammo == 0 && o.wport > 0 && o.pwr > 0);
+                give_sidekick(g, 0, unlimited, 1);
+            },
+        ),
+    ];
+    let mut rig = Rig::from_fixture("ots 1\n", 500);
+    let base = rig.g.snapshot();
+    for (name, scene_edit, game_edit) in cases {
+        rig.g.restore(base.clone());
+        let mut scene = quiet_scene();
+        scene_edit(&mut scene);
+        apply_scene(&mut rig.g, &scene);
+        game_edit(&mut rig.g);
+        rig.store();
+        rig.clear();
+        for _ in 0..scene.frames {
+            assert_eq!(player_frame_both(&mut rig), Ok(()), "{name}");
+        }
+        if let Err(e) = same_game(&mut rig) {
+            panic!("{name}: {e}");
+        }
+    }
+}
+
+/// An enemy (or pick-up) placed relative to the colliding player.
+#[derive(Clone, Debug)]
+struct Contact {
+    slot: usize,
+    evalue: i16,
+    /// 0 used, 2 secret pick-up.
+    avail: u8,
+    scoreitem: bool,
+    armorleft: u8,
+    linknum: u8,
+    push: (i8, i8),
+    enemytype: u16,
+    /// `(dx, dy, mapoffset)`: offset from the player; within (11, 13) it
+    /// collides.
+    at: (i32, i32, u16),
+    ground: (bool, u8),
+}
+
+/// Pick-up values of every kind, kept inside the tables C indexes with
+/// them: in super arcade mode every value above 30000 is a super-arcade
+/// weapon (`SAWeapon[mode-1][value-30001]`, 5 per mode); otherwise
+/// `optionSelect` series < 16, and the special, weapon and
+/// `specialArcadeWeapon` tables.
+fn any_evalue(sam: u8) -> BoxedStrategy<i16> {
+    let common = prop_oneof![
+        Just(30000i16),
+        20001i16..=29999,
+        10001i16..=10255,
+        prop::sample::select(vec![1i16, -1, -2, -3, -4, -5]),
+        -500i16..=10000,
+    ];
+    if sam != 0 {
+        return prop_oneof![1 => 30001i16..=30005, 3 => common].boxed();
+    }
+    prop_oneof![
+        30001i16..=30000 + PORT_NUM as i16,
+        31001i16..=31000 + PORT_NUM as i16,
+        32001i16..=32015,
+        32101i16..=32100 + SPECIAL_NUM as i16,
+        common,
+    ]
+    .boxed()
+}
+
+fn any_contact(sam: u8) -> impl Strategy<Value = Contact> {
+    (
+        0usize..100,
+        any_evalue(sam),
+        prop_oneof![3 => Just(0u8), 1 => Just(2u8)],
+        any::<bool>(),
+        prop_oneof![Just(255u8), any::<u8>()],
+        prop_oneof![Just(0u8), 1u8..=4, 38u8..=110, any::<u8>()],
+        (-3i8..=3, -3i8..=3),
+        1u16..=850,
+        (-15i32..=15, -16i32..=16, 0u16..=30),
+        (any::<bool>(), 0u8..=13),
+    )
+        .prop_map(
+            |(slot, evalue, avail, scoreitem, armorleft, linknum, push, enemytype, at, ground)| {
+                Contact {
+                    slot,
+                    evalue,
+                    avail,
+                    scoreitem,
+                    armorleft,
+                    linknum,
+                    push,
+                    enemytype,
+                    at,
+                    ground,
+                }
+            },
+        )
+}
+
+/// A collision scene: flags, the colliding player, and the enemies.
+#[derive(Clone, Debug)]
+struct Crash {
+    /// two players, linked, galaga, one-player arcade, network, bonus
+    /// level, cheating
+    flags: [bool; 7],
+    sam: u8,
+    player_num: u8,
+    /// `(x, y, invulnerable, shield, armor, superbombs)`.
+    pilot: (i32, i32, u32, u32, u32, u32),
+    /// Weapon `(id, power)` of both players.
+    items: [[(u8, u8); 2]; 2],
+    /// Player 2's sidekick series and level.
+    series: (u8, u8),
+    damage_rate: u8,
+    contacts: Vec<Contact>,
+}
+
+fn any_crash() -> impl Strategy<Value = Crash> {
+    let weapon = (0u8..=PORT_NUM as u8, 1u8..=11);
+    (
+        prop::array::uniform7(any::<bool>()),
+        prop_oneof![2 => Just(0u8), 1 => 1u8..=7],
+        1u8..=2,
+        (
+            40i32..=256,
+            10i32..=160,
+            prop_oneof![3 => Just(0u32), 1 => 1u32..=3],
+            0u32..=10,
+            0u32..=28,
+            0u32..=10,
+        ),
+        prop::array::uniform2(prop::array::uniform2(weapon)),
+        (0u8..=15, 101u8..=103),
+        1u8..=40,
+    )
+        .prop_flat_map(
+            |(flags, sam, player_num, pilot, items, series, damage_rate)| {
+                (
+                    Just((flags, sam, player_num, pilot, items, series, damage_rate)),
+                    prop::collection::vec(any_contact(sam), 1..6),
+                )
+            },
+        )
+        .prop_map(
+            |((flags, sam, player_num, pilot, items, series, damage_rate), contacts)| Crash {
+                flags,
+                sam,
+                player_num,
+                pilot,
+                items,
+                series,
+                damage_rate,
+                contacts,
+            },
+        )
+}
+
+fn apply_crash(g: &mut rustyrian_core::Game, s: &Crash) {
+    let [two, linked, galaga, one, net, bonus, cheat] = s.flags;
+    let c = &mut g.config;
+    (
+        c.two_player_mode,
+        c.two_player_linked,
+        c.galaga_mode,
+        c.one_player_action,
+        c.super_arcade_mode,
+        c.you_are_cheating,
+    ) = (two, linked, galaga, one, s.sam, cheat);
+    g.network.is_network_game = net;
+    g.network.network_player_name = Some(b"Ann".to_vec());
+    g.network.network_opponent_name = Some(b"Bob".to_vec());
+    g.episodes.bonus_level = bonus;
+    g.varz.damage_rate = s.damage_rate;
+    for p in 0..2 {
+        let pl = &mut g.player.player[p];
+        pl.lives = Some(p);
+        for w in 0..2 {
+            (pl.items.weapon[w].id, pl.items.weapon[w].power) = s.items[p][w];
+        }
+    }
+    let items = &mut g.player.player[1].items;
+    (items.sidekick_series, items.sidekick_level) = s.series;
+    let pl = &mut g.player.player[usize::from(s.player_num) - 1];
+    let (x, y, invulnerable, shield, armor, superbombs) = s.pilot;
+    (pl.x, pl.y, pl.invulnerable_ticks) = (x, y, invulnerable);
+    (pl.shield, pl.armor, pl.superbombs) = (shield, armor, superbombs);
+    pl.is_alive = true;
+
+    // Only the scene's enemies are on screen.
+    g.varz.enemy_avail = [1; 100];
+    for e in &s.contacts {
+        g.varz.enemy_avail[e.slot] = e.avail;
+        // Explosion types past `explosion_data` (D-UB-VARZ-1) belong to no
+        // placed enemy.
+        let mut t = e.enemytype;
+        while g.episodes.enemy_dat[usize::from(t)].explosiontype >= 53 {
+            t = t % 850 + 1;
+        }
+        let en = &mut g.varz.enemy[e.slot];
+        let (dx, dy, offset) = e.at;
+        en.mapoffset = offset;
+        en.ex = (x + dx - i32::from(offset)) as i16;
+        en.ey = (y + dy) as i16;
+        en.evalue = e.evalue;
+        en.scoreitem = e.scoreitem;
+        en.armorleft = e.armorleft;
+        en.linknum = e.linknum;
+        (en.exc, en.eyc) = e.push;
+        en.enemytype = t;
+        (en.enemyground, en.explonum) = e.ground;
+    }
+}
+
+/// Pick-ups of every kind and collisions (damage, push-back, linked kills)
+/// for either player.
+#[test]
+fn player_collide_matches_c() {
+    run_scenes(any_crash(), 500, 64, |rig, crash| {
+        let mut crash = crash;
+        for e in &mut crash.contacts {
+            // `shotAvail[z] = 0` for the orbiting asteroid killer (-3)
+            // writes past `shotAvail` from enemy slot 81 on
+            // (D-UB-MAININT-SHOTAVAIL).
+            if e.evalue == -3 {
+                e.slot %= rustyrian_core::shots::MAX_PWEAPON;
+            }
+        }
+        apply_crash(&mut rig.g, &crash);
+        rig.store();
+        let p = usize::from(crash.player_num) - 1;
+        let num = crash.player_num;
+        let out = rig.run(
+            // SAFETY: plain C call on the stored game state.
+            || unsafe { b::JE_playerCollide(c_player(p), num) },
+            |g| mi::je_player_collide(g, p, num),
+        );
+        prop_assert_eq!(out, Ok(()));
+        same_game(rig)
+    });
+}
+
+/// The keys `JE_mainKeyboardInput` reads besides Backspace, Num Lock and P
+/// (F1 opens the help screen; see `main_keyboard_input_help_matches_c`).
+const COMMAND_KEYS: [usize; 22] = [
+    43, 57, 30, 31, 34, 38, 39, 59, 60, 61, 62, 63, 64, 65, 66, 67, 69, 49, 56, 6, 45, 71,
+];
+
+/// Custom ships whose items lie inside the tables (`JE_SGr` indexes
+/// `GR[graphic-1]`, `varz.c:381`).
+fn any_extra_ships() -> impl Strategy<Value = Vec<u8>> {
+    prop::collection::vec(
+        (
+            1u8..=15,
+            (0u8..=PORT_NUM as u8, 0u8..=PORT_NUM as u8),
+            0u8..=SPECIAL_NUM as u8,
+            prop::array::uniform2(0u8..=OPTION_NUM as u8),
+            0u8..=POWER_NUM as u8,
+            any::<u8>(),
+            0u8..=SHIELD_NUM as u8,
+        ),
+        10,
+    )
+    .prop_map(|rows| {
+        let mut v = vec![0u8; 154];
+        for (k, (gr, (front, rear), special, side, generator, armor, shield)) in
+            rows.into_iter().enumerate()
+        {
+            let r = &mut v[k * 15..k * 15 + 15];
+            (r[0], r[1], r[2], r[3]) = (gr, front, rear, special);
+            (r[4], r[5], r[6], r[7], r[8]) = (side[0], side[1], generator, armor, shield);
+        }
+        v
+    })
+}
+
+/// Every command key combination outside the help key: edited ships for
+/// either player, the Nort ship, cheats, debug, level skip, pause and menu
+/// requests, smoothies, filters, game speed and random music.
+#[test]
+fn main_keyboard_input_matches_c() {
+    let strategy = (
+        prop::collection::vec(prop::sample::select(&COMMAND_KEYS[..]), 0..7),
+        prop::array::uniform4(any::<bool>()),
+        (
+            prop::bool::weighted(0.2),
+            prop::bool::weighted(0.25),
+            prop::bool::weighted(0.2),
+            prop_oneof![3 => Just(0u8), 1 => 1u8..=7],
+            any::<bool>(),
+        ),
+        (
+            prop::bool::weighted(0.7),
+            any_extra_ships(),
+            prop::array::uniform2(any::<bool>()),
+        ),
+        (
+            prop_oneof![Just(-99i8), -1i8..=15],
+            0u8..=2,
+            any::<bool>(),
+            1u32..=3,
+        ),
+    );
+    run_scenes(
+        strategy,
+        500,
+        64,
+        |rig,
+         (
+            keys,
+            [backspace, numlock, p, escape],
+            (net, two, super_tyrian, sam, constant),
+            (extra, ships, edits),
+            (filter, fast, pause, mode),
+        )| {
+            let g = &mut rig.g;
+            for k in keys {
+                g.keyboard.keysactive[k] = true;
+            }
+            g.keyboard.keysactive[42] = backspace;
+            g.keyboard.keysactive[83] = numlock;
+            g.keyboard.keysactive[19] = p;
+            g.keyboard.keysactive[41] = escape;
+            g.network.is_network_game = net;
+            g.config.two_player_mode = two;
+            g.config.super_tyrian = super_tyrian;
+            g.config.super_arcade_mode = sam;
+            g.params.constant_play = constant;
+            g.editship.extra_avail = extra;
+            g.editship.extra_ships.copy_from_slice(&ships);
+            (g.varz.edit_ship1, g.varz.edit_ship2) = (edits[0], edits[1]);
+            g.config.level_filter = filter;
+            g.config.fast_play = fast;
+            g.config.super_pause = pause;
+            for pl in g.player.player.iter_mut() {
+                pl.weapon_mode = mode;
+            }
+            rig.store();
+            let out = rig.run(
+                // SAFETY: plain C call on the stored game state.
+                || unsafe { b::JE_mainKeyboardInput() },
+                mi::je_main_keyboard_input,
+            );
+            prop_assert_eq!(out, Ok(()));
+            same_game(rig)
+        },
+    );
+}
+
+/// F1 opens the in-game help (a key closes it); in a network game it only
+/// requests it.
+#[test]
+fn main_keyboard_input_help_matches_c() {
+    for net in [false, true] {
+        let s = input(&[(2500, "SPACE")], &[], &[(1500, "mouse-move 100 100")]);
+        let (out, frames) = screen_run_frames(
+            &s,
+            |g| {
+                g.keyboard.keysactive[58] = true;
+                g.network.is_network_game = net;
+            },
+            // SAFETY: plain C call on the test thread.
+            || unsafe { b::JE_mainKeyboardInput() },
+            mi::je_main_keyboard_input,
+        );
+        assert_eq!(out, Ok(()));
+        assert_eq!(frames > 0, !net, "the help screen presents");
+    }
+}
+
+/// `JE_playerMovement` on both engines for player `p` as
+/// `JE_mainGamePlayerFunctions` passes it, with an explicit input device.
+fn movement_both(rig: &mut Rig, p: usize, device: u8) -> mainint_support::Outcome<()> {
+    let (num, gr, ptr) = if p == 0 {
+        (1, rig.g.varz.ship_gr, rig.g.varz.ship_gr_ptr)
+    } else {
+        (2, rig.g.varz.ship_gr2, rig.g.varz.ship_gr2ptr)
+    };
+    rig.run(
+        || {
+            let pl = c_player(p);
+            // SAFETY: plain C call; the pointers address the C player.
+            unsafe {
+                b::JE_playerMovement(
+                    pl,
+                    device,
+                    num,
+                    gr,
+                    sprite2_ref_to_c(ptr),
+                    &raw mut (*pl).mouseX,
+                    &raw mut (*pl).mouseY,
+                );
+            }
+        },
+        |g| mi::je_player_movement(g, p, device, num, gr, ptr),
+    )
+}
+
+/// Two pads (axes pushed, buttons held), digital and analog, as one
+/// player's device, each player's device, and every pad at once; player 2
+/// aims the linked gun with its stick.
+#[test]
+fn player_movement_joystick_matches_c() {
+    let script = "ots 1\n\
+        joystick \"Pad 0\" 2 6 0\n\
+        joystick \"Pad 1\" 2 6 0\n\
+        @0 joy-axis 0 0 30000\n\
+        @0 joy-axis 0 1 -20000\n\
+        @0 joy-button 0 0 1\n\
+        @0 joy-button 0 1 1\n\
+        @0 joy-button 0 2 1\n\
+        @0 joy-axis 1 0 -32000\n\
+        @0 joy-axis 1 1 25000\n\
+        @0 joy-button 1 0 1\n\
+        @0 joy-button 1 3 1\n\
+        @0 joy-button 1 4 1\n\
+        @0 joy-button 1 5 1\n";
+    for (analog, two, linked, devices) in [
+        ([false, false], false, false, [0, 0]),
+        ([true, true], false, false, [0, 0]),
+        ([false, true], true, false, [3, 4]),
+        ([true, false], true, false, [4, 3]),
+        ([false, true], true, true, [3, 4]),
+        ([true, true], true, true, [1, 4]),
+    ] {
+        let mut rig = Rig::from_fixture(script, 500);
+        let out = rig.run(
+            // SAFETY: plain C call.
+            || unsafe { b::init_joysticks() },
+            |g| {
+                rustyrian_core::joystick::init_joysticks(g);
+                Ok(())
+            },
+        );
+        assert_eq!(out, Ok(()));
+        assert_eq!(rig.g.joystick.joysticks, 2);
+        let g = &mut rig.g;
+        for (j, a) in analog.into_iter().enumerate() {
+            g.joystick.joystick.as_mut().expect("open")[j].analog = a;
+        }
+        g.demo.play_demo = false;
+        g.config.two_player_mode = two;
+        g.config.two_player_linked = linked;
+        g.config.galaga_mode = false;
+        g.config.input_device = devices;
+        for p in 0..2 {
+            let pl = &mut g.player.player[p];
+            pl.is_alive = true;
+            (pl.x, pl.y) = (150, 100);
+            pl.items.weapon[REAR].id = pl.items.weapon[REAR].id.clamp(1, 38);
+        }
+        g.varz.ship_gr2 = 0;
+        g.varz.ship_gr2ptr = Some(Sprite2Ref::SpriteSheet9);
+        rig.store();
+        rig.clear();
+        for _ in 0..3 {
+            assert_eq!(player_frame_both(&mut rig), Ok(()));
+        }
+        // An explicit device per call (the joystick of player 1, then the
+        // mouse and the keyboard only).
+        for device in [3, 2, 1] {
+            assert_eq!(movement_both(&mut rig, 0, device), Ok(()));
+        }
+        rig.check();
+    }
+}
+
+const REAR: usize = rustyrian_core::player::REAR_WEAPON;
+
+/// A state packet for `JE_playerMovement`'s network reads.
+fn state_packet(data: &[u8]) -> rustyrian_core::platform::UdpPacket {
+    let mut d = vec![0u8; rustyrian_core::network::NET_PACKET_SIZE as usize];
+    d[..data.len()].copy_from_slice(data);
+    rustyrian_core::platform::UdpPacket {
+        channel: 0,
+        data: d,
+        len: 28,
+        maxlen: rustyrian_core::network::NET_PACKET_SIZE,
+        status: 0,
+        address: Default::default(),
+    }
+}
+
+/// Network games: this PC's player writes its state packet (a fresh one,
+/// or the unsent previous one), then both players move by the queued
+/// packets once the state queues are full; player 2's PC takes the
+/// difficulty from player 1's packets.
+#[test]
+fn player_movement_netplay_matches_c() {
+    let net = (
+        1u32..=2,
+        1i32..=3,
+        any::<bool>(),
+        any::<bool>(),
+        prop::collection::vec(any::<u8>(), 18),
+        prop::collection::vec(any::<u8>(), 18),
+    );
+    run_scenes(
+        (any_scene(), net),
+        500,
+        24,
+        |rig, (scene, (me, delay, reset, unsent, inbound, outbound))| {
+            apply_scene(&mut rig.g, &scene);
+            let n = &mut rig.g.network;
+            n.is_network_game = true;
+            n.this_player_num = me;
+            n.network_delay = delay;
+            n.last_state_out_sync = if reset { 0 } else { delay as u16 + 3 };
+            // Small deltas keep the players on screen.
+            let mut inbound = inbound;
+            let mut outbound = outbound;
+            for d in [&mut inbound, &mut outbound] {
+                for at in [4, 6, 8, 10] {
+                    let v = (i16::from(d[at + 1] as i8) % 6) as u16;
+                    d[at..at + 2].copy_from_slice(&v.to_be_bytes());
+                }
+            }
+            n.packet_state_in[0] = Some(state_packet(&inbound));
+            n.packet_state_out[delay as usize] = Some(state_packet(&outbound));
+            n.packet_state_out[0] = unsent.then(|| state_packet(&[]));
+            rig.store();
+            for _ in 0..scene.frames {
+                prop_assert_eq!(player_frame_both(rig), Ok(()));
+            }
+            same_game(rig)
+        },
+    );
+}
+
+/// Recording a demo: the keyboard is the device, and the keys are written
+/// to `demorec.1` as they change.
+#[test]
+fn player_movement_records_demo_matches_c() {
+    let mut rig = Rig::from_fixture("ots 1\n", 500);
+    rig.g.demo.play_demo = false;
+    rig.g.demo.demo_file = Default::default();
+    rig.store();
+    let out = rig.run(
+        // SAFETY: plain C call.
+        || unsafe { b::beginRecordDemo() },
+        rustyrian_core::demo::begin_record_demo,
+    );
+    assert_eq!(out, Ok(()));
+    // From here on, state changes go to both engines directly: a store
+    // would point C's open demo file at Rust's.
+    rig.g.demo.record_demo = true;
+    // SAFETY: plain writes of C globals on the test thread.
+    unsafe { *rustyrian_oracle::mirror::global_mut(&raw mut b::recordDemo) = true };
+    rig.clear();
+    let fire = rig.g.config.key_settings[4] as usize;
+    let left = rig.g.config.key_settings[2] as usize;
+    for k in [Some(fire), Some(left), None, Some(fire)] {
+        if let Some(k) = k {
+            let down = !rig.g.keyboard.keysactive[k];
+            rig.g.keyboard.keysactive[k] = down;
+            // SAFETY: as above.
+            unsafe { (*rustyrian_oracle::mirror::global_mut(&raw mut b::keysactive))[k] = down };
+        }
+        assert_eq!(player_frame_both(&mut rig), Ok(()));
+    }
+    let out = rig.run(
+        // SAFETY: plain C call.
+        || unsafe { b::endRecordDemo() },
+        rustyrian_core::demo::end_record_demo,
+    );
+    assert_eq!(out, Ok(()));
+    let (c, r) = (
+        std::fs::read(rig.c_dir.join("demorec.1")).expect("C demo"),
+        std::fs::read(rig.r_dir.join("demorec.1")).expect("Rust demo"),
+    );
+    assert_eq!(c, r);
+    rig.check();
+}
+
+/// The end of the recording ends the level.
+#[test]
+fn player_movement_demo_end_matches_c() {
+    let mut rig = Rig::from_fixture("ots 1\n", 500);
+    let path = mainint_support::tmp("demo-end").join("demo.short");
+    std::fs::write(&path, [1u8, 0]).expect("short demo");
+    let path = std::os::unix::ffi::OsStrExt::as_bytes(path.as_os_str()).to_vec();
+    rig.g.demo.demo_file = rustyrian_core::file::file_open(&path, "rb");
+    rig.g.demo.demo_keys_wait = 0;
+    rig.g.demo.play_demo = true;
+    rig.g.varz.end_level = false;
+    rig.store();
+    rig.clear();
+    assert_eq!(player_frame_both(&mut rig), Ok(()));
+    assert!(rig.g.varz.end_level);
+    for _ in 0..3 {
+        assert_eq!(player_frame_both(&mut rig), Ok(()));
+    }
+    rig.check();
+}
+
+/// The linked turret of player 2 pointing up from the top of the screen
+/// puts its markers above the screen: C converts the negative float
+/// coordinate to `JE_word` (D-UB-MAININT-FLOAT).
+#[test]
+fn link_gun_above_the_screen_matches_c() {
+    for (direc, fire) in [
+        (3.1f32, true),
+        (3.0, true),
+        (0.5, true),
+        (6.2, true),
+        (1.0, false),
+    ] {
+        let mut rig = Rig::from_fixture("ots 1\n", 500);
+        let g = &mut rig.g;
+        g.demo.play_demo = false;
+        g.config.two_player_mode = true;
+        g.config.two_player_linked = true;
+        g.config.galaga_mode = false;
+        g.config.link_gun_direc = direc;
+        g.config.input_device = [1, 1];
+        for p in 0..2 {
+            let pl = &mut g.player.player[p];
+            pl.is_alive = true;
+            (pl.x, pl.y) = (120, 10);
+            pl.items.weapon[REAR].id = pl.items.weapon[REAR].id.clamp(1, 38);
+        }
+        g.config.shot_repeat = [0; 11];
+        g.varz.ship_gr2 = 0;
+        g.varz.ship_gr2ptr = Some(Sprite2Ref::SpriteSheet9);
+        let up = g.config.key_settings[0] as usize;
+        let fire_key = g.config.key_settings[4] as usize;
+        g.keyboard.keysactive[up] = true;
+        g.keyboard.keysactive[fire_key] = fire;
+        rig.store();
+        rig.clear();
+        for _ in 0..4 {
+            assert_eq!(player_frame_both(&mut rig), Ok(()));
+        }
+        rig.check();
+    }
+}
+
+/// A real loopback network game, frame by frame as `JE_main` runs it:
+/// movement (this PC's player writes its state packet), then
+/// `network_state_send` and `network_state_update`, with the opponent's
+/// state packets arriving over the socket. Once the state queues are full,
+/// the remote player moves by the opponent's packets and the local one by
+/// its delayed own; on player 2's PC the difficulty comes from player 1.
+#[test]
+fn player_movement_net_session_matches_c() {
+    for me in [1u32, 2] {
+        let s = input(&[], &[], &[]);
+        let mut rig = net_rig(&s, |g| {
+            g.demo.play_demo = false;
+            g.config.two_player_mode = true;
+            g.config.two_player_linked = false;
+            g.config.galaga_mode = false;
+            g.config.input_device = [1, 1];
+            g.network.this_player_num = me;
+            for (p, pl) in g.player.player.iter_mut().enumerate() {
+                pl.is_alive = true;
+                (pl.x, pl.y) = (100 + 60 * p as i32, 120);
+                pl.items.weapon[REAR].id = pl.items.weapon[REAR].id.clamp(1, 38);
+            }
+            g.varz.ship_gr2 = 0;
+            g.varz.ship_gr2ptr = Some(Sprite2Ref::SpriteSheet9);
+            let right = g.config.key_settings[3] as usize;
+            let fire = g.config.key_settings[4] as usize;
+            g.keyboard.keysactive[right] = true;
+            g.keyboard.keysactive[fire] = true;
+        });
+        let out = rig.run(
+            // SAFETY: plain C call.
+            || unsafe { b::network_state_reset() },
+            |g| {
+                rustyrian_core::network::network_state_reset(g);
+                Ok(())
+            },
+        );
+        assert_eq!(out, Ok(()));
+        // The opponent's state for frames 0..6: moving left and up, with
+        // the fire and left-sidekick buttons, at difficulty 4.
+        for sync in 0..6u16 {
+            let mut p = vec![0u8; 28];
+            p[..2].copy_from_slice(&rustyrian_core::network::PACKET_STATE.to_be_bytes());
+            p[2..4].copy_from_slice(&sync.to_be_bytes());
+            p[4..6].copy_from_slice(&(-2i16 as u16).to_be_bytes());
+            p[6..8].copy_from_slice(&(-1i16 as u16).to_be_bytes());
+            p[8..10].copy_from_slice(&(-1i16 as u16).to_be_bytes());
+            p[12..14].copy_from_slice(&0b0011u16.to_be_bytes());
+            p[16..18].copy_from_slice(&4u16.to_be_bytes());
+            rig.push(&p);
+        }
+        rig.clear();
+        for frame in 0..5 {
+            let out = rig.run(
+                || {
+                    // SAFETY: plain C calls on the test thread.
+                    unsafe {
+                        b::JE_mainGamePlayerFunctions();
+                        b::network_state_send();
+                        b::network_state_update()
+                    }
+                },
+                |g| {
+                    mi::je_main_game_player_functions(g)?;
+                    rustyrian_core::network::network_state_send(g);
+                    rustyrian_core::network::network_state_update(g)
+                },
+            );
+            assert_eq!(out, Ok(frame >= 1), "frame {frame}");
+        }
+        if me == 2 {
+            assert_eq!(rig.g.config.difficulty_level, 4);
+        }
+        rig.check();
+    }
+}
+
+/// D-UB-MAININT-TABLES, D-UB-MAININT-JOYSTICK, D-UB-MAININT-SHOTAVAIL:
+/// item numbers, pick-up values and sidekick frames outside their tables
+/// read zeroed entries, a device past the connected joysticks polls
+/// nothing, and the asteroid killer from an enemy slot past `shotAvail`
+/// writes nothing; no panic.
+#[test]
+fn movement_and_collision_guards_hold() {
+    let script = "ots 1\njoystick \"Pad 0\" 2 6 0\n";
+    let mut rig = Rig::from_fixture(script, 500);
+    let g = &mut rig.g;
+    rustyrian_core::joystick::init_joysticks(g);
+    assert_eq!(g.joystick.joysticks, 1);
+    g.demo.play_demo = false;
+    g.config.two_player_mode = true;
+    g.config.two_player_linked = false;
+    g.config.galaga_mode = false;
+    g.config.input_device = [7, 200];
+    let fire = g.config.key_settings[4] as usize;
+    g.keyboard.keysactive[fire] = true;
+    for p in 0..2 {
+        let pl = &mut g.player.player[p];
+        pl.is_alive = true;
+        pl.items.weapon = [rustyrian_core::player::PlayerItemsWeapon { id: 250, power: 0 }; 2];
+        pl.weapon_mode = 0;
+        pl.items.sidekick = [250, 250];
+        pl.lives = Some(p);
+    }
+    g.config.shot_repeat = [0; 11];
+    mi::je_main_game_player_functions(g).expect("no exit");
+    // Weapon 250 has no `weaponPort` entry: its zeroed `opnum` keeps mode 0
+    // and its zeroed `op` table fires nothing.
+    assert_eq!(g.player.player[1].weapon_mode, 0);
+    // The linked turret and charge shot of a player 2 without a rear weapon.
+    g.config.two_player_linked = true;
+    mi::je_main_game_player_functions(g).expect("no exit");
+
+    let (x, y) = (g.player.player[0].x, g.player.player[0].y);
+    let pick_up = |g: &mut rustyrian_core::Game, sam: u8, z: usize, evalue: i16, p: usize| {
+        g.config.super_arcade_mode = sam;
+        g.varz.enemy_avail = [1; 100];
+        g.varz.enemy_avail[z] = 0;
+        let e = &mut g.varz.enemy[z];
+        (e.ex, e.ey, e.mapoffset) = (x as i16, y as i16, 0);
+        e.evalue = evalue;
+        e.scoreitem = true;
+        e.enemytype = 1;
+        let pl = &mut g.player.player[p];
+        pl.is_alive = true;
+        (pl.x, pl.y) = (x, y);
+        mi::je_player_collide(g, p, p as u8 + 1).expect("no exit");
+        assert_eq!(g.varz.enemy_avail[z], 1, "picked up {evalue}");
+    };
+
+    // A super-arcade pick-up past `SAWeapon`'s row reads weapon 0.
+    pick_up(g, 3, 10, 30999, 0);
+    assert_eq!(g.varz.temp_w, 0);
+    assert_eq!(g.player.player[0].items.weapon[0].id, 0);
+    // A special past `special` is stored as C stores it, named "".
+    pick_up(g, 0, 11, 32767, 0);
+    assert_eq!(g.player.player[0].items.special, (32767 - 32100) as u8);
+    // A sidekick series past `optionSelect` gives no sidekicks.
+    pick_up(g, 0, 12, 32050, 1);
+    assert_eq!(g.player.player[1].items.sidekick_series, 50);
+    assert_eq!(g.player.player[1].items.sidekick, [0, 0]);
+    // The asteroid killer from slot 99 clears no shot.
+    let before = g.shots.shot_avail;
+    pick_up(g, 0, 99, -3, 0);
+    for (i, (&b, &a)) in before.iter().zip(&g.shots.shot_avail).enumerate() {
+        assert!(b == 0 || a == b, "shot {i} changed from {b} to {a}");
+    }
+}
+
+/// The full key combinations: the Nort ship (local and requested), both
+/// cheats, the level skip (local and requested), smoothies, the filter
+/// wrap, and an edited ship keeping its lower armor.
+#[test]
+fn main_keyboard_input_combinations_match_c() {
+    const NORT: &[usize] = &[59, 61, 63, 64, 66, 49, 56];
+    let cases: [(&[usize], GameEdit); 9] = [
+        (NORT, |_| {}),
+        (NORT, |g| g.network.is_network_game = true),
+        (&[59, 60, 63], |_| {}),
+        (&[59, 60, 61], |_| {}),
+        (&[59, 63, 64], |_| {}),
+        (&[59, 63, 65], |g| g.network.is_network_game = true),
+        (&[42, 69, 71, 31, 34, 38, 39], |_| {}),
+        (&[42, 45], |g| g.config.level_filter = 15),
+        (&[43, 30], |g| {
+            g.editship.extra_avail = true;
+            for k in 0..10 {
+                g.editship.extra_ships[k * 15..k * 15 + 9]
+                    .copy_from_slice(&[1, 1, 1, 0, 0, 0, 1, 28, 1]);
+            }
+            g.varz.edit_ship1 = true;
+            g.player.player[0].armor = 3;
+        }),
+    ];
+    let mut rig = Rig::from_fixture("ots 1\n", 500);
+    let base = rig.g.snapshot();
+    for (keys, edit) in cases {
+        rig.g.restore(base.clone());
+        rig.g.config.two_player_mode = false;
+        rig.g.config.super_tyrian = false;
+        rig.g.config.super_arcade_mode = 0;
+        for &k in keys {
+            rig.g.keyboard.keysactive[k] = true;
+        }
+        edit(&mut rig.g);
+        rig.store();
+        rig.clear();
+        let out = rig.run(
+            // SAFETY: plain C call on the stored game state.
+            || unsafe { b::JE_mainKeyboardInput() },
+            mi::je_main_keyboard_input,
+        );
+        assert_eq!(out, Ok(()), "{keys:?}");
+        if let Err(e) = same_game(&mut rig) {
+            panic!("{keys:?}: {e}");
+        }
+    }
+}
+
+/// One score item on player 1 in a one-player game.
+fn quiet_crash() -> Crash {
+    Crash {
+        flags: [false; 7],
+        sam: 0,
+        player_num: 1,
+        pilot: (150, 100, 0, 5, 10, 1),
+        items: [[(1, 1), (1, 1)], [(1, 1), (1, 1)]],
+        series: (0, 101),
+        damage_rate: 5,
+        contacts: vec![Contact {
+            slot: 5,
+            evalue: 1,
+            avail: 0,
+            scoreitem: true,
+            armorleft: 10,
+            linknum: 0,
+            push: (0, 0),
+            enemytype: 1,
+            at: (0, 0, 0),
+            ground: (false, 0),
+        }],
+    }
+}
+
+type CrashEdit = fn(&mut Crash);
+
+/// Pick-ups the generated scenes reach rarely: a super-arcade weapon the
+/// player already has, specials and weapons in each game mode, a repeated
+/// sidekick series, a rear weapon without power, the weapon power-ups in
+/// two-player and network games, super bombs and the hot dog.
+#[test]
+fn player_collide_edge_cases_match_c() {
+    // Flags: two players, linked, galaga, one-player arcade, network,
+    // bonus level, cheating.
+    let cases: [CrashEdit; 12] = [
+        |c| {
+            c.sam = 1;
+            c.contacts[0].evalue = 30001;
+            c.items[0][0].0 = rustyrian_core::varz::SA_WEAPON[0][0] as u8;
+        },
+        |c| c.contacts[0].evalue = 32101,
+        |c| {
+            c.flags[0] = true;
+            c.contacts[0].evalue = 32102;
+        },
+        |c| {
+            c.player_num = 2;
+            c.flags[0] = true;
+            c.series = (3, 101);
+            c.contacts[0].evalue = 32003;
+        },
+        |c| {
+            c.flags[3] = true;
+            c.items[0][1].1 = 0;
+            c.contacts[0].evalue = 31005;
+        },
+        |c| {
+            c.flags[0] = true;
+            c.contacts[0].evalue = 30005;
+        },
+        |c| {
+            c.flags[4] = true;
+            c.contacts[0].evalue = -1;
+        },
+        |c| {
+            c.flags[0] = true;
+            c.contacts[0].evalue = -1;
+        },
+        |c| {
+            c.flags[0] = true;
+            c.contacts[0].evalue = -2;
+        },
+        |c| {
+            c.pilot.5 = 3;
+            c.contacts[0].evalue = -4;
+        },
+        |c| {
+            c.pilot.5 = 10;
+            c.contacts[0].evalue = -4;
+        },
+        |c| c.contacts[0].evalue = -5,
+    ];
+    let mut rig = Rig::from_fixture("ots 1\n", 500);
+    let base = rig.g.snapshot();
+    for (i, edit) in cases.into_iter().enumerate() {
+        rig.g.restore(base.clone());
+        let mut crash = quiet_crash();
+        edit(&mut crash);
+        apply_crash(&mut rig.g, &crash);
+        rig.store();
+        rig.clear();
+        let p = usize::from(crash.player_num) - 1;
+        let num = crash.player_num;
+        let out = rig.run(
+            // SAFETY: plain C call on the stored game state.
+            || unsafe { b::JE_playerCollide(c_player(p), num) },
+            |g| mi::je_player_collide(g, p, num),
+        );
+        assert_eq!(out, Ok(()), "case {i}");
+        if let Err(e) = same_game(&mut rig) {
+            panic!("case {i}: {e}");
+        }
+    }
+}
