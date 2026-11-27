@@ -107,221 +107,291 @@ fn any_enemy_offset() -> impl Strategy<Value = u16> {
     prop::sample::select(vec![0u16, 25, 50, 75, 30])
 }
 
-proptest! {
-    #![proptest_config(ProptestConfig { cases: 48, ..ProptestConfig::default() })]
+// The enemy, boss-bar and drawing tests below are capped: each case stores
+// the full Game (most restore a fixture) and loads large C state back
+// (enemies, screens; about 0.05-0.35 s per case).
 
-    #[test]
-    fn je_create_new_event_enemy_matches(
-        frame in prop::sample::select(FRAMES.to_vec()),
-        loc in 1u16..=EVENT_MAXIMUM as u16,
-        eventdat in 0i16..=800,
-        type_ofs in 0u8..50,
-        dat2 in prop_oneof![Just(-99i16), any::<i16>()],
-        dats: (i8, i8, i8, u8),
-        offset in any_enemy_offset(),
+#[test]
+fn je_create_new_event_enemy_matches() {
+    let strategy = (
+        prop::sample::select(FRAMES.to_vec()),
+        1u16..=EVENT_MAXIMUM as u16,
+        0i16..=800,
+        0u8..50,
+        prop_oneof![Just(-99i16), any::<i16>()],
+        any::<(i8, i8, i8, u8)>(),
+        any_enemy_offset(),
         // Often no free slot in the searched range (the early return).
-        avail in prop_oneof![
+        prop_oneof![
             prop::collection::vec(0u8..3, 100),
             prop::collection::vec(prop_oneof![Just(0u8), Just(2u8)], 100),
         ],
-        unique in prop::sample::select(vec![0i16, 21, 26, 99]),
-        map: (u16, u16, u16, u16, u16),
-        flags: (bool, bool, bool),
-    ) {
-        let mut d = Diff::new();
-        fixture_game(&mut d, frame);
-        let g = &mut d.game;
-        g.varz.event_loc = loc;
-        g.tyrian2.event_rec[usize::from(loc) - 1] = JeEventRecType {
-            eventdat,
-            eventdat2: dat2,
-            eventdat3: dats.0,
-            eventdat5: dats.1,
-            eventdat6: dats.2,
-            eventdat4: dats.3,
-            ..JeEventRecType::default()
-        };
-        g.varz.enemy_avail.copy_from_slice(&avail);
-        let bk = &mut g.backgrnd;
-        (bk.map_x, bk.map_x3, bk.back_move, bk.back_move2, bk.back_move3) = map;
-        (g.varz.background3x1, g.varz.background3x1b, g.varz.small_enemy_adjust) = flags;
-        d.store_to_c();
-        // SAFETY: plain C call; `eventLoc >= 1` and the enemy index is valid.
-        unsafe { b::JE_createNewEventEnemy(type_ofs, offset, unique) };
-        t2::je_create_new_event_enemy(&mut d.game, type_ofs, offset, unique);
-        check_enemies(&d)?;
-    }
+        prop::sample::select(vec![0i16, 21, 26, 99]),
+        any::<(u16, u16, u16, u16, u16)>(),
+        any::<(bool, bool, bool)>(),
+    );
+    diff::capped_runner(48)
+        .run(
+            &strategy,
+            |(frame, loc, eventdat, type_ofs, dat2, dats, offset, avail, unique, map, flags)| {
+                let mut d = Diff::new();
+                fixture_game(&mut d, frame);
+                let g = &mut d.game;
+                g.varz.event_loc = loc;
+                g.tyrian2.event_rec[usize::from(loc) - 1] = JeEventRecType {
+                    eventdat,
+                    eventdat2: dat2,
+                    eventdat3: dats.0,
+                    eventdat5: dats.1,
+                    eventdat6: dats.2,
+                    eventdat4: dats.3,
+                    ..JeEventRecType::default()
+                };
+                g.varz.enemy_avail.copy_from_slice(&avail);
+                let bk = &mut g.backgrnd;
+                (
+                    bk.map_x,
+                    bk.map_x3,
+                    bk.back_move,
+                    bk.back_move2,
+                    bk.back_move3,
+                ) = map;
+                (
+                    g.varz.background3x1,
+                    g.varz.background3x1b,
+                    g.varz.small_enemy_adjust,
+                ) = flags;
+                d.store_to_c();
+                // SAFETY: plain C call; `eventLoc >= 1` and the enemy index is valid.
+                unsafe { b::JE_createNewEventEnemy(type_ofs, offset, unique) };
+                t2::je_create_new_event_enemy(&mut d.game, type_ofs, offset, unique);
+                check_enemies(&d)?;
+                Ok(())
+            },
+        )
+        .expect("JE_createNewEventEnemy matches");
+}
 
-    /// Jumps to any location (or back with 65535) in an event list that
-    /// ends at time 65535, as every level's does.
-    #[test]
-    fn je_event_jump_matches(
-        steps in prop::collection::vec(0u16..40, EVENT_MAXIMUM - 1),
-        jump in prop_oneof![Just(65535u16), any::<u16>()],
-        cur: u16,
-        ret: u16,
-    ) {
-        let mut d = Diff::new();
-        let mut t = 0u16;
-        for (e, s) in d.game.tyrian2.event_rec.iter_mut().zip(steps) {
-            t = t.saturating_add(s);
-            e.eventtime = t;
-        }
-        d.game.tyrian2.event_rec[EVENT_MAXIMUM - 1].eventtime = 65535;
-        (d.game.varz.cur_loc, d.game.varz.return_loc) = (cur, ret);
-        d.store_to_c();
-        // SAFETY: plain C call; an event at time 65535 ends the search.
-        unsafe { b::JE_eventJump(jump) };
-        t2::je_event_jump(&mut d.game, jump);
-        let c = diff::load::<varz::State>();
-        prop_assert_eq!(
-            (c.cur_loc, c.return_loc, c.event_loc),
-            (d.game.varz.cur_loc, d.game.varz.return_loc, d.game.varz.event_loc)
-        );
-    }
+/// Jumps to any location (or back with 65535) in an event list that ends at
+/// time 65535, as every level's does.
+#[test]
+fn je_event_jump_matches() {
+    let strategy = (
+        prop::collection::vec(0u16..40, EVENT_MAXIMUM - 1),
+        prop_oneof![Just(65535u16), any::<u16>()],
+        any::<u16>(),
+        any::<u16>(),
+    );
+    diff::capped_runner(64)
+        .run(&strategy, |(steps, jump, cur, ret)| {
+            let mut d = Diff::new();
+            let mut t = 0u16;
+            for (e, s) in d.game.tyrian2.event_rec.iter_mut().zip(steps) {
+                t = t.saturating_add(s);
+                e.eventtime = t;
+            }
+            d.game.tyrian2.event_rec[EVENT_MAXIMUM - 1].eventtime = 65535;
+            (d.game.varz.cur_loc, d.game.varz.return_loc) = (cur, ret);
+            d.store_to_c();
+            // SAFETY: plain C call; an event at time 65535 ends the search.
+            unsafe { b::JE_eventJump(jump) };
+            t2::je_event_jump(&mut d.game, jump);
+            let c = diff::load::<varz::State>();
+            prop_assert_eq!(
+                (c.cur_loc, c.return_loc, c.event_loc),
+                (
+                    d.game.varz.cur_loc,
+                    d.game.varz.return_loc,
+                    d.game.varz.event_loc
+                )
+            );
+            Ok(())
+        })
+        .expect("JE_eventJump matches");
+}
 
-    #[test]
-    fn je_search_for_matches(
-        avail in prop::collection::vec(0u8..3, 100),
-        links in prop::collection::vec(0u8..4, 100),
-        values in prop::collection::vec(any::<i16>(), 100),
-        galaga: bool,
-        pl_type in 0u8..5,
-        with_out: bool,
-    ) {
-        let mut d = Diff::new();
-        d.game.varz.enemy_avail.copy_from_slice(&avail);
-        for (i, e) in d.game.varz.enemy.iter_mut().enumerate() {
-            e.linknum = links[i];
-            e.evalue = values[i];
-        }
-        d.game.config.galaga_mode = galaga;
-        d.store_to_c();
-        let (mut c_out, mut r_out) = (200u8, 200u8);
-        let c_ptr = if with_out { &raw mut c_out } else { std::ptr::null_mut() };
-        // SAFETY: plain C call; the out pointer is valid or NULL.
-        let c = unsafe { b::JE_searchFor(pl_type, c_ptr) };
-        let r = t2::je_search_for(&mut d.game, pl_type, with_out.then_some(&mut r_out));
-        prop_assert_eq!(c, r);
-        prop_assert_eq!(c_out, r_out);
-        check_enemies(&d)?;
-    }
+#[test]
+fn je_search_for_matches() {
+    let strategy = (
+        prop::collection::vec(0u8..3, 100),
+        prop::collection::vec(0u8..4, 100),
+        prop::collection::vec(any::<i16>(), 100),
+        any::<bool>(),
+        0u8..5,
+        any::<bool>(),
+    );
+    diff::capped_runner(64)
+        .run(
+            &strategy,
+            |(avail, links, values, galaga, pl_type, with_out)| {
+                let mut d = Diff::new();
+                d.game.varz.enemy_avail.copy_from_slice(&avail);
+                for (i, e) in d.game.varz.enemy.iter_mut().enumerate() {
+                    e.linknum = links[i];
+                    e.evalue = values[i];
+                }
+                d.game.config.galaga_mode = galaga;
+                d.store_to_c();
+                let (mut c_out, mut r_out) = (200u8, 200u8);
+                let c_ptr = if with_out {
+                    &raw mut c_out
+                } else {
+                    std::ptr::null_mut()
+                };
+                // SAFETY: plain C call; the out pointer is valid or NULL.
+                let c = unsafe { b::JE_searchFor(pl_type, c_ptr) };
+                let r = t2::je_search_for(&mut d.game, pl_type, with_out.then_some(&mut r_out));
+                prop_assert_eq!(c, r);
+                prop_assert_eq!(c_out, r_out);
+                check_enemies(&d)?;
+                Ok(())
+            },
+        )
+        .expect("JE_searchFor matches");
+}
 
-    /// Boss bars on a fixture screen: live, dead and missing bosses, one or
-    /// two bars, with and without the level timer.
-    #[test]
-    fn draw_boss_bar_matches(
-        frame in prop::sample::select(FRAMES.to_vec()),
+/// Boss bars on a fixture screen: live, dead and missing bosses, one or two
+/// bars, with and without the level timer.
+#[test]
+fn draw_boss_bar_matches() {
+    let strategy = (
+        prop::sample::select(FRAMES.to_vec()),
         // Bar 0 tracks link 1 and bar 1 link 2 (or none), each with or
         // without a live boss, so one, two and moved bars all occur.
-        bars in prop::array::uniform2((any::<bool>(), any::<bool>(), any::<u8>(), 0u8..20)),
-        boss_slots in prop::array::uniform2(0usize..100),
-        avail in prop::collection::vec(0u8..3, 100),
+        prop::array::uniform2((any::<bool>(), any::<bool>(), any::<u8>(), 0u8..20)),
+        prop::array::uniform2(0usize..100),
+        prop::collection::vec(0u8..3, 100),
         // Mostly links no bar tracks, so a live boss usually keeps its bar;
         // sometimes a boss link (a dead twin ends the bar).
-        links in prop::collection::vec(
+        prop::collection::vec(
             prop_oneof![200 => prop::sample::select(vec![0u8, 3]), 1 => 1u8..3],
             100,
         ),
-        armor in prop::collection::vec(prop_oneof![Just(0u8), Just(255u8), any::<u8>()], 100),
-        level_timer: bool,
-    ) {
-        let mut d = Diff::new();
-        fixture_game(&mut d, frame);
-        let g = &mut d.game;
-        g.varz.enemy_avail.copy_from_slice(&avail);
-        for (i, e) in g.varz.enemy.iter_mut().enumerate() {
-            e.linknum = links[i];
-            e.armorleft = armor[i];
-        }
-        for (b, (on, alive, armor, color)) in bars.into_iter().enumerate() {
-            let link_num = if on { b as u8 + 1 } else { 0 };
-            g.tyrian2.boss_bar[b] = BossBarT { link_num, armor, color };
-            if on && alive {
-                let e = &mut g.varz.enemy[boss_slots[b]];
-                e.linknum = link_num;
-                e.armorleft = e.armorleft.max(1);
-                g.varz.enemy_avail[boss_slots[b]] = 0;
-            }
-        }
-        g.varz.level_timer = level_timer;
-        d.store_to_c();
-        // SAFETY: plain C call on fixture state.
-        unsafe { b::draw_boss_bar() };
-        t2::draw_boss_bar(&mut d.game);
-        prop_assert_eq!(diff::load::<State>(), d.game.tyrian2.clone());
-        prop_assert!(
-            diff::load::<rustyrian_core::video::State>() == d.game.video,
-            "surfaces differ"
-        );
-    }
+        prop::collection::vec(prop_oneof![Just(0u8), Just(255u8), any::<u8>()], 100),
+        any::<bool>(),
+    );
+    diff::capped_runner(48)
+        .run(
+            &strategy,
+            |(frame, bars, boss_slots, avail, links, armor, level_timer)| {
+                let mut d = Diff::new();
+                fixture_game(&mut d, frame);
+                let g = &mut d.game;
+                g.varz.enemy_avail.copy_from_slice(&avail);
+                for (i, e) in g.varz.enemy.iter_mut().enumerate() {
+                    e.linknum = links[i];
+                    e.armorleft = armor[i];
+                }
+                for (b, (on, alive, armor, color)) in bars.into_iter().enumerate() {
+                    let link_num = if on { b as u8 + 1 } else { 0 };
+                    g.tyrian2.boss_bar[b] = BossBarT {
+                        link_num,
+                        armor,
+                        color,
+                    };
+                    if on && alive {
+                        let e = &mut g.varz.enemy[boss_slots[b]];
+                        e.linknum = link_num;
+                        e.armorleft = e.armorleft.max(1);
+                        g.varz.enemy_avail[boss_slots[b]] = 0;
+                    }
+                }
+                g.varz.level_timer = level_timer;
+                d.store_to_c();
+                // SAFETY: plain C call on fixture state.
+                unsafe { b::draw_boss_bar() };
+                t2::draw_boss_bar(&mut d.game);
+                prop_assert_eq!(diff::load::<State>(), d.game.tyrian2.clone());
+                prop_assert!(
+                    diff::load::<rustyrian_core::video::State>() == d.game.video,
+                    "surfaces differ"
+                );
+                Ok(())
+            },
+        )
+        .expect("draw_boss_bar matches");
+}
 
-    #[test]
-    fn je_bar_x_matches(x1 in 0u16..330, y1 in 0u16..210, w in 0u16..60, h in 0u16..12, col: u8) {
-        let mut d = Diff::new();
-        fixture_game(&mut d, 500);
-        d.store_to_c();
-        // SAFETY: plain C call on fixture state.
-        unsafe { b::ot_s_tyrian2_JE_barX(x1, y1, x1 + w, y1 + h, col) };
-        t2::je_bar_x(&mut d.game, x1, y1, x1 + w, y1 + h, col);
-        prop_assert!(
-            diff::load::<rustyrian_core::video::State>() == d.game.video,
-            "surfaces differ"
-        );
-    }
+#[test]
+fn je_bar_x_matches() {
+    let strategy = (0u16..330, 0u16..210, 0u16..60, 0u16..12, any::<u8>());
+    diff::capped_runner(48)
+        .run(&strategy, |(x1, y1, w, h, col)| {
+            let mut d = Diff::new();
+            fixture_game(&mut d, 500);
+            d.store_to_c();
+            // SAFETY: plain C call on fixture state.
+            unsafe { b::ot_s_tyrian2_JE_barX(x1, y1, x1 + w, y1 + h, col) };
+            t2::je_bar_x(&mut d.game, x1, y1, x1 + w, y1 + h, col);
+            prop_assert!(
+                diff::load::<rustyrian_core::video::State>() == d.game.video,
+                "surfaces differ"
+            );
+            Ok(())
+        })
+        .expect("JE_barX matches");
+}
 
-    /// Enemies drawn from every loaded sheet, with and without a filter, and
-    /// enemies without a sheet.
-    #[test]
-    fn blit_enemy_matches(
-        frame in prop::sample::select(FRAMES.to_vec()),
-        i in 0u32..100,
-        sheet in 0usize..8,
-        cycle in 1u8..=20,
-        gr: u16,
-        sprite_offset in prop::sample::select(vec![0i32, 1, 19, 20]),
-        pos in (-30i16..300, -30i16..200, -7i32..8, -7i32..8),
-        filter in prop_oneof![Just(0u8), any::<u8>()],
-        map_x_ofs in 0u16..30,
-    ) {
-        let mut d = Diff::new();
-        fixture_game(&mut d, frame);
-        let g = &mut d.game;
-        let sheets: Vec<Option<Sprite2Ref>> = [
-            Sprite2Ref::EnemySpriteSheets(0),
-            Sprite2Ref::EnemySpriteSheets(1),
-            Sprite2Ref::EnemySpriteSheets(2),
-            Sprite2Ref::EnemySpriteSheets(3),
-            Sprite2Ref::SpriteSheet10,
-            Sprite2Ref::SpriteSheet11,
-        ]
-        .into_iter()
-        .filter(|&r| loaded_count(g, r) > 21)
-        .map(Some)
-        .chain([None])
-        .collect();
-        let sprite2s = sheets[sheet % sheets.len()];
-        let e = &mut g.varz.enemy[i as usize];
-        e.sprite2s = sprite2s;
-        e.enemycycle = cycle;
-        // Frames inside the sheet's offset table only: others are
-        // D-UB-SPRITE-1 territory (`tyrian2.c:84` → `sprite.c:550`).
-        let count = sprite2s.map_or(21, |r| loaded_count(g, r));
-        let e = &mut g.varz.enemy[i as usize];
-        e.egr[usize::from(cycle) - 1] = 1 + gr % (count - 20);
-        (e.ex, e.ey) = (pos.0, pos.1);
-        e.filter = filter;
-        g.backgrnd.temp_map_x_ofs = map_x_ofs;
-        d.store_to_c();
-        // SAFETY: plain C call; the enemy's sheet is loaded or NULL.
-        unsafe { b::ot_s_tyrian2_blit_enemy(b::VGAScreen, i, pos.2, pos.3, sprite_offset) };
-        let vga = d.game.video.vga_screen_id();
-        t2::blit_enemy(&mut d.game, vga, i, pos.2, pos.3, sprite_offset);
-        prop_assert!(
-            diff::load::<rustyrian_core::video::State>() == d.game.video,
-            "surfaces differ"
-        );
-    }
+/// Enemies drawn from every loaded sheet, with and without a filter, and
+/// enemies without a sheet.
+#[test]
+fn blit_enemy_matches() {
+    let strategy = (
+        prop::sample::select(FRAMES.to_vec()),
+        0u32..100,
+        0usize..8,
+        1u8..=20,
+        any::<u16>(),
+        prop::sample::select(vec![0i32, 1, 19, 20]),
+        (-30i16..300, -30i16..200, -7i32..8, -7i32..8),
+        prop_oneof![Just(0u8), any::<u8>()],
+        0u16..30,
+    );
+    diff::capped_runner(48)
+        .run(
+            &strategy,
+            |(frame, i, sheet, cycle, gr, sprite_offset, pos, filter, map_x_ofs)| {
+                let mut d = Diff::new();
+                fixture_game(&mut d, frame);
+                let g = &mut d.game;
+                let sheets: Vec<Option<Sprite2Ref>> = [
+                    Sprite2Ref::EnemySpriteSheets(0),
+                    Sprite2Ref::EnemySpriteSheets(1),
+                    Sprite2Ref::EnemySpriteSheets(2),
+                    Sprite2Ref::EnemySpriteSheets(3),
+                    Sprite2Ref::SpriteSheet10,
+                    Sprite2Ref::SpriteSheet11,
+                ]
+                .into_iter()
+                .filter(|&r| loaded_count(g, r) > 21)
+                .map(Some)
+                .chain([None])
+                .collect();
+                let sprite2s = sheets[sheet % sheets.len()];
+                let e = &mut g.varz.enemy[i as usize];
+                e.sprite2s = sprite2s;
+                e.enemycycle = cycle;
+                // Frames inside the sheet's offset table only: others are
+                // D-UB-SPRITE-1 territory (`tyrian2.c:84` → `sprite.c:550`).
+                let count = sprite2s.map_or(21, |r| loaded_count(g, r));
+                let e = &mut g.varz.enemy[i as usize];
+                e.egr[usize::from(cycle) - 1] = 1 + gr % (count - 20);
+                (e.ex, e.ey) = (pos.0, pos.1);
+                e.filter = filter;
+                g.backgrnd.temp_map_x_ofs = map_x_ofs;
+                d.store_to_c();
+                // SAFETY: plain C call; the enemy's sheet is loaded or NULL.
+                unsafe { b::ot_s_tyrian2_blit_enemy(b::VGAScreen, i, pos.2, pos.3, sprite_offset) };
+                let vga = d.game.video.vga_screen_id();
+                t2::blit_enemy(&mut d.game, vga, i, pos.2, pos.3, sprite_offset);
+                prop_assert!(
+                    diff::load::<rustyrian_core::video::State>() == d.game.video,
+                    "surfaces differ"
+                );
+                Ok(())
+            },
+        )
+        .expect("blit_enemy matches");
 }
 
 /// The offset-table entries of a loaded sheet (0 when it is not loaded).
@@ -467,7 +537,9 @@ fn new_super_tyrian_game_matches() {
 /// through `JE_makeEnemy`.
 #[test]
 fn je_make_enemy_matches_on_synthetic_records() {
-    let mut runner = proptest::test_runner::TestRunner::default();
+    // Capped: each case stores the full Game and loads `varz` back (about
+    // 0.05 s per case).
+    let mut runner = diff::capped_runner(64);
     let rec = (
         (
             any::<i8>(),
@@ -557,6 +629,202 @@ fn je_whoa_matches() {
         assert_eq!(r, Ok(()));
         rig.check();
     }
+}
+
+/// Per-slot perturbations of one enemy for `JE_drawEnemy`.
+#[derive(Clone, Debug)]
+struct EnemyTweak {
+    live: bool,
+    accel: (u8, u8),
+    circle: (i8, i8, i8),
+    shots: ([u8; 3], [usize; 3], u8),
+    iced: u8,
+    damaged: bool,
+    launch: (u8, u8, u16, u8),
+    score: bool,
+    gone: bool,
+    shift: (i16, i16),
+    /// Reversal points at the current velocities; bounce bounds at the
+    /// current position; the launched record's own launch type (with no
+    /// launch frequency, so the child is aimed or scattered).
+    edges: (bool, bool, Option<u16>),
+}
+
+fn any_tweak() -> impl Strategy<Value = EnemyTweak> {
+    let accel = || prop_oneof![Just(0u8), 89u8..100];
+    (
+        any::<bool>(),
+        (accel(), accel()),
+        (-3i8..4, -3i8..4, 0i8..3),
+        (
+            prop::array::uniform3(0u8..3),
+            prop::array::uniform3(0usize..64),
+            1u8..3,
+        ),
+        prop_oneof![4 => Just(0u8), 1 => 1u8..3],
+        prop::bool::weighted(0.1),
+        (
+            0u8..3,
+            1u8..3,
+            prop_oneof![Just(0u16), 1u16..=90, 91u16..=850],
+            0u8..3,
+        ),
+        any::<bool>(),
+        prop::bool::weighted(0.05),
+        (-30i16..30, -30i16..30),
+        (
+            prop::bool::weighted(0.2),
+            prop::bool::weighted(0.2),
+            prop::option::weighted(0.3, prop_oneof![1u16..=90, 91u16..=150]),
+        ),
+    )
+        .prop_map(
+            |(live, accel, circle, shots, iced, damaged, launch, score, gone, shift, edges)| {
+                EnemyTweak {
+                    live,
+                    accel,
+                    circle,
+                    shots,
+                    iced,
+                    damaged,
+                    launch,
+                    score,
+                    gone,
+                    shift,
+                    edges,
+                }
+            },
+        )
+}
+
+/// One `JE_drawEnemy` pass over a fixture's enemy group, with every slot
+/// perturbed: steering, circles, bounds, firing every turret kind (weapons
+/// the episode's enemies use, magnets, repulsors, the Savara missiles),
+/// galaga mode, difficulty, two players, launching all launch kinds, ice and
+/// damage.
+#[test]
+fn je_draw_enemy_matches() {
+    // Capped: each case restores a fixture, runs a whole enemy pass and
+    // compares the full Game (about 0.75 s per case).
+    let strategy = (
+        prop::sample::select(FRAMES.to_vec()),
+        prop::sample::select(vec![25i32, 50, 75, 100]),
+        prop::collection::vec(any_tweak(), 25),
+        (any::<bool>(), 0u16..400),
+        -1i8..=10,
+        prop::array::uniform2((0i32..280, 0i32..190, any::<bool>())),
+        // A player placed on one of the group's enemies (magnets reach it).
+        prop::array::uniform2(prop::option::weighted(0.3, 0usize..25)),
+        any::<bool>(),
+        0u16..3,
+        any::<bool>(),
+        0u16..30,
+    );
+    diff::capped_runner(48)
+        .run(
+            &strategy,
+            |(
+                frame,
+                offset,
+                tweaks,
+                galaga,
+                difficulty,
+                players,
+                near,
+                two_player,
+                back_move,
+                shot_avail,
+                map_x_ofs,
+            )| {
+                let mut d = Diff::new();
+                fixture_game(&mut d, frame);
+                let g = &mut d.game;
+                // Turrets: weapons the loaded episode's enemies fire (valid data keeps
+                // their multi-shot positions inside the 8-entry arrays), plus the
+                // special turrets.
+                let mut turs: Vec<u8> = g
+                    .episodes
+                    .enemy_dat
+                    .iter()
+                    .flat_map(|e| e.tur)
+                    .filter(|&t| t != 0 && t < 251)
+                    .collect();
+                turs.sort_unstable();
+                turs.dedup();
+                turs.extend([0, 251, 252, 253, 254, 255]);
+                let live: Vec<usize> = (0..100).filter(|&i| g.varz.enemy_avail[i] != 1).collect();
+                prop_assert!(!live.is_empty());
+
+                for (k, t) in tweaks.iter().enumerate() {
+                    let i = offset as usize - 25 + k;
+                    if t.live && g.varz.enemy_avail[i] == 1 {
+                        g.varz.enemy[i] = g.varz.enemy[live[k % live.len()]];
+                        g.varz.enemy_avail[i] = 0;
+                    }
+                    let e = &mut g.varz.enemy[i];
+                    (e.xaccel, e.yaccel) = t.accel;
+                    (e.excc, e.eycc, e.exccw) = t.circle;
+                    e.freq = t.shots.0;
+                    // Half the turrets are the special kinds (none, magnets,
+                    // repulsor, Savara missiles), half real enemy weapons.
+                    e.tur = t.shots.1.map(|j| {
+                        if j % 2 == 0 {
+                            [0, 251, 252, 253, 254, 255][j / 2 % 6]
+                        } else {
+                            turs[j % turs.len()]
+                        }
+                    });
+                    e.eshotwait = [t.shots.2; 3];
+                    e.iced = t.iced;
+                    e.edamaged = t.damaged;
+                    (e.launchfreq, e.launchwait, e.launchtype, e.launchspecial) = t.launch;
+                    e.scoreitem = t.score;
+                    if t.gone && e.enemycycle > 0 {
+                        e.egr[usize::from(e.enemycycle) - 1] = 999;
+                    }
+                    e.ex = e.ex.wrapping_add(t.shift.0);
+                    let (rev, bounce, child) = t.edges;
+                    if rev {
+                        (e.exrev, e.eyrev) = (e.exc, e.eyc);
+                    }
+                    if bounce {
+                        e.xminbounce = e.ex.saturating_add(40);
+                        e.yminbounce = e.ey.saturating_add(40);
+                    }
+                    if let (Some(child), launched @ 1..) = (child, t.launch.2) {
+                        let r = &mut g.episodes.enemy_dat[usize::from(launched)];
+                        (r.elaunchtype, r.elaunchfreq) = (child, 0);
+                    }
+                    e.ey = e.ey.wrapping_add(t.shift.1);
+                }
+                (g.config.galaga_mode, g.varz.galaga_shot_freq) = galaga;
+                g.config.difficulty_level = difficulty;
+                g.config.two_player_mode = two_player;
+                for (p, (x, y, alive)) in g.player.player.iter_mut().zip(players) {
+                    (p.x, p.y, p.is_alive) = (x, y, alive);
+                }
+                for (p, k) in near.iter().enumerate() {
+                    if let Some(k) = k {
+                        let e = g.varz.enemy[offset as usize - 25 + k];
+                        let pl = &mut g.player.player[p];
+                        (pl.x, pl.y) = (i32::from(e.ex) + 14, i32::from(e.ey));
+                    }
+                }
+                g.varz.temp_back_move = back_move;
+                g.varz.enemy_shot_avail = [shot_avail; varz::ENEMY_SHOT_MAX];
+                g.backgrnd.temp_map_x_ofs = map_x_ofs;
+                d.store_to_c();
+                // SAFETY: plain C call on fixture state; `offset` is 25..=100.
+                unsafe { b::JE_drawEnemy(offset) };
+                t2::je_draw_enemy(&mut d.game, offset);
+                if let Some(diff) = diff::first_difference(&d.c_game_state(), &d.game.snapshot()) {
+                    panic!("states differ at {diff}");
+                }
+                prop_assert_eq!(d.c_calls(), d.rust_calls());
+                Ok(())
+            },
+        )
+        .expect("JE_drawEnemy matches");
 }
 
 #[test]

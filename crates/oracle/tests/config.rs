@@ -133,8 +133,6 @@ fn any_save() -> impl Strategy<Value = JeSaveFileType> {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig { cases: 64, ..ProptestConfig::default() })]
-
     #[test]
     fn playeritems_to_pitems_matches(items in any_items(), ep: u8) {
         let mut c_items = player_items_to_c(&items);
@@ -173,58 +171,80 @@ proptest! {
         cfg::je_init_processor_type(&mut d.game);
         prop_assert_eq!(diff::load::<State>(), d.game.config.clone());
     }
+}
 
-    /// `saveSaves` writes byte-identical files; `loadSaves` reads them back
-    /// into identical state (and equal to what was saved).
-    #[test]
-    fn save_saves_and_load_saves_round_trip(saves in prop::collection::vec(any_save(), SAVE_FILES_NUM), avail: [u8; 100], level: u16) {
-        let (c_dir, r_dir) = (tmp("save-c"), tmp("save-r"));
-        let mut d = Diff::new();
-        d.game.config.save_files.copy_from_slice(&saves);
-        d.game.config.editor_item_avail = avail;
-        d.game.config.editor_level = level;
-        split_user_dirs(&mut d, &c_dir, &r_dir);
-        // SAFETY: plain C call.
-        unsafe { b::saveSaves() };
-        cfg::save_saves(&mut d.game);
-        files_match(&c_dir, &r_dir);
-        check_after(&mut d);
-        let saved = d.game.config.clone();
+// The file and load tests below are capped: each case writes and reads user
+// files and compares the full C state (about 0.03-0.05 s per case).
 
-        let mut d = Diff::new();
-        split_user_dirs(&mut d, &c_dir, &r_dir);
-        // SAFETY: plain C call.
-        unsafe { b::loadSaves() };
-        cfg::load_saves(&mut d.game);
-        check_after(&mut d);
-        prop_assert_eq!(d.game.config.editor_item_avail, saved.editor_item_avail);
-        prop_assert_eq!(d.game.config.editor_level, saved.editor_level);
-    }
+/// `saveSaves` writes byte-identical files; `loadSaves` reads them back into
+/// identical state (and equal to what was saved).
+#[test]
+fn save_saves_and_load_saves_round_trip() {
+    let strategy = (
+        prop::collection::vec(any_save(), SAVE_FILES_NUM),
+        any::<[u8; 100]>(),
+        any::<u16>(),
+    );
+    diff::capped_runner(64)
+        .run(&strategy, |(saves, avail, level)| {
+            let (c_dir, r_dir) = (tmp("save-c"), tmp("save-r"));
+            let mut d = Diff::new();
+            d.game.config.save_files.copy_from_slice(&saves);
+            d.game.config.editor_item_avail = avail;
+            d.game.config.editor_level = level;
+            split_user_dirs(&mut d, &c_dir, &r_dir);
+            // SAFETY: plain C call.
+            unsafe { b::saveSaves() };
+            cfg::save_saves(&mut d.game);
+            files_match(&c_dir, &r_dir);
+            check_after(&mut d);
+            let saved = d.game.config.clone();
 
-    /// `loadSaves` on damaged files: any single corrupted byte (checksum
-    /// failure, defaults drawn from `mt_rand`) and truncation.
-    #[test]
-    fn load_saves_damaged_files_match(at in 0usize..2502, x in 1u8..=255, len in 0usize..2600, seed: u64) {
-        let (c_dir, r_dir) = (tmp("dmg-c"), tmp("dmg-r"));
-        let mut d = Diff::new();
-        split_user_dirs(&mut d, &c_dir, &r_dir);
-        // SAFETY: plain C call.
-        unsafe { b::saveSaves() };
-        let mut data = std::fs::read(c_dir.join("tyrian.sav")).expect("saved");
-        data[at] ^= x;
-        data.truncate(len);
-        for dir in [&c_dir, &r_dir] {
-            std::fs::write(dir.join("tyrian.sav"), &data).expect("write");
-        }
-        let _ = d.c_calls();
-        rustyrian_core::mtrand::mt_srand(&mut d.game, seed);
-        d.game.config.save_files[3] = JeSaveFileType { level: 9, ..Default::default() };
-        split_user_dirs(&mut d, &c_dir, &r_dir);
-        // SAFETY: plain C call.
-        unsafe { b::loadSaves() };
-        cfg::load_saves(&mut d.game);
-        check_after(&mut d);
-    }
+            let mut d = Diff::new();
+            split_user_dirs(&mut d, &c_dir, &r_dir);
+            // SAFETY: plain C call.
+            unsafe { b::loadSaves() };
+            cfg::load_saves(&mut d.game);
+            check_after(&mut d);
+            prop_assert_eq!(d.game.config.editor_item_avail, saved.editor_item_avail);
+            prop_assert_eq!(d.game.config.editor_level, saved.editor_level);
+            Ok(())
+        })
+        .expect("saveSaves/loadSaves round trip");
+}
+
+/// `loadSaves` on damaged files: any single corrupted byte (checksum
+/// failure, defaults drawn from `mt_rand`) and truncation.
+#[test]
+fn load_saves_damaged_files_match() {
+    let strategy = (0usize..2502, 1u8..=255, 0usize..2600, any::<u64>());
+    diff::capped_runner(64)
+        .run(&strategy, |(at, x, len, seed)| {
+            let (c_dir, r_dir) = (tmp("dmg-c"), tmp("dmg-r"));
+            let mut d = Diff::new();
+            split_user_dirs(&mut d, &c_dir, &r_dir);
+            // SAFETY: plain C call.
+            unsafe { b::saveSaves() };
+            let mut data = std::fs::read(c_dir.join("tyrian.sav")).expect("saved");
+            data[at] ^= x;
+            data.truncate(len);
+            for dir in [&c_dir, &r_dir] {
+                std::fs::write(dir.join("tyrian.sav"), &data).expect("write");
+            }
+            let _ = d.c_calls();
+            rustyrian_core::mtrand::mt_srand(&mut d.game, seed);
+            d.game.config.save_files[3] = JeSaveFileType {
+                level: 9,
+                ..Default::default()
+            };
+            split_user_dirs(&mut d, &c_dir, &r_dir);
+            // SAFETY: plain C call.
+            unsafe { b::loadSaves() };
+            cfg::load_saves(&mut d.game);
+            check_after(&mut d);
+            Ok(())
+        })
+        .expect("loadSaves on damaged files matches");
 }
 
 /// The freeware data ships no save; a missing file gives the defaults.
@@ -330,114 +350,145 @@ fn save_files_write_errors_match() {
     files_match(&c_dir, &r_dir);
 }
 
-proptest! {
-    #![proptest_config(ProptestConfig { cases: 32, ..ProptestConfig::default() })]
+/// `saveConfiguration` writes byte-identical `tyrian.cfg` and
+/// `opentyrian.cfg` from any settings.
+#[test]
+fn save_configuration_matches() {
+    let strategy = (
+        any::<[u8; 12]>(),
+        any::<[u8; 4]>(),
+        any::<[u8; 8]>(),
+        any::<(u16, u16)>(),
+        prop::array::uniform8(0u32..300),
+        0u32..9,
+        0u32..4,
+        -2i32..3,
+        any::<bool>(),
+    );
+    diff::capped_runner(32)
+        .run(
+            &strategy,
+            |(bytes12, joy, dos, volumes, keys, scaler, mode, fullscreen, existing)| {
+                let (c_dir, r_dir) = (tmp("cfg-c"), tmp("cfg-r"));
+                let mut d = Diff::new();
+                let c = &mut d.game.config;
+                c.background2 = bytes12[0] & 1 != 0;
+                c.game_speed = bytes12[1];
+                c.input_device_ = bytes12[2];
+                c.j_configure = bytes12[3];
+                c.version_num = bytes12[4];
+                c.processor_type = bytes12[5];
+                c.midi_port = bytes12[6];
+                c.sound_effects = bytes12[7];
+                c.gamma_correction = bytes12[8];
+                c.difficulty_level = bytes12[9] as i8;
+                c.input_device1 = bytes12[10];
+                c.input_device2 = bytes12[11];
+                c.joy_button_assign = joy;
+                c.dos_key_settings = dos;
+                c.key_settings = keys;
+                if existing {
+                    let s = rustyrian_core::config_file::config_add_section(
+                        &mut c.opentyrian_config,
+                        b"video",
+                        None,
+                    );
+                    rustyrian_core::config_file::config_set_string_option(
+                        s,
+                        b"other",
+                        Some(b"kept"),
+                    );
+                    rustyrian_core::config_file::config_add_section(
+                        &mut c.opentyrian_config,
+                        b"extra",
+                        Some(b"x"),
+                    );
+                }
+                (d.game.nortsong.tyr_music_volume, d.game.nortsong.fx_volume) = volumes;
+                d.game.video_scale.scaler = scaler;
+                d.game.video.scaling_mode =
+                    rustyrian_core::video::ScalingMode::from_c(mode).expect("mode");
+                d.game.video.fullscreen_display = fullscreen;
+                split_user_dirs(&mut d, &c_dir, &r_dir);
+                // SAFETY: plain C call.
+                unsafe { b::saveConfiguration() };
+                cfg::save_configuration(&mut d.game);
+                files_match(&c_dir, &r_dir);
+                check_after(&mut d);
+                Ok(())
+            },
+        )
+        .expect("saveConfiguration matches");
+}
 
-    /// `saveConfiguration` writes byte-identical `tyrian.cfg` and
-    /// `opentyrian.cfg` from any settings.
-    #[test]
-    fn save_configuration_matches(
-        bytes12: [u8; 12],
-        joy: [u8; 4],
-        dos: [u8; 8],
-        volumes: (u16, u16),
-        keys in prop::array::uniform8(0u32..300),
-        scaler in 0u32..9,
-        mode in 0u32..4,
-        fullscreen in -2i32..3,
-        existing: bool,
-    ) {
-        let (c_dir, r_dir) = (tmp("cfg-c"), tmp("cfg-r"));
-        let mut d = Diff::new();
-        let c = &mut d.game.config;
-        c.background2 = bytes12[0] & 1 != 0;
-        c.game_speed = bytes12[1];
-        c.input_device_ = bytes12[2];
-        c.j_configure = bytes12[3];
-        c.version_num = bytes12[4];
-        c.processor_type = bytes12[5];
-        c.midi_port = bytes12[6];
-        c.sound_effects = bytes12[7];
-        c.gamma_correction = bytes12[8];
-        c.difficulty_level = bytes12[9] as i8;
-        c.input_device1 = bytes12[10];
-        c.input_device2 = bytes12[11];
-        c.joy_button_assign = joy;
-        c.dos_key_settings = dos;
-        c.key_settings = keys;
-        if existing {
-            let s = rustyrian_core::config_file::config_add_section(&mut c.opentyrian_config, b"video", None);
-            rustyrian_core::config_file::config_set_string_option(s, b"other", Some(b"kept"));
-            rustyrian_core::config_file::config_add_section(&mut c.opentyrian_config, b"extra", Some(b"x"));
-        }
-        (d.game.nortsong.tyr_music_volume, d.game.nortsong.fx_volume) = volumes;
-        d.game.video_scale.scaler = scaler;
-        d.game.video.scaling_mode = rustyrian_core::video::ScalingMode::from_c(mode).expect("mode");
-        d.game.video.fullscreen_display = fullscreen;
-        split_user_dirs(&mut d, &c_dir, &r_dir);
-        // SAFETY: plain C call.
-        unsafe { b::saveConfiguration() };
-        cfg::save_configuration(&mut d.game);
-        files_match(&c_dir, &r_dir);
-        check_after(&mut d);
-    }
+/// `JE_saveGame` then `JE_loadGame` of the same slot (loading reads episode
+/// data, so the freeware data directory is used).
+#[test]
+fn je_save_game_and_je_load_game_match() {
+    let strategy = (
+        1u8..=22,
+        any::<bool>(),
+        (
+            any::<bool>(),
+            any::<bool>(),
+            prop_oneof![Just(0u8), 0u8..10],
+        ),
+        prop::array::uniform2(any_items()),
+        any_items(),
+        any::<(u64, u64)>(),
+        1u8..=5,
+        prop::sample::select(vec![&b"Completed"[..], b"LEVEL 7"]),
+        any::<(u8, i8, i8, u8, [u8; 2], u16)>(),
+        any::<u8>(),
+    );
+    diff::capped_runner(32)
+        .run(
+            &strategy,
+            |(slot, two_player, flags, items, last, cash, ep, level, misc, sidekick_level)| {
+                let (c_dir, r_dir) = (tmp("game-c"), tmp("game-r"));
+                let mut d = Diff::new();
+                d.game.file.custom_data_dir_path = Some(bytes(&data_dir()));
+                let c = &mut d.game.config;
+                c.two_player_mode = two_player;
+                (c.super_tyrian, c.one_player_action, c.super_arcade_mode) = flags;
+                c.save_level = misc.0;
+                c.initial_difficulty = misc.1;
+                c.difficulty_level = misc.2;
+                c.secret_hint = misc.3;
+                c.input_device = misc.4;
+                c.last_cube_max = misc.5;
+                c.game_has_repeated = flags.0;
+                c.last_level_name = [0; 11];
+                c.last_level_name[..level.len()].copy_from_slice(level);
+                d.game.episodes.episode_num = ep - 1;
+                d.game.episodes.initial_episode_num = ep;
+                for (p, it) in d.game.player.player.iter_mut().zip(items) {
+                    p.items = it;
+                    p.last_items = last;
+                    p.lives = Some(0);
+                }
+                d.game.player.player[1].items.sidekick_level = sidekick_level;
+                (d.game.player.player[0].cash, d.game.player.player[1].cash) = cash;
+                split_user_dirs(&mut d, &c_dir, &r_dir);
+                let name = b"Saved game nameXYZ\0";
+                // SAFETY: `name` is NUL-terminated and longer than 14 bytes.
+                unsafe { b::JE_saveGame(slot, name.as_ptr().cast()) };
+                cfg::je_save_game(&mut d.game, slot, name);
+                files_match(&c_dir, &r_dir);
+                check_after(&mut d);
 
-    /// `JE_saveGame` then `JE_loadGame` of the same slot (loading reads
-    /// episode data, so the freeware data directory is used).
-    #[test]
-    fn je_save_game_and_je_load_game_match(
-        slot in 1u8..=22,
-        two_player: bool,
-        flags in (any::<bool>(), any::<bool>(), prop_oneof![Just(0u8), 0u8..10]),
-        items in prop::array::uniform2(any_items()),
-        last in any_items(),
-        cash: (u64, u64),
-        ep in 1u8..=5,
-        level in prop::sample::select(vec![&b"Completed"[..], b"LEVEL 7"]),
-        misc: (u8, i8, i8, u8, [u8; 2], u16),
-        sidekick_level: u8,
-    ) {
-        let (c_dir, r_dir) = (tmp("game-c"), tmp("game-r"));
-        let mut d = Diff::new();
-        d.game.file.custom_data_dir_path = Some(bytes(&data_dir()));
-        let c = &mut d.game.config;
-        c.two_player_mode = two_player;
-        (c.super_tyrian, c.one_player_action, c.super_arcade_mode) = flags;
-        c.save_level = misc.0;
-        c.initial_difficulty = misc.1;
-        c.difficulty_level = misc.2;
-        c.secret_hint = misc.3;
-        c.input_device = misc.4;
-        c.last_cube_max = misc.5;
-        c.game_has_repeated = flags.0;
-        c.last_level_name = [0; 11];
-        c.last_level_name[..level.len()].copy_from_slice(level);
-        d.game.episodes.episode_num = ep - 1;
-        d.game.episodes.initial_episode_num = ep;
-        for (p, it) in d.game.player.player.iter_mut().zip(items) {
-            p.items = it;
-            p.last_items = last;
-            p.lives = Some(0);
-        }
-        d.game.player.player[1].items.sidekick_level = sidekick_level;
-        (d.game.player.player[0].cash, d.game.player.player[1].cash) = cash;
-        split_user_dirs(&mut d, &c_dir, &r_dir);
-        let name = b"Saved game nameXYZ\0";
-        // SAFETY: `name` is NUL-terminated and longer than 14 bytes.
-        unsafe { b::JE_saveGame(slot, name.as_ptr().cast()) };
-        cfg::je_save_game(&mut d.game, slot, name);
-        files_match(&c_dir, &r_dir);
-        check_after(&mut d);
-
-        // SAFETY: JE_loadGame may exit (missing episode), which the guard catches.
-        let c = unsafe { rustyrian_oracle::guard_call(|| b::JE_loadGame(slot)) };
-        let r = cfg::je_load_game(&mut d.game, slot);
-        prop_assert_eq!(c.is_some(), r.is_err());
-        if let Some(code) = c {
-            prop_assert_eq!(r, Err(Halt { code }));
-        }
-        check_after(&mut d);
-    }
+                // SAFETY: JE_loadGame may exit (missing episode), which the guard catches.
+                let c = unsafe { rustyrian_oracle::guard_call(|| b::JE_loadGame(slot)) };
+                let r = cfg::je_load_game(&mut d.game, slot);
+                prop_assert_eq!(c.is_some(), r.is_err());
+                if let Some(code) = c {
+                    prop_assert_eq!(r, Err(Halt { code }));
+                }
+                check_after(&mut d);
+                Ok(())
+            },
+        )
+        .expect("JE_saveGame/JE_loadGame match");
 }
 
 /// After a load: every state the load functions touch agrees, plus calls.
@@ -528,73 +579,87 @@ fn write_opentyrian_cfg(dir: &Path, cfg: &Option<Vec<u8>>) {
     }
 }
 
-proptest! {
-    #![proptest_config(ProptestConfig { cases: 64, ..ProptestConfig::default() })]
+#[test]
+fn load_open_tyrian_config_matches() {
+    let strategy = (any_opentyrian_cfg(), -1i32..3, any::<[u32; 8]>());
+    diff::capped_runner(64)
+        .run(&strategy, |(cfg, fullscreen, keys)| {
+            let (c_dir, r_dir) = (tmp("otc-c"), tmp("otc-r"));
+            for dir in [&c_dir, &r_dir] {
+                write_opentyrian_cfg(dir, &cfg);
+            }
+            let mut d = Diff::new();
+            d.game.video.fullscreen_display = fullscreen;
+            d.game.config.key_settings = keys;
+            split_user_dirs(&mut d, &c_dir, &r_dir);
+            // SAFETY: plain C call.
+            unsafe { b::ot_s_config_loadOpenTyrianConfig() };
+            cfg::load_open_tyrian_config(&mut d.game);
+            check_load(&mut d)?;
+            Ok(())
+        })
+        .expect("loadOpenTyrianConfig matches");
+}
 
-    #[test]
-    fn load_open_tyrian_config_matches(cfg in any_opentyrian_cfg(), fullscreen in -1i32..3, keys: [u32; 8]) {
-        let (c_dir, r_dir) = (tmp("otc-c"), tmp("otc-r"));
-        for dir in [&c_dir, &r_dir] {
-            write_opentyrian_cfg(dir, &cfg);
-        }
-        let mut d = Diff::new();
-        d.game.video.fullscreen_display = fullscreen;
-        d.game.config.key_settings = keys;
-        split_user_dirs(&mut d, &c_dir, &r_dir);
-        // SAFETY: plain C call.
-        unsafe { b::ot_s_config_loadOpenTyrianConfig() };
-        cfg::load_open_tyrian_config(&mut d.game);
-        check_load(&mut d)?;
-    }
-
-    /// `tyrian.cfg` of any length and content (with in-range and over-range
-    /// volumes), together with any `opentyrian.cfg`, with audio enabled or
-    /// disabled.
-    #[test]
-    fn load_configuration_matches(
-        data in prop_oneof![
+/// `tyrian.cfg` of any length and content (with in-range and over-range
+/// volumes), together with any `opentyrian.cfg`, with audio enabled or
+/// disabled.
+#[test]
+fn load_configuration_matches() {
+    let strategy = (
+        prop_oneof![
             1 => Just(None),
             6 => prop::collection::vec(any::<u8>(), 28).prop_map(Some),
             2 => prop::collection::vec(any::<u8>(), 0..40).prop_map(Some),
         ],
-        small_volumes: bool,
-        cfg in any_opentyrian_cfg(),
-        audio_disabled: bool,
-    ) {
-        let (c_dir, r_dir) = (tmp("lc-c"), tmp("lc-r"));
-        let mut data = data;
-        if let Some(v) = data.as_mut().filter(|v| v.len() == 28 && small_volumes) {
-            v[15] = 0;
-            v[17] = 0;
-        }
-        for dir in [&c_dir, &r_dir] {
-            write_opentyrian_cfg(dir, &cfg);
-            if let Some(v) = &data {
-                std::fs::write(dir.join("tyrian.cfg"), v).expect("write");
+        any::<bool>(),
+        any_opentyrian_cfg(),
+        any::<bool>(),
+    );
+    diff::capped_runner(64)
+        .run(&strategy, |(data, small_volumes, cfg, audio_disabled)| {
+            let (c_dir, r_dir) = (tmp("lc-c"), tmp("lc-r"));
+            let mut data = data;
+            if let Some(v) = data.as_mut().filter(|v| v.len() == 28 && small_volumes) {
+                v[15] = 0;
+                v[17] = 0;
             }
-        }
-        let mut d = Diff::new();
-        d.game.loudness.audio_disabled = audio_disabled;
-        d.game.config.fast_play = 9;
-        split_user_dirs(&mut d, &c_dir, &r_dir);
-        // SAFETY: plain C call.
-        unsafe { b::loadConfiguration() };
-        cfg::load_configuration(&mut d.game);
-        check_load(&mut d)?;
-    }
+            for dir in [&c_dir, &r_dir] {
+                write_opentyrian_cfg(dir, &cfg);
+                if let Some(v) = &data {
+                    std::fs::write(dir.join("tyrian.cfg"), v).expect("write");
+                }
+            }
+            let mut d = Diff::new();
+            d.game.loudness.audio_disabled = audio_disabled;
+            d.game.config.fast_play = 9;
+            split_user_dirs(&mut d, &c_dir, &r_dir);
+            // SAFETY: plain C call.
+            unsafe { b::loadConfiguration() };
+            cfg::load_configuration(&mut d.game);
+            check_load(&mut d)?;
+            Ok(())
+        })
+        .expect("loadConfiguration matches");
+}
 
-    #[test]
-    fn je_set_new_game_speed_matches(fast_play in 0u8..8, smooth: bool, count_max: u16) {
-        let mut d = Diff::new();
-        d.game.config.fast_play = fast_play;
-        d.game.config.smooth_scroll = smooth;
-        d.game.nortsong.frame_count_max = count_max;
-        d.store_to_c();
-        // SAFETY: plain C call.
-        unsafe { b::JE_setNewGameSpeed() };
-        cfg::je_set_new_game_speed(&mut d.game);
-        check_load(&mut d)?;
-    }
+#[test]
+fn je_set_new_game_speed_matches() {
+    let strategy = (0u8..8, any::<bool>(), any::<u16>());
+    diff::capped_runner(64)
+        .run(&strategy, |(fast_play, smooth, count_max)| {
+            let mut d = Diff::new();
+            d.game.config.fast_play = fast_play;
+            d.game.config.smooth_scroll = smooth;
+            d.game.nortsong.frame_count_max = count_max;
+            d.store_to_c();
+            // SAFETY: plain C call.
+            unsafe { b::JE_setNewGameSpeed() };
+            cfg::je_set_new_game_speed(&mut d.game);
+            check_load(&mut d)?;
+            Ok(())
+        })
+        .expect("JE_setNewGameSpeed matches");
 }
 
 /// A valid `opentyrian.cfg` changes every setting it names, in both engines.

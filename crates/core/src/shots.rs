@@ -7,8 +7,8 @@
 use crate::Game;
 use crate::episodes::JeWeaponType;
 use crate::lvlmast::{PORT_NUM, WEAP_NUM};
-use crate::sprite::blit_sprite2;
-use crate::varz::Sprite2Ref;
+use crate::sprite::{OPTION_SHAPES, blit_sprite2};
+use crate::varz::{SHADOW_Y_DIST, Sprite2Ref};
 use libm::{cosf, sinf};
 use serde::{Deserialize, Serialize};
 use std::f64::consts::{FRAC_PI_2, PI};
@@ -163,6 +163,200 @@ pub fn simulate_player_shots(g: &mut Game) {
             }
         }
     }
+}
+
+/// The out-parameters of `player_shot_move_and_draw`. Upstream writes only
+/// some of them on each path; the others keep the caller's values.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PlayerShotOut {
+    pub is_special: bool,
+    pub shotx: i32,
+    pub shoty: i32,
+    pub shot_damage: i16,
+    pub blast_filter: u8,
+    pub chain: u8,
+    pub player_num: u8,
+    pub special_radiusw: u16,
+    pub special_radiush: u16,
+}
+
+/// `v + d` for the 16-bit shot coordinates, as C computes it in `int` and
+/// stores it.
+fn add_i32(v: i16, d: i32) -> i16 {
+    i32::from(v).wrapping_add(d) as i16
+}
+
+/// `player_shot_move_and_draw(shot_id, &out...)`: moves shot `shot_id`;
+/// returns false when it left the screen.
+pub fn player_shot_move_and_draw(g: &mut Game, shot_id: i32, out: &mut PlayerShotOut) -> bool {
+    let id = shot_id as usize;
+
+    g.shots.shot_avail[id] = g.shots.shot_avail[id].wrapping_sub(1);
+    if id == MAX_PWEAPON - 1 {
+        return true;
+    }
+
+    let deltas = |g: &Game, n: u8| {
+        let p = &g.player.player[usize::from(n) - 1];
+        (p.delta_x_shot_move, p.delta_y_shot_move)
+    };
+
+    let n = g.shots.player_shot_data[id].player_number;
+    let shot = &mut g.shots.player_shot_data[id];
+    shot.shot_xm = shot.shot_xm.wrapping_add(shot.shot_xc);
+    shot.shot_x = shot.shot_x.wrapping_add(shot.shot_xm);
+    let tmp_shot_xm = shot.shot_xm;
+
+    if shot.shot_xm > 100 {
+        let (dx, dy) = deltas(g, n);
+        let shot = &mut g.shots.player_shot_data[id];
+        if shot.shot_xm == 101 {
+            shot.shot_x = shot.shot_x.wrapping_sub(101);
+            shot.shot_x = add_i32(shot.shot_x, dx);
+            shot.shot_y = add_i32(shot.shot_y, dy);
+        } else {
+            shot.shot_x = shot.shot_x.wrapping_sub(120);
+            shot.shot_x = add_i32(shot.shot_x, dx);
+        }
+    }
+
+    let shot = &mut g.shots.player_shot_data[id];
+    shot.shot_ym = shot.shot_ym.wrapping_add(shot.shot_yc);
+    shot.shot_y = shot.shot_y.wrapping_add(shot.shot_ym);
+
+    if shot.shot_ym > 100 {
+        let (_, dy) = deltas(g, n);
+        let shot = &mut g.shots.player_shot_data[id];
+        shot.shot_y = shot.shot_y.wrapping_sub(120);
+        shot.shot_y = add_i32(shot.shot_y, dy);
+    }
+
+    let shot = &mut g.shots.player_shot_data[id];
+    if shot.shot_complicated {
+        shot.shot_dev_x = shot.shot_dev_x.wrapping_add(shot.shot_dir_x);
+        shot.shot_x = shot.shot_x.wrapping_add(shot.shot_dev_x);
+
+        if i32::from(shot.shot_dev_x).abs() == i32::from(shot.shot_cir_size_x) {
+            shot.shot_dir_x = shot.shot_dir_x.wrapping_neg();
+        }
+
+        shot.shot_dev_y = shot.shot_dev_y.wrapping_add(shot.shot_dir_y);
+        shot.shot_y = shot.shot_y.wrapping_add(shot.shot_dev_y);
+
+        if i32::from(shot.shot_dev_y).abs() == i32::from(shot.shot_cir_size_y) {
+            shot.shot_dir_y = shot.shot_dir_y.wrapping_neg();
+        }
+        // Double Speed Circle Shots - add a second copy of above loop
+    }
+
+    out.shotx = i32::from(shot.shot_x);
+    out.shoty = i32::from(shot.shot_y);
+
+    if shot.shot_x < -34 || shot.shot_x > 290 || shot.shot_y < -15 || shot.shot_y > 190 {
+        g.shots.shot_avail[id] = 0;
+        return false;
+    }
+
+    if shot.shot_trail != 255 {
+        let (x, y, trail) = (shot.shot_x, shot.shot_y, i16::from(shot.shot_trail));
+        let (xm, ym) = (shot.shot_xm, shot.shot_ym);
+        if trail == 98 {
+            crate::varz::je_setup_explosion(
+                g,
+                add_i32(x, -i32::from(xm)),
+                add_i32(y, -i32::from(ym)),
+                0,
+                trail,
+                false,
+                false,
+            );
+        } else {
+            crate::varz::je_setup_explosion(g, x, y, 0, trail, false, false);
+        }
+    }
+
+    let shot = &g.shots.player_shot_data[id];
+    if shot.aim_at_enemy != 0 {
+        let target = usize::from(shot.aim_at_enemy) - 1;
+        let (avail, ex, ey) = (
+            g.varz.enemy_avail[target],
+            g.varz.enemy[target].ex,
+            g.varz.enemy[target].ey,
+        );
+        let shot = &mut g.shots.player_shot_data[id];
+        shot.aim_delay = shot.aim_delay.wrapping_sub(1);
+        if shot.aim_delay == 0 {
+            shot.aim_delay = shot.aim_delay_max;
+
+            if avail != 1 {
+                shot.shot_xm = if shot.shot_x < ex {
+                    shot.shot_xm.wrapping_add(1)
+                } else {
+                    shot.shot_xm.wrapping_sub(1)
+                };
+
+                shot.shot_ym = if shot.shot_y < ey {
+                    shot.shot_ym.wrapping_add(1)
+                } else {
+                    shot.shot_ym.wrapping_sub(1)
+                };
+            } else {
+                shot.shot_xm = if shot.shot_xm > 0 {
+                    shot.shot_xm.wrapping_add(1)
+                } else {
+                    shot.shot_xm.wrapping_sub(1)
+                };
+            }
+        }
+    }
+
+    let shot = &mut g.shots.player_shot_data[id];
+    let mut sprite_frame = shot.shot_gr.wrapping_add(shot.shot_ani);
+    shot.shot_ani = shot.shot_ani.wrapping_add(1);
+    if shot.shot_ani == shot.shot_ani_max {
+        shot.shot_ani = 0;
+    }
+
+    out.shot_damage = i16::from(shot.shot_dmg);
+    out.blast_filter = shot.shot_blast_filter;
+    out.chain = shot.chain_reaction;
+    out.player_num = shot.player_number;
+
+    out.is_special = sprite_frame > 60000;
+
+    let vga = g.video.vga_screen_id();
+    let (x, y) = (out.shotx + 1, out.shoty);
+    if out.is_special {
+        let index = u32::from(sprite_frame - 60001);
+        crate::sprite::blit_sprite_blend(g, vga, x, y, OPTION_SHAPES as u32, index);
+
+        // D-UB-SHOTS-2: an index past the sprite table has no sprite; its
+        // radius is 0.
+        let s = g.sprite.sprite_table[OPTION_SHAPES]
+            .sprite
+            .get(index as usize);
+        out.special_radiusw = s.map_or(0, |s| s.width / 2);
+        out.special_radiush = s.map_or(0, |s| s.height / 2);
+    } else {
+        if sprite_frame > 1000 {
+            let color = (u32::from(sprite_frame / 1000) << 4) as u8;
+            crate::varz::je_do_sp(g, (x + 6) as u16, (y + 6) as u16, 5, 3, color);
+            sprite_frame %= 1000;
+        }
+        let (sheet, index) = if sprite_frame > 500 {
+            (Sprite2Ref::SpriteSheet12, sprite_frame - 500)
+        } else {
+            (Sprite2Ref::SpriteSheet8, sprite_frame)
+        };
+        // `*out_shoty + shadowYDist` is computed in `unsigned int`.
+        let shadow_y = (y as u32).wrapping_add(SHADOW_Y_DIST);
+        if g.config.background2 && shadow_y < 190 && tmp_shot_xm < 100 {
+            crate::sprite::blit_sprite2_darken(g, vga, x, shadow_y as i32, sheet, u32::from(index));
+        }
+        blit_sprite2(g, vga, x, y, sheet, u32::from(index));
+    }
+
+    true
 }
 
 pub fn player_shot_set_direction(g: &mut Game, shot_id: i16, weapon_id: u32, direction: f32) {
