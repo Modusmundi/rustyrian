@@ -231,6 +231,9 @@ pub const DECRELCONST: [Fltype; 4] = [
     1.0 / 22.44608,
 ];
 
+/// `wavtable`: the three waveforms.
+pub type Wavtable = [i16; WAVEPREC as usize * 3];
+
 /// Every global of `opl.c` (all file statics), plus `adlib_init`'s local
 /// static `initfirstime`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -254,7 +257,7 @@ pub struct OplState {
     pub recipsamp: Fltype,
     /// Wave form table.
     #[serde(with = "crate::serde_big::boxed")]
-    pub wavtable: Box<[i16; WAVEPREC as usize * 3]>,
+    pub wavtable: Box<Wavtable>,
     pub vib_table: [i32; VIBTAB_SIZE],
     #[serde(with = "crate::serde_big")]
     pub trem_table: [i32; TREMTAB_SIZE * 2],
@@ -316,6 +319,7 @@ impl Default for OplState {
 pub struct State {}
 
 /// Runs the envelope function `opfuncs[op_pt.op_state]`.
+#[inline(always)]
 fn run_opfunc(op_pt: &mut OpType) {
     match OPFUNCS[op_pt.op_state as usize] {
         OpFunc::OperatorAttack => operator_attack(op_pt),
@@ -333,8 +337,12 @@ fn vib_step(tinc: u32, vib: i32) -> u32 {
 
 /// `operator_advance(&op[op_pt], vib)`.
 pub fn operator_advance(s: &mut OplState, op_pt: usize, vib: i32) {
-    let generator_add = s.generator_add;
-    let o = &mut s.op[op_pt];
+    advance(&mut s.op[op_pt], s.generator_add, vib);
+}
+
+/// The body of `operator_advance` on one operator.
+#[inline]
+fn advance(o: &mut OpType, generator_add: u32, vib: i32) {
     o.wfpos = o.tcount;
 
     o.tcount = o.tcount.wrapping_add(o.tinc);
@@ -356,9 +364,24 @@ pub fn operator_advance_drums(
     op_pt3: usize,
     vib3: i32,
 ) {
+    advance_drums(
+        &mut s.op,
+        s.generator_add,
+        crand,
+        [(op_pt1, vib1), (op_pt2, vib2), (op_pt3, vib3)],
+    );
+}
+
+/// The body of `operator_advance_drums` on the operator array.
+fn advance_drums(
+    op: &mut [OpType; MAXOPERATORS],
+    generator_add: u32,
+    crand: &std::sync::Mutex<crate::crand::State>,
+    [(op_pt1, vib1), (op_pt2, vib2), (op_pt3, vib3)]: [(usize, i32); 3],
+) {
     const FX: u32 = FIXEDPT as u32;
-    let c1 = s.op[op_pt1].tcount / FX;
-    let c3 = s.op[op_pt3].tcount / FX;
+    let c1 = op[op_pt1].tcount / FX;
+    let c3 = op[op_pt3].tcount / FX;
     let phasebit: u32 = if (((c1 & 0x88) ^ ((c1 << 5) & 0x80)) | ((c3 ^ (c3 << 2)) & 0x20)) != 0 {
         0x02
     } else {
@@ -367,9 +390,8 @@ pub fn operator_advance_drums(
 
     let noisebit = (crate::crand::rand_shared(crand) & 1) as u32;
 
-    let snare_phase_bit = ((s.op[op_pt1].tcount / FX) / 0x100) & 1;
+    let snare_phase_bit = ((op[op_pt1].tcount / FX) / 0x100) & 1;
 
-    let generator_add = s.generator_add;
     let advance = |o: &mut OpType, inttm: u32, vib: i32| {
         o.wfpos = inttm.wrapping_mul(FX);
         o.tcount = o.tcount.wrapping_add(o.tinc);
@@ -379,26 +401,31 @@ pub fn operator_advance_drums(
 
     // Hihat
     let inttm = (phasebit << 8) | (0x34 << (phasebit ^ (noisebit << 1)));
-    advance(&mut s.op[op_pt1], inttm, vib1);
+    advance(&mut op[op_pt1], inttm, vib1);
 
     // Snare
     let inttm = ((1 + snare_phase_bit) ^ noisebit) << 8;
-    advance(&mut s.op[op_pt2], inttm, vib2);
+    advance(&mut op[op_pt2], inttm, vib2);
 
     // Cymbal
     let inttm = (1 + phasebit) << 8;
-    advance(&mut s.op[op_pt3], inttm, vib3);
+    advance(&mut op[op_pt3], inttm, vib3);
 }
 
 /// `operator_output(&op[op_pt], modulator, trem)`.
 pub fn operator_output(s: &mut OplState, op_pt: usize, modulator: i32, trem: i32) {
-    let o = &mut s.op[op_pt];
+    output(&mut s.op[op_pt], &s.wavtable, modulator, trem);
+}
+
+/// The body of `operator_output` on one operator.
+#[inline]
+fn output(o: &mut OpType, wavtable: &Wavtable, modulator: i32, trem: i32) {
     if o.op_state != OF_TYPE_OFF {
         o.lastcval = o.cval;
         let i = o.wfpos.wrapping_add(modulator as u32) / FIXEDPT as u32;
 
         let wform = o.cur_wform.expect("adlib_init selects a waveform");
-        let w = s.wavtable[wform + (i & o.cur_wmask) as usize];
+        let w = wavtable[wform + (i & o.cur_wmask) as usize];
         o.cval = (o.step_amp * o.vol * f64::from(w) * f64::from(trem) / 16.0) as i32;
     }
 }
@@ -1026,29 +1053,93 @@ fn select_vibval(
     var
 }
 
-/// `vibvalN[i]` for the table a `vibval*` pointer targets.
-fn vibval_at(s: &OplState, table: VibvalTable, i: usize) -> i32 {
-    match table {
-        VibvalTable::Const => s.vibval_const[i],
-        VibvalTable::Var1 => s.vibval_var1[i],
-        VibvalTable::Var2 => s.vibval_var2[i],
-        VibvalTable::Null => unreachable!("vibval pointers are set before use"),
+/// The tables the sample loops read through the `vibval*` pointers and the
+/// `tremval*` choices, borrowed apart from the operators they advance.
+struct Tables<'a> {
+    generator_add: u32,
+    wavtable: &'a Wavtable,
+    vibval_const: &'a [i32; BLOCKBUF_SIZE],
+    vibval_var1: &'a [i32; BLOCKBUF_SIZE],
+    vibval_var2: &'a [i32; BLOCKBUF_SIZE],
+    tremval_const: &'a [i32; BLOCKBUF_SIZE],
+    trem_lut: &'a [i32; BLOCKBUF_SIZE],
+}
+
+impl<'a> Tables<'a> {
+    /// Splits `s` into its operators and the tables (`trem_lut` is
+    /// `adlib_getsample`'s local table).
+    fn split(
+        s: &'a mut OplState,
+        trem_lut: &'a [i32; BLOCKBUF_SIZE],
+    ) -> (&'a mut [OpType; MAXOPERATORS], Self) {
+        let OplState {
+            op,
+            generator_add,
+            wavtable,
+            vibval_const,
+            vibval_var1,
+            vibval_var2,
+            tremval_const,
+            ..
+        } = s;
+        let tables = Tables {
+            generator_add: *generator_add,
+            wavtable,
+            vibval_const,
+            vibval_var1,
+            vibval_var2,
+            tremval_const,
+            trem_lut,
+        };
+        (op, tables)
+    }
+
+    /// The first `n` entries of the table a `vibval*` pointer targets.
+    fn vibval(&self, table: VibvalTable, n: usize) -> &'a [i32] {
+        let t = match table {
+            VibvalTable::Const => self.vibval_const,
+            VibvalTable::Var1 => self.vibval_var1,
+            VibvalTable::Var2 => self.vibval_var2,
+            VibvalTable::Null => unreachable!("vibval pointers are set before use"),
+        };
+        &t[..n]
+    }
+
+    /// The first `n` entries of `tremvalN`: `trem_lut` when the operator's
+    /// tremolo is enabled, else `tremval_const`.
+    fn tremval(&self, use_lut: bool, n: usize) -> &'a [i32] {
+        let t = if use_lut {
+            self.trem_lut
+        } else {
+            self.tremval_const
+        };
+        &t[..n]
+    }
+
+    /// `operator_advance(o, vib); opfuncs[o->op_state](o);
+    /// operator_output(o, modulator(o), trem)`.
+    #[inline(always)]
+    fn op_sample(&self, o: &mut OpType, vib: i32, modulator: fn(&OpType) -> i32, trem: i32) {
+        advance(o, self.generator_add, vib);
+        run_opfunc(o);
+        let m = modulator(o);
+        output(o, self.wavtable, m, trem);
     }
 }
 
-/// `tremvalN[i]`: `trem_lut` when the operator's tremolo is enabled, else
-/// `tremval_const`.
-fn tremval_at(s: &OplState, use_lut: bool, trem_lut: &[i32; BLOCKBUF_SIZE], i: usize) -> i32 {
-    if use_lut {
-        trem_lut[i]
-    } else {
-        s.tremval_const[i]
-    }
+/// Operators `a` and `b` (`a < b`), borrowed together.
+fn op_pair(op: &mut [OpType; MAXOPERATORS], a: usize, b: usize) -> (&mut OpType, &mut OpType) {
+    let (lo, hi) = op.split_at_mut(b);
+    (&mut lo[a], &mut hi[0])
 }
 
-/// The self-feedback modulator `(lastcval+cval)*mfbi/2` of operator `op_pt`.
-fn feedback_of(s: &OplState, op_pt: usize) -> i32 {
-    let o = &s.op[op_pt];
+/// No modulation.
+fn no_modulator(_: &OpType) -> i32 {
+    0
+}
+
+/// The self-feedback modulator `(lastcval+cval)*mfbi/2` of an operator.
+fn feedback_of(o: &OpType) -> i32 {
     o.lastcval.wrapping_add(o.cval).wrapping_mul(o.mfbi) / 2
 }
 
@@ -1107,6 +1198,7 @@ pub fn adlib_getsample(
         }
 
         let off = |s: &OplState, o: usize| s.op[o].op_state == OF_TYPE_OFF;
+        let outbuf = &mut outbufl[..n];
 
         if (s.adlibreg[ARC_PERC_MODE] & 0x20) != 0 {
             // BassDrum (operators 6 and 15)
@@ -1117,14 +1209,14 @@ pub fn adlib_getsample(
                     let en = s.op[c9].vibrato;
                     s.vibval1 = select_vibval(s, en, VibvalTable::Var1, &vib_lut, c9, n);
                     let tl1 = s.op[c9].tremolo;
+                    let vt1 = s.vibval1;
+                    let (op, t) = Tables::split(s, &trem_lut);
+                    let (vib1, trem1) = (t.vibval(vt1, n), t.tremval(tl1, n));
+                    let o = &mut op[c9];
                     for i in 0..n {
-                        let v = vibval_at(s, s.vibval1, i);
-                        operator_advance(s, c9, v);
-                        run_opfunc(&mut s.op[c9]);
-                        let t = tremval_at(s, tl1, &trem_lut, i);
-                        operator_output(s, c9, 0, t);
-                        let chanval = s.op[c9].cval.wrapping_mul(2);
-                        outbufl[i] = outbufl[i].wrapping_add(chanval);
+                        t.op_sample(o, vib1[i], no_modulator, trem1[i]);
+                        let chanval = o.cval.wrapping_mul(2);
+                        outbuf[i] = outbuf[i].wrapping_add(chanval);
                     }
                 }
             } else {
@@ -1136,10 +1228,15 @@ pub fn adlib_getsample(
                     s.vibval2 = select_vibval(s, en, VibvalTable::Var2, &vib_lut, c9, n);
                     let tl1 = s.op[c0].tremolo;
                     let tl2 = s.op[c9].tremolo;
+                    let (vt1, vt2) = (s.vibval1, s.vibval2);
+                    let (op, t) = Tables::split(s, &trem_lut);
+                    let (vib1, vib2) = (t.vibval(vt1, n), t.vibval(vt2, n));
+                    let (trem1, trem2) = (t.tremval(tl1, n), t.tremval(tl2, n));
+                    let (m, c) = op_pair(op, c0, c9);
                     for i in 0..n {
-                        two_op_fm_sample(s, c0, c9, &trem_lut, tl1, tl2, i);
-                        let chanval = s.op[c9].cval.wrapping_mul(2);
-                        outbufl[i] = outbufl[i].wrapping_add(chanval);
+                        two_op_fm_sample(&t, m, c, (vib1[i], vib2[i]), (trem1[i], trem2[i]));
+                        let chanval = c.cval.wrapping_mul(2);
+                        outbuf[i] = outbuf[i].wrapping_add(chanval);
                     }
                 }
             }
@@ -1150,14 +1247,14 @@ pub fn adlib_getsample(
                 let en = s.op[c0].vibrato;
                 s.vibval3 = select_vibval(s, en, VibvalTable::Var1, &vib_lut, c0, n);
                 let tl3 = s.op[c0].tremolo;
+                let vt3 = s.vibval3;
+                let (op, t) = Tables::split(s, &trem_lut);
+                let (vib3, trem3) = (t.vibval(vt3, n), t.tremval(tl3, n));
+                let o = &mut op[c0];
                 for i in 0..n {
-                    let v = vibval_at(s, s.vibval3, i);
-                    operator_advance(s, c0, v);
-                    run_opfunc(&mut s.op[c0]);
-                    let t = tremval_at(s, tl3, &trem_lut, i);
-                    operator_output(s, c0, 0, t);
-                    let chanval = s.op[c0].cval.wrapping_mul(2);
-                    outbufl[i] = outbufl[i].wrapping_add(chanval);
+                    t.op_sample(o, vib3[i], no_modulator, trem3[i]);
+                    let chanval = o.cval.wrapping_mul(2);
+                    outbuf[i] = outbuf[i].wrapping_add(chanval);
                 }
             }
 
@@ -1174,29 +1271,31 @@ pub fn adlib_getsample(
                 s.vibval4 = select_vibval(s, en, VibvalTable::Var2, &vib_lut, 17, n);
                 let tl4 = s.op[17].tremolo;
 
+                let (vt1, vt2, vt4) = (s.vibval1, s.vibval2, s.vibval4);
+                let (op, t) = Tables::split(s, &trem_lut);
+                let (vib1, vib2, vib4) = (t.vibval(vt1, n), t.vibval(vt2, n), t.vibval(vt4, n));
+                let (trem1, trem2, trem4) =
+                    (t.tremval(tl1, n), t.tremval(tl2, n), t.tremval(tl4, n));
                 for i in 0..n {
-                    let (v1, v2, v4) = (
-                        vibval_at(s, s.vibval1, i),
-                        vibval_at(s, s.vibval2, i),
-                        vibval_at(s, s.vibval4, i),
+                    advance_drums(
+                        op,
+                        t.generator_add,
+                        crand,
+                        [(7, vib1[i]), (7 + 9, vib2[i]), (8 + 9, vib4[i])],
                     );
-                    operator_advance_drums(s, crand, 7, v1, 7 + 9, v2, 8 + 9, v4);
-                    run_opfunc(&mut s.op[7]); // Hihat
-                    let t = tremval_at(s, tl1, &trem_lut, i);
-                    operator_output(s, 7, 0, t);
-                    run_opfunc(&mut s.op[7 + 9]); // Snare
-                    let t = tremval_at(s, tl2, &trem_lut, i);
-                    operator_output(s, 7 + 9, 0, t);
-                    run_opfunc(&mut s.op[8 + 9]); // Cymbal
-                    let t = tremval_at(s, tl4, &trem_lut, i);
-                    operator_output(s, 8 + 9, 0, t);
+                    run_opfunc(&mut op[7]); // Hihat
+                    output(&mut op[7], t.wavtable, 0, trem1[i]);
+                    run_opfunc(&mut op[7 + 9]); // Snare
+                    output(&mut op[7 + 9], t.wavtable, 0, trem2[i]);
+                    run_opfunc(&mut op[8 + 9]); // Cymbal
+                    output(&mut op[8 + 9], t.wavtable, 0, trem4[i]);
 
-                    let chanval = s.op[7]
+                    let chanval = op[7]
                         .cval
-                        .wrapping_add(s.op[7 + 9].cval)
-                        .wrapping_add(s.op[8 + 9].cval)
+                        .wrapping_add(op[7 + 9].cval)
+                        .wrapping_add(op[8 + 9].cval)
                         .wrapping_mul(2);
-                    outbufl[i] = outbufl[i].wrapping_add(chanval);
+                    outbuf[i] = outbuf[i].wrapping_add(chanval);
                 }
             }
         }
@@ -1224,32 +1323,30 @@ pub fn adlib_getsample(
             let tl1 = s.op[c0].tremolo;
             let tl2 = s.op[c9].tremolo;
 
-            for i in 0..n {
-                let chanval = if additive {
+            let (vt1, vt2) = (s.vibval1, s.vibval2);
+            let (op, t) = Tables::split(s, &trem_lut);
+            let (vib1, vib2) = (t.vibval(vt1, n), t.vibval(vt2, n));
+            let (trem1, trem2) = (t.tremval(tl1, n), t.tremval(tl2, n));
+            let (m, c) = op_pair(op, c0, c9);
+            if additive {
+                for i in 0..n {
                     // carrier1
-                    let v = vibval_at(s, s.vibval1, i);
-                    operator_advance(s, c0, v);
-                    run_opfunc(&mut s.op[c0]);
-                    let m = feedback_of(s, c0);
-                    let t = tremval_at(s, tl1, &trem_lut, i);
-                    operator_output(s, c0, m, t);
+                    t.op_sample(m, vib1[i], feedback_of, trem1[i]);
                     // carrier2
-                    let v = vibval_at(s, s.vibval2, i);
-                    operator_advance(s, c9, v);
-                    run_opfunc(&mut s.op[c9]);
-                    let t = tremval_at(s, tl2, &trem_lut, i);
-                    operator_output(s, c9, 0, t);
-                    s.op[c9].cval.wrapping_add(s.op[c0].cval)
-                } else {
-                    two_op_fm_sample(s, c0, c9, &trem_lut, tl1, tl2, i);
-                    s.op[c9].cval
-                };
-                outbufl[i] = outbufl[i].wrapping_add(chanval);
+                    t.op_sample(c, vib2[i], no_modulator, trem2[i]);
+                    let chanval = c.cval.wrapping_add(m.cval);
+                    outbuf[i] = outbuf[i].wrapping_add(chanval);
+                }
+            } else {
+                for i in 0..n {
+                    two_op_fm_sample(&t, m, c, (vib1[i], vib2[i]), (trem1[i], trem2[i]));
+                    outbuf[i] = outbuf[i].wrapping_add(c.cval);
+                }
             }
         }
 
         // convert to 16bit samples
-        for &v in &outbufl[..n] {
+        for &v in outbuf.iter() {
             clipit16(v, &mut sndptr[out]);
             out += 1;
         }
@@ -1258,29 +1355,21 @@ pub fn adlib_getsample(
     }
 }
 
-/// One sample of a 2op FM pair: modulator `c0` (with self-feedback,
-/// `vibval1`) into carrier `c9` (`vibval2`).
+/// One sample of a 2op FM pair: modulator `m` (with self-feedback) into
+/// carrier `c`; `vib` and `trem` are their `vibvalN[i]` and `tremvalN[i]`.
+#[inline(always)]
 fn two_op_fm_sample(
-    s: &mut OplState,
-    c0: usize,
-    c9: usize,
-    trem_lut: &[i32; BLOCKBUF_SIZE],
-    tl1: bool,
-    tl2: bool,
-    i: usize,
+    t: &Tables<'_>,
+    m: &mut OpType,
+    c: &mut OpType,
+    vib: (i32, i32),
+    trem: (i32, i32),
 ) {
     // modulator
-    let v = vibval_at(s, s.vibval1, i);
-    operator_advance(s, c0, v);
-    run_opfunc(&mut s.op[c0]);
-    let m = feedback_of(s, c0);
-    let t = tremval_at(s, tl1, trem_lut, i);
-    operator_output(s, c0, m, t);
+    t.op_sample(m, vib.0, feedback_of, trem.0);
     // carrier
-    let v = vibval_at(s, s.vibval2, i);
-    operator_advance(s, c9, v);
-    run_opfunc(&mut s.op[c9]);
-    let m = s.op[c0].cval.wrapping_mul(FIXEDPT);
-    let t = tremval_at(s, tl2, trem_lut, i);
-    operator_output(s, c9, m, t);
+    let modulator = m.cval.wrapping_mul(FIXEDPT);
+    advance(c, t.generator_add, vib.1);
+    run_opfunc(c);
+    output(c, t.wavtable, modulator, trem.1);
 }
