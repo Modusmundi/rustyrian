@@ -123,3 +123,15 @@ pub fn argv(args: &[CString]) -> Vec<*mut c_char> {
     v.push(std::ptr::null_mut());
     v
 }
+
+/// A proptest runner that runs exactly `cases` cases, whatever
+/// `PROPTEST_CASES` says. The `proptest!` macro re-reads that variable and
+/// replaces an explicit `cases`, so tests that run a whole screen, game or
+/// script per case (nightly sets 10 000) use this instead:
+/// `capped_runner(32).run(&strategy, |args| { … Ok(()) })`.
+pub fn capped_runner(cases: u32) -> proptest::test_runner::TestRunner {
+    proptest::test_runner::TestRunner::new(proptest::test_runner::Config {
+        cases,
+        ..proptest::test_runner::Config::default()
+    })
+}

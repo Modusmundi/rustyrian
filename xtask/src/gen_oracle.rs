@@ -280,11 +280,13 @@ pub fn run(root: &Path) -> Result<()> {
     }
 
     let src = upstream_src(root);
-    let mut c_files: Vec<String> = std::fs::read_dir(&src)?
-        .filter_map(|e| e.ok())
-        .map(|e| e.file_name().to_string_lossy().into_owned())
-        .filter(|n| n.ends_with(".c"))
-        .collect();
+    let mut c_files: Vec<String> = Vec::new();
+    for e in std::fs::read_dir(&src)? {
+        let name = e?.file_name().to_string_lossy().into_owned();
+        if name.ends_with(".c") {
+            c_files.push(name);
+        }
+    }
     c_files.sort();
 
     let clang = std::env::var("CLANG").unwrap_or_else(|_| "clang".to_owned());

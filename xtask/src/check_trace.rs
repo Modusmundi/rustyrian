@@ -279,11 +279,20 @@ pub fn run(root: &Path) -> Result<()> {
     }
     for file in &verified_files {
         let module = module_of(file);
-        let mirror =
-            std::fs::read_to_string(root.join(format!("crates/oracle/src/mirror/{module}.rs")))
-                .unwrap_or_default();
+        let globals: Vec<_> = inv.globals.iter().filter(|g| g.file == *file).collect();
+        if globals.is_empty() {
+            continue;
+        }
+        let mirror_path = format!("crates/oracle/src/mirror/{module}.rs");
+        let mirror = match std::fs::read_to_string(root.join(&mirror_path)) {
+            Ok(text) => text,
+            Err(e) => {
+                errors.push(format!("{file}: cannot read {mirror_path}: {e}"));
+                continue;
+            }
+        };
         let stem = file.trim_end_matches(".c").trim_end_matches(".h");
-        for g in inv.globals.iter().filter(|g| g.file == *file) {
+        for g in globals {
             let getter = match &g.function {
                 Some(func) => format!("ot_sv_{stem}_{func}_{}", g.name),
                 None => format!("ot_sv_{stem}_{}", g.name),
