@@ -47,7 +47,7 @@ const SPRITE2_CALLS: &[u8] = &[
     9, 150, 0, 100, 0, 1, 0,
 ];
 
-/// Seeds per target. `level_map` waits for `JE_loadMap`.
+/// Seeds per target. (`level_map` waits for `JE_loadMap`.)
 const SEEDS: &[(&str, &[Source])] = &[
     ("cfg_text", &[Generated("opentyrian.cfg", opentyrian_cfg)]),
     ("cfg_binary", &[Generated("tyrian.cfg", tyrian_cfg)]),
@@ -62,7 +62,6 @@ const SEEDS: &[(&str, &[Source])] = &[
     ),
     ("demo", &[Data("demo.*", Whole)]),
     ("level_index", &[Data("tyrian*.lvl", Whole)]),
-    ("level_map", &[Data("tyrian*.lvl", Whole)]),
     ("episode_items", &[Data("tyrian.hdt", Whole)]),
     (
         "shapes",
