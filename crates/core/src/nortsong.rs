@@ -212,15 +212,24 @@ pub fn load_sounds(
         *p = i64::from(file::file_read_u32(&mut f));
     }
 
-    positions[count] = file::file_get_length(&mut f);
+    let file_length = file::file_get_length(&mut f);
+    positions[count] = file_length;
 
+    // Divergence D-UB-SND-2 (R10): a sound larger than the whole file holds
+    // only the bytes the file has after its position (before the voice
+    // trim). Smaller sounds keep upstream's size, including its short read
+    // and zero fill when the file ends early.
     let size_of_sound = |i: usize| {
         let (position, end_position) = (positions[i], positions[i + 1]);
-        let size = if end_position > position {
-            (end_position - position) as usize
+        let mut size = if end_position > position {
+            end_position - position
         } else {
             0
         };
+        if size > file_length {
+            size = (file_length - position).max(0);
+        }
+        let size = size as usize;
 
         // Voice sounds end with some bad data.
         if trim { size.saturating_sub(100) } else { size }
@@ -230,8 +239,21 @@ pub fn load_sounds(
         max_size = max_size.max(size_of_sound(i));
     }
 
+    // The converter's buffer is reserved fallibly (D-UB-SND-2): a failure is
+    // a read error with ENOMEM, and no sound is loaded.
     let len_mult = cvt.len_mult as usize;
-    let mut buf = vec![0u8; max_size * len_mult];
+    let mut buf = Vec::new();
+    let reserved = max_size
+        .checked_mul(len_mult)
+        .is_some_and(|n| buf.try_reserve_exact(n).is_ok());
+    let count = if reserved {
+        buf.resize(max_size * len_mult, 0);
+        count
+    } else {
+        f.error = true;
+        f.errnum = file::ENOMEM;
+        0
+    };
 
     #[allow(clippy::needless_range_loop)] // `i` also indexes `soundSamples`
     for i in 0..count {
