@@ -157,6 +157,10 @@ fn main() {
             ]
             .map(String::from),
         );
+        // Known upstream defects on valid game paths (each names its UF row).
+        let ignorelist = manifest.join("asan.ignorelist");
+        println!("cargo:rerun-if-changed={}", ignorelist.display());
+        common.push(format!("-fsanitize-ignorelist={}", ignorelist.display()));
         link_runtime(
             &cc,
             &[

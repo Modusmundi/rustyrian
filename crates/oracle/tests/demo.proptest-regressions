@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc acba40623638c147b2043eb6fd2904f333e04b2a0a7b1bbcb40157154a58451c # shrinks to which = 1, cut = 1, missing = false
+cc edad6ae9f42d1f53c7be96a68bec8c880f88e090bf4c96047798d44311d50988 # shrinks to frames = [0, 0, 0, 0, 0, 0, 0, 0, 90, 40, 40, 40, 40, 239, 239, 239, 44, 203, 203, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 157, 157, 157, 157, 157, 114, 114, 114, 114, 114, 114, 114, 114, 114, 114, 114, 114, 114, 114, 114, 95, 95, 95, 101, 101, 101, 101, 101, 202, 202, 202, 164, 164, 56, 56, 124, 66, 227, 227, 53, 168, 205, 205, 76, 76, 76, 76, 76, 76, 76, 76, 76, 78, 78, 78, 113, 113, 87, 87, 87, 87, 204, 204, 112, 112, 112, 112, 112, 112, 133, 133, 20, 20, 20, 20, 20, 20, 224, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 227, 227, 227, 151, 28, 28, 28, 178, 178, 178, 178, 178, 250, 250, 250, 250, 250, 246, 246, 118, 118, 118, 223, 223, 223, 223, 142, 142, 142, 142, 142, 142, 142, 7, 29, 29, 29, 29, 29, 29, 29, 69, 26, 26], existing = 1, episode = 4, level_name = " WUO", items = [192, 208, 209, 239, 255, 128, 19, 226, 67, 100, 219, 253, 119, 206, 83], lvl_file_num = 87, level_song = 156, near_full_wait = true

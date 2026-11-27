@@ -1,0 +1,10 @@
+# AddressSanitizer ignorelist for the sanitized oracle (OT_REF_SANITIZE=1),
+# passed to clang as -fsanitize-ignorelist. Only known upstream defects reached
+# through valid game flows belong here, each with its upstream-findings.md row;
+# the Rust port does not reproduce them. UBSan still checks these functions.
+[address]
+
+# UF-34: JE_drawMainMenuHelpText memcpys 67 bytes from a 66-byte mainMenuHelp
+# row; for the last row (selected by the item screen) that is one byte past
+# the array.
+fun:JE_drawMainMenuHelpText

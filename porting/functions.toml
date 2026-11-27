@@ -4143,6 +4143,7 @@ rust = "rustyrian_core::sprite::je_load_comp_shapes"
 status = "verified"
 verify = ["diff:sprite::je_load_comp_shapes_and_blits_match_on_every_sheet_file", "diff:sprite::je_load_comp_shapes_error_paths_match"]
 notes = ""
+waived_lines = [{ line = 519, reason = "read failure after a successful open: the only portable trigger is a directory named like the file; on Linux its SEEK_END length is LLONG_MAX and C would read into a NULL buffer (UF-22), so C runs it only on macOS, where the line is covered" }, { line = 520, reason = "read failure after a successful open: the only portable trigger is a directory named like the file; on Linux its SEEK_END length is LLONG_MAX and C would read into a NULL buffer (UF-22), so C runs it only on macOS, where the line is covered" }]
 
 [[fn]]
 c = "sprite.c::JE_loadCompShapesB"
