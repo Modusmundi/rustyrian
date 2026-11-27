@@ -10,6 +10,10 @@ repository.workspace = true
 [dependencies]
 rustyrian-core.workspace = true
 sdl2-sys = { version = "0.39", features = ["bundled", "static-link"] }
+libc = "0.2"
+
+[dev-dependencies]
+rustyrian-harness.workspace = true
 
 [lints]
 workspace = true
