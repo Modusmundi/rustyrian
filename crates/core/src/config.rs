@@ -434,6 +434,259 @@ fn c_str_eq(a: &[u8], s: &[u8]) -> bool {
     &a[..strlen(a)] == s
 }
 
+/// The scaler `loadOpenTyrianConfig` selects before reading the file.
+const DEFAULT_SCALER_NAME: &[u8] = b"Scale2x";
+
+/// `SDL_SCANCODE_UNKNOWN`.
+const SDL_SCANCODE_UNKNOWN: i32 = 0;
+
+#[doc(alias = "loadOpenTyrianConfig")]
+pub fn load_open_tyrian_config(g: &mut Game) {
+    // defaults
+    g.video.fullscreen_display = -1;
+    crate::video_scale::set_scaler_by_name(g, DEFAULT_SCALER_NAME);
+    g.config.key_settings = DEFAULT_KEY_SETTINGS;
+
+    let mut file = file::user_file_open(g, OPENTYRIAN_CONFIG_FILENAME, "r");
+    if file.error {
+        let message = format!(
+            "Failed to open '{}': {}",
+            OPENTYRIAN_CONFIG_FILENAME,
+            file::file_get_error(&file)
+        );
+        g.platform.log_warn(LOG_CATEGORY, &message);
+
+        return;
+    }
+
+    let stream = file.f.as_mut().expect("open file has a stream");
+    let success = cf::config_parse(&mut g.config.opentyrian_config, stream);
+    file.error |= stream.ferror();
+
+    if file.error {
+        let message = format!(
+            "Failed to read from '{}': {}",
+            OPENTYRIAN_CONFIG_FILENAME,
+            file::file_get_error(&file)
+        );
+        g.platform.log_error(LOG_CATEGORY, &message);
+    } else if !success {
+        let message = format!("Failed to parse '{OPENTYRIAN_CONFIG_FILENAME}'.");
+        g.platform.log_error(LOG_CATEGORY, &message);
+    }
+
+    file::file_close(&mut file);
+
+    if !success {
+        return;
+    }
+
+    // The option values are copied out of the section before calls that
+    // need the whole game (C keeps pointers into the section).
+    let fullscreen_display = &mut g.video.fullscreen_display;
+    let video = cf::config_find_section(&mut g.config.opentyrian_config, b"video", None).map(|s| {
+        cf::config_get_int_option(s, b"fullscreen", fullscreen_display);
+        let mut scaler = None;
+        let found_scaler = cf::config_get_string_option(s, b"scaler", &mut scaler);
+        let mut mode = None;
+        let found_mode = cf::config_get_string_option(s, b"scaling_mode", &mut mode);
+        (
+            found_scaler.then(|| scaler.unwrap_or(b"").to_vec()),
+            found_mode.then(|| mode.unwrap_or(b"").to_vec()),
+        )
+    });
+    if let Some((scaler, mode)) = video {
+        if let Some(scaler) = scaler {
+            crate::video_scale::set_scaler_by_name(g, &scaler);
+        }
+        if let Some(mode) = mode {
+            crate::video::set_scaling_mode_by_name(g, &mode);
+        }
+    }
+
+    let keys: Option<Vec<Option<Vec<u8>>>> =
+        cf::config_find_section(&mut g.config.opentyrian_config, b"keyboard", None).map(|s| {
+            KEY_SETTING_NAMES
+                .iter()
+                .map(|name| {
+                    let mut key_name = None;
+                    cf::config_get_string_option(s, name.as_bytes(), &mut key_name)
+                        .then(|| key_name.unwrap_or(b"").to_vec())
+                })
+                .collect()
+        });
+    if let Some(keys) = keys {
+        for (i, key_name) in keys.into_iter().enumerate() {
+            if let Some(key_name) = key_name {
+                // The platform takes UTF-8 names; SDL's scancode names are
+                // ASCII, so lossy conversion only affects names that match
+                // nothing either way.
+                let scancode = g
+                    .platform
+                    .get_scancode_from_name(&String::from_utf8_lossy(&key_name));
+                if scancode != SDL_SCANCODE_UNKNOWN {
+                    g.config.key_settings[i] = scancode as u32;
+                }
+            }
+        }
+    }
+}
+
+#[doc(alias = "JE_setNewGameSpeed")]
+pub fn je_set_new_game_speed(g: &mut Game) {
+    let speed: u16;
+    let c = &mut g.config;
+    let frame_count_max = &mut g.nortsong.frame_count_max;
+    match c.fast_play {
+        // Pentium Hyper
+        1 => {
+            speed = 0x3000;
+            c.smooth_scroll = true;
+            *frame_count_max = 2;
+        }
+        2 => {
+            speed = 0x2000;
+            c.smooth_scroll = false;
+            *frame_count_max = 2;
+        }
+        // Slug mode
+        3 => {
+            speed = 0x5300;
+            c.smooth_scroll = true;
+            *frame_count_max = 4;
+        }
+        // Slower
+        4 => {
+            speed = 0x4300;
+            c.smooth_scroll = true;
+            *frame_count_max = 3;
+        }
+        // Slow: 2.5 periods of 0x4300 per frame
+        5 => {
+            speed = 0x53C0;
+            c.smooth_scroll = true;
+            *frame_count_max = 2;
+        }
+        // Normal (upstream asserts on other values, then falls through to
+        // Normal; NDEBUG builds only fall through)
+        _ => {
+            speed = 0x4300;
+            c.smooth_scroll = true;
+            *frame_count_max = 2;
+        }
+    }
+
+    crate::nortsong::set_frame_speed(g, speed);
+    let frame_count_max = g.nortsong.frame_count_max;
+    crate::nortsong::set_frame_count(g, frame_count_max);
+}
+
+#[doc(alias = "loadConfiguration")]
+pub fn load_configuration(g: &mut Game) {
+    let mut invalid = false;
+
+    let mut file = file::user_file_open(g, TYRIAN_CONFIG_FILENAME, "rb");
+    if file.error {
+        let message = format!(
+            "Failed to open '{}': {}",
+            TYRIAN_CONFIG_FILENAME,
+            file::file_get_error(&file)
+        );
+        g.platform.log_warn(LOG_CATEGORY, &message);
+
+        invalid = true;
+    } else {
+        // Upstream leaves this uninitialized; the oracle (and every path that
+        // keeps these values) zero-fills it.
+        let mut data = [0u8; 28];
+        file::file_read_exactly(&mut file, &mut data);
+
+        invalid |= file::file_get_length(&mut file) != data.len() as i64;
+
+        invalid |= file.error;
+
+        if file.error {
+            let message = format!(
+                "Failed to read from '{}': {}",
+                TYRIAN_CONFIG_FILENAME,
+                file::file_get_error(&file)
+            );
+            g.platform.log_error(LOG_CATEGORY, &message);
+        }
+
+        file::file_close(&mut file);
+
+        let mut reader = MemReader::new(&data);
+        let r = &mut reader;
+        let c = &mut g.config;
+        let n = &mut g.nortsong;
+
+        c.background2 = mr::mem_read_bool(r);
+        c.game_speed = mr::mem_read_u8(r);
+        c.input_device_ = mr::mem_read_u8(r);
+        c.j_configure = mr::mem_read_u8(r);
+        c.version_num = mr::mem_read_u8(r);
+        c.processor_type = mr::mem_read_u8(r);
+        c.midi_port = mr::mem_read_u8(r);
+        c.sound_effects = mr::mem_read_u8(r);
+        c.gamma_correction = mr::mem_read_u8(r);
+        c.difficulty_level = mr::mem_read_s8(r);
+        mr::mem_read_u8_array(r, &mut c.joy_button_assign);
+        n.tyr_music_volume = mr::mem_read_u16(r);
+        n.fx_volume = mr::mem_read_u16(r);
+        c.input_device1 = mr::mem_read_u8(r);
+        c.input_device2 = mr::mem_read_u8(r);
+        mr::mem_read_u8_array(r, &mut c.dos_key_settings);
+
+        debug_assert!(reader.size() == 0 || reader.error);
+        invalid |= reader.error;
+
+        c.input_device_ = 0;
+        if c.j_configure == 0 {
+            c.j_configure = 1;
+        }
+        // Game resets version number; ShipEdit doesn't.
+        c.version_num = 2;
+
+        if n.tyr_music_volume > 255 {
+            n.tyr_music_volume = 255;
+        }
+        if n.fx_volume > 255 {
+            n.fx_volume = 255;
+        }
+    }
+
+    if invalid {
+        let message = format!("'{TYRIAN_CONFIG_FILENAME}' is invalid or missing.");
+        g.platform.log_warn(LOG_CATEGORY, &message);
+
+        let c = &mut g.config;
+        c.background2 = true;
+        c.game_speed = 4;
+        c.input_device_ = 0;
+        c.j_configure = 0;
+        c.version_num = 2;
+        c.processor_type = 3;
+        c.midi_port = 1;
+        c.sound_effects = 1;
+        c.gamma_correction = 0;
+        c.difficulty_level = 0;
+        c.joy_button_assign = DEFAULT_JOY_BUTTON_ASSIGN;
+        g.nortsong.tyr_music_volume = 223;
+        g.nortsong.fx_volume = 223;
+        c.input_device1 = 0;
+        c.input_device2 = 0;
+        c.dos_key_settings = DEFAULT_DOS_KEY_SETTINGS;
+    }
+
+    load_open_tyrian_config(g);
+
+    let (music, fx) = (g.nortsong.tyr_music_volume, g.nortsong.fx_volume);
+    crate::loudness::set_volume(g, music as u8, fx as u8);
+
+    je_init_processor_type(g);
+}
+
 #[doc(alias = "saveOpenTyrianConfig")]
 pub fn save_open_tyrian_config(g: &mut Game) {
     let config = &mut g.config.opentyrian_config;

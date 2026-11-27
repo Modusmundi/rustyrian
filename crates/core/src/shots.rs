@@ -7,6 +7,8 @@
 use crate::Game;
 use crate::episodes::JeWeaponType;
 use crate::lvlmast::{PORT_NUM, WEAP_NUM};
+use crate::sprite::blit_sprite2;
+use crate::varz::Sprite2Ref;
 use libm::{cosf, sinf};
 use serde::{Deserialize, Serialize};
 use std::f64::consts::{FRAC_PI_2, PI};
@@ -75,6 +77,93 @@ impl Default for State {
 
 /// `soundChannel` (function-local constant of `player_shot_create`).
 const SOUND_CHANNEL: [u8; 11] = [0, 2, 4, 4, 2, 2, 5, 5, 1, 4, 1];
+
+pub fn simulate_player_shots(g: &mut Game) {
+    // Player Shot Images
+    for z in 0..MAX_PWEAPON {
+        if g.shots.shot_avail[z] == 0 {
+            continue;
+        }
+        g.shots.shot_avail[z] -= 1;
+        if z == MAX_PWEAPON - 1 {
+            continue;
+        }
+
+        let delta_y_shot_move = g.player.player[0].delta_y_shot_move;
+        let shot = &mut g.shots.player_shot_data[z];
+
+        shot.shot_xm = shot.shot_xm.wrapping_add(shot.shot_xc);
+
+        if shot.shot_xm <= 100 {
+            shot.shot_x = shot.shot_x.wrapping_add(shot.shot_xm);
+        }
+
+        shot.shot_ym = shot.shot_ym.wrapping_add(shot.shot_yc);
+        shot.shot_y = shot.shot_y.wrapping_add(shot.shot_ym);
+
+        if shot.shot_ym > 100 {
+            shot.shot_y = shot.shot_y.wrapping_sub(120);
+            shot.shot_y = (i32::from(shot.shot_y).wrapping_add(delta_y_shot_move)) as i16;
+        }
+
+        if shot.shot_complicated {
+            shot.shot_dev_x = shot.shot_dev_x.wrapping_add(shot.shot_dir_x);
+            shot.shot_x = shot.shot_x.wrapping_add(shot.shot_dev_x);
+
+            if i32::from(shot.shot_dev_x).abs() == i32::from(shot.shot_cir_size_x) {
+                shot.shot_dir_x = shot.shot_dir_x.wrapping_neg();
+            }
+
+            shot.shot_dev_y = shot.shot_dev_y.wrapping_add(shot.shot_dir_y);
+            shot.shot_y = shot.shot_y.wrapping_add(shot.shot_dev_y);
+
+            if i32::from(shot.shot_dev_y).abs() == i32::from(shot.shot_cir_size_y) {
+                shot.shot_dir_y = shot.shot_dir_y.wrapping_neg();
+            }
+            // Double Speed Circle Shots - add a second copy of above loop
+        }
+
+        let temp_shot_x = i32::from(shot.shot_x);
+        let temp_shot_y = i32::from(shot.shot_y);
+
+        if shot.shot_x < 0 || shot.shot_x > 140 || shot.shot_y < 0 || shot.shot_y > 170 {
+            g.shots.shot_avail[z] = 0;
+            continue;
+        }
+
+        let mut anim_frame = shot.shot_gr.wrapping_add(shot.shot_ani);
+        shot.shot_ani = shot.shot_ani.wrapping_add(1);
+        if shot.shot_ani == shot.shot_ani_max {
+            shot.shot_ani = 0;
+        }
+
+        if anim_frame < 60000 {
+            if anim_frame > 1000 {
+                anim_frame %= 1000;
+            }
+            let screen = g.video.vga_screen_id();
+            if anim_frame > 500 {
+                blit_sprite2(
+                    g,
+                    screen,
+                    temp_shot_x + 1,
+                    temp_shot_y,
+                    Sprite2Ref::SpriteSheet12,
+                    u32::from(anim_frame - 500),
+                );
+            } else {
+                blit_sprite2(
+                    g,
+                    screen,
+                    temp_shot_x + 1,
+                    temp_shot_y,
+                    Sprite2Ref::SpriteSheet8,
+                    u32::from(anim_frame),
+                );
+            }
+        }
+    }
+}
 
 pub fn player_shot_set_direction(g: &mut Game, shot_id: i16, weapon_id: u32, direction: f32) {
     let shot = &mut g.shots.player_shot_data[shot_id as usize];
