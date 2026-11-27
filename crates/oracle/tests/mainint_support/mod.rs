@@ -225,7 +225,9 @@ impl Rig {
     /// Equal calls, whole states and saved files.
     pub fn check(&mut self) {
         assert_eq!(self.c_calls(), self.rust_calls(), "platform calls differ");
-        assert!(self.c_state() == self.g.snapshot(), "states differ");
+        if let Some(d) = diff::first_difference(&self.c_state(), &self.g.snapshot()) {
+            panic!("states differ at {d}");
+        }
         self.check_files();
     }
 

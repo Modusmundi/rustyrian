@@ -1,11 +1,26 @@
-//! Input scripts for the menu and prompt tests (`menus`, `xmas`): keyboard
-//! and mouse interactions in screen coordinates, always followed by ESC taps
-//! so every menu loop ends.
+//! Input scripts for the menu and prompt tests (`menus`, `xmas`, `opentyr`):
+//! keyboard and mouse interactions in screen coordinates, always followed by
+//! ESC taps so every menu loop ends.
 
 #![allow(dead_code)]
 
 use proptest::prelude::*;
 use rustyrian_core::platform::Rect;
+use rustyrian_oracle::diff::capped_runner;
+
+/// Runs `test` on `cases` values of `strategy` through
+/// [`capped_runner`] (a hard cap: `PROPTEST_CASES` cannot raise it); panics
+/// with the minimal failing input.
+pub fn run_capped<S>(cases: u32, strategy: S, test: impl Fn(S::Value) -> Result<(), TestCaseError>)
+where
+    S: Strategy,
+    S::Value: std::fmt::Debug,
+{
+    let mut runner = capped_runner(cases);
+    if let Err(e) = runner.run(&strategy, test) {
+        panic!("{e}\n{runner}");
+    }
+}
 
 /// One interaction.
 #[derive(Clone, Debug)]

@@ -7,6 +7,7 @@
 //! module's `State`, aggregated in [`game::Game`] (rule R3).
 #![forbid(unsafe_code)]
 
+pub mod cconv;
 pub mod crand;
 pub mod game;
 pub mod platform;

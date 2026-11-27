@@ -1019,7 +1019,7 @@ c = "destruct.c::JE_makeExplosion"
 c_sha = "2d155797dbdf"
 rust = "rustyrian_core::destruct::je_make_explosion"
 status = "verified"
-verify = ["diff:destruct::explosions_match_c", "diff:destruct::run_tick_matches_c"]
+verify = ["diff:destruct::explosions_match_c", "diff:destruct::explosion_sweep_matches_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
@@ -1171,7 +1171,8 @@ c = "destruct.c::DE_RunTickExplosions"
 c_sha = "87124370e47a"
 rust = "rustyrian_core::destruct::de_run_tick_explosions"
 status = "verified"
-verify = ["diff:destruct::explosions_match_c", "diff:destruct::run_tick_matches_c"]
+verify = ["diff:destruct::explosions_match_c", "diff:destruct::explosion_sweep_matches_c", "diff:destruct::run_tick_matches_c"]
+waived_lines = [{ line = 1873, reason = "unreachable: explosions are only made with dirt or flare types (no shot of another type is ever fired)" }]
 notes = ""
 
 [[fn]]
@@ -1195,7 +1196,7 @@ c = "destruct.c::DE_RunTickShots"
 c_sha = "59ce92e0cb41"
 rust = "rustyrian_core::destruct::de_run_tick_shots"
 status = "verified"
-verify = ["diff:destruct::shots_match_c", "diff:destruct::edge_cases_match_c", "diff:destruct::run_tick_matches_c"]
+verify = ["diff:destruct::shots_match_c", "diff:destruct::shot_walls_match_c", "diff:destruct::edge_cases_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
@@ -1211,7 +1212,7 @@ c = "destruct.c::DE_RunTickAI"
 c_sha = "95472241b220"
 rust = "rustyrian_core::destruct::de_run_tick_ai"
 status = "verified"
-verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::edge_cases_match_c", "diff:destruct::run_tick_matches_c"]
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::ai_sweep_matches_c", "diff:destruct::edge_cases_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
@@ -1243,7 +1244,8 @@ c = "destruct.c::DE_ProcessInput"
 c_sha = "84c1eca55547"
 rust = "rustyrian_core::destruct::de_process_input"
 status = "verified"
-verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::run_tick_matches_c"]
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::process_input_sweep_matches_c", "diff:destruct::run_tick_matches_c"]
+waived_lines = [{ line = 2533, reason = "unreachable: every shotDirt value is one of the four handled cases" }]
 notes = ""
 
 [[fn]]
@@ -1323,7 +1325,7 @@ c = "destruct.c::DE_RunTickCheckEndgame"
 c_sha = "e4469ec5a3c6"
 rust = "rustyrian_core::destruct::de_run_tick_check_endgame"
 status = "verified"
-verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::run_tick_matches_c"]
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::endgame_branches_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
@@ -2772,9 +2774,9 @@ notes = ""
 c = "mainint.c::JE_playCredits"
 c_sha = "38783e0b0976"
 rust = "rustyrian_core::mainint::je_play_credits"
-status = "ported"
-verify = ["diff:mainint::play_credits_matches_c", "diff:mainint::play_credits_for_a_minute_matches_c", "diff:mainint::play_credits_missing_file_halts_like_c", "diff:mainint::play_credits_truncated_file_halts_like_c"]
-notes = "lines 2499, 2502, 2506-2508 (fade_song, closing-song restart) are reached only at the end of the 7860-tick roll, by diff:mainint::play_credits_to_the_end_matches_c, which passes but is #[ignore]d (about 160 s); verified once coverage runs it or it is made cheaper"
+status = "verified"
+verify = ["diff:mainint::play_credits_matches_c", "diff:mainint::play_credits_for_a_minute_matches_c", "diff:mainint::play_credits_missing_file_halts_like_c", "diff:mainint::play_credits_truncated_file_halts_like_c", "diff:mainint::play_credits_to_the_end_matches_c"]
+notes = "lines 2499, 2502, 2506-2508 (fade_song, closing-song restart) are reached only at the end of the 7860-tick roll, by the #[ignore]d play_credits_to_the_end_matches_c (about 160 s), which coverage and nightly run"
 
 [[fn]]
 c = "mainint.c::JE_endLevelAni"
@@ -3661,8 +3663,8 @@ notes = ""
 c = "opentyr.c::setupMenu"
 c_sha = "2403ee7222a6"
 rust = "rustyrian_core::opentyr::setup_menu"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opentyr::setup_menu_graphics_pickers_match", "diff:opentyr::setup_menu_sound_matches", "diff:opentyr::setup_menu_jukebox_matches", "diff:opentyr::setup_menu_mouse_matches", "diff:opentyr::setup_menu_matches"]
 notes = ""
 
 [[fn]]
@@ -4047,9 +4049,9 @@ notes = ""
 c = "shots.c::player_shot_move_and_draw"
 c_sha = "de1d09ee601d"
 rust = "rustyrian_core::shots::player_shot_move_and_draw"
-status = "todo"
-verify = []
-notes = "blocked on sprite.c::blit_sprite2, sprite.c::blit_sprite2_darken, sprite.c::blit_sprite_blend, sprite.h::sprite, varz.c::JE_doSP, varz.c::JE_setupExplosion (not verified on main)"
+status = "verified"
+verify = ["diff:shots::player_shot_move_and_draw_matches", "diff:shots::player_shot_move_and_draw_special_past_table_has_no_radius"]
+notes = "R10 guard (D-UB-SHOTS-2): a special frame past the 151-entry OPTION_SHAPES table gets radius 0 instead of reading outside the table"
 
 [[fn]]
 c = "shots.c::player_shot_create"
@@ -4376,9 +4378,9 @@ notes = ""
 c = "tyrian2.c::JE_drawEnemy"
 c_sha = "4991ecfcf656"
 rust = "rustyrian_core::tyrian2::je_draw_enemy"
-status = "todo"
-verify = []
-notes = "blocked on varz.c::JE_setupExplosion (not verified on main)"
+status = "verified"
+verify = ["diff:tyrian2::je_draw_enemy_matches"]
+notes = ""
 
 [[fn]]
 c = "tyrian2.c::JE_main"

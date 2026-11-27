@@ -9,7 +9,7 @@ use rustyrian_oracle::mirror::Mirror;
 mod net_support;
 use net_support::Rig;
 mod menus_support;
-use menus_support::{Act, any_act, any_name, output_rect, script};
+use menus_support::{Act, any_act, any_name, output_rect, run_capped, script};
 
 #[test]
 fn initial_state_matches_c() {
@@ -95,58 +95,64 @@ fn acts(targets: Vec<(i32, i32)>, keys: Vec<Act>) -> impl Strategy<Value = Vec<(
     prop::collection::vec((any_act(targets, keys), 20u32..200), 0..10)
 }
 
-proptest! {
-    #![proptest_config(ProptestConfig { cases: 48, ..ProptestConfig::default() })]
+// Each case below runs a whole menu on both engines (about 0.17 s), so the
+// case counts are capped at 48 whatever `PROPTEST_CASES` says.
 
-    /// `gameplaySelect`: keyboard and mouse navigation, the disabled network
-    /// item, choosing a mode or cancelling.
-    #[test]
-    fn gameplay_select_matches(
-        acts in acts((0..4).map(|i| (160, 60 + 24 * i)).collect(), menu_keys()),
-        names in any_names(),
-    ) {
+/// `gameplaySelect`: keyboard and mouse navigation, the disabled network
+/// item, choosing a mode or cancelling.
+#[test]
+fn gameplay_select_matches() {
+    let s = (
+        acts((0..4).map(|i| (160, 60 + 24 * i)).collect(), menu_keys()),
+        any_names(),
+    );
+    run_capped(48, s, |(acts, names)| {
         run_menu(0, &acts, &names, [true; 5]);
-    }
+        Ok(())
+    });
+}
 
-    /// `episodeSelect`: available and unavailable episodes; choosing one
-    /// loads it.
-    #[test]
-    fn episode_select_matches(
-        acts in acts((0..4).map(|i| (30, 56 + 30 * i)).collect(), menu_keys()),
-        names in any_names(),
-        avail: [bool; 4],
-    ) {
+/// `episodeSelect`: available and unavailable episodes; choosing one loads
+/// it.
+#[test]
+fn episode_select_matches() {
+    let s = (
+        acts((0..4).map(|i| (30, 56 + 30 * i)).collect(), menu_keys()),
+        any_names(),
+        any::<[bool; 4]>(),
+    );
+    run_capped(48, s, |(acts, names, avail)| {
         let mut a = [false; 5];
         a[..4].copy_from_slice(&avail);
         run_menu(1, &acts, &names, a);
-    }
+        Ok(())
+    });
+}
 
-    /// `difficultySelect`: the hidden levels revealed by shift+G, shift+]
-    /// and the four "lord" keys (held together or typed in order).
-    #[test]
-    fn difficulty_select_matches(
-        acts in acts(
-            (0..6).map(|i| (160, 60 + 24 * i)).collect(),
-            {
-                let mut k = menu_keys();
-                k.extend([
-                    Act::Shift("G"),
-                    Act::Shift("G"),
-                    Act::Shift("RIGHTBRACKET"),
-                    Act::Shift("RIGHTBRACKET"),
-                    Act::Hold(vec!["L", "O", "R", "D"]),
-                    Act::Key("L"),
-                    Act::Key("O"),
-                    Act::Key("R"),
-                    Act::Key("D"),
-                ]);
-                k
-            },
-        ),
-        names in any_names(),
-    ) {
+/// `difficultySelect`: the hidden levels revealed by shift+G, shift+] and the
+/// four "lord" keys (held together or typed in order).
+#[test]
+fn difficulty_select_matches() {
+    let mut keys = menu_keys();
+    keys.extend([
+        Act::Shift("G"),
+        Act::Shift("G"),
+        Act::Shift("RIGHTBRACKET"),
+        Act::Shift("RIGHTBRACKET"),
+        Act::Hold(vec!["L", "O", "R", "D"]),
+        Act::Key("L"),
+        Act::Key("O"),
+        Act::Key("R"),
+        Act::Key("D"),
+    ]);
+    let s = (
+        acts((0..6).map(|i| (160, 60 + 24 * i)).collect(), keys),
+        any_names(),
+    );
+    run_capped(48, s, |(acts, names)| {
         run_menu(2, &acts, &names, [true; 5]);
-    }
+        Ok(())
+    });
 }
 
 /// Every difficulty, reached through all hidden levels (the "lord" keys typed

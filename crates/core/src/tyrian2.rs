@@ -5,14 +5,16 @@
 //! Port of upstream `tyrian2.c` / `tyrian2.h`.
 
 use crate::Game;
-use crate::config::{DIFFICULTY_SUICIDE, DIFFICULTY_ZINGLON};
+use crate::config::{
+    DIFFICULTY_MANIACAL, DIFFICULTY_NORMAL, DIFFICULTY_SUICIDE, DIFFICULTY_ZINGLON,
+};
 use crate::file::{self, File};
 use crate::game::{EXIT_FAILURE, Flow, Halt};
 use crate::keyboard::{INPUT_NO_MOTION, KeyboardInput};
 use crate::lvlmast::EVENT_MAXIMUM;
 use crate::mtrand::mt_rand;
 use crate::sprite::FONT_SHAPES;
-use crate::varz::{JeEventRecType, SA_NONE, Sprite2Ref};
+use crate::varz::{ENEMY_SHOT_MAX, JeEventRecType, SA_NONE, Sprite2Ref};
 use crate::video::ScreenId;
 use serde::{Deserialize, Serialize};
 
@@ -229,6 +231,503 @@ pub fn intro_logos(g: &mut Game) -> Flow {
 #[doc(alias = "JE_readTextSync")]
 pub fn je_read_text_sync(_g: &mut Game) {
     // this function seems to be unnecessary
+}
+
+/// The x/y acceleration step of `JE_drawEnemy`: steers velocity `v` towards
+/// the player by one, at most to `accel - 89`. C compares `accel - 89u`
+/// (unsigned) with `mt_rand() % 11`, drawing only when `accel` is non-zero.
+fn steer(g: &mut Game, accel: u8, v: i8, player_ahead: bool) -> i8 {
+    if accel == 0 || u64::from(u32::from(accel).wrapping_sub(89)) <= mt_rand(g) % 11 {
+        return v;
+    }
+    let limit = i32::from(accel) - 89;
+    if player_ahead {
+        if i32::from(v) < limit {
+            return v.wrapping_add(1);
+        }
+    } else if v >= 0 || -i32::from(v) < limit {
+        return v.wrapping_sub(1);
+    }
+    v
+}
+
+/// `(target + 25) - from - tempMapXOfs - 4` and `target - from`, each made
+/// non-zero, and the larger magnitude, as `JE_integer`s.
+fn aim(target_x: i32, target_y: i32, from_x: i16, from_y: i16, map_x_ofs: u16) -> (i16, i16, i16) {
+    let mut aim_x = (target_x + 25 - i32::from(from_x) - i32::from(map_x_ofs) - 4) as i16;
+    if aim_x == 0 {
+        aim_x = 1;
+    }
+    let mut aim_y = (target_y - i32::from(from_y)) as i16;
+    if aim_y == 0 {
+        aim_y = 1;
+    }
+    let max_mag_aim = i32::from(aim_x).abs().max(i32::from(aim_y).abs()) as i16;
+    (aim_x, aim_y, max_mag_aim)
+}
+
+/// `roundf((float)a / max * scale)`.
+fn aimed(a: i16, max: i16, scale: u8) -> f32 {
+    (f32::from(a) / f32::from(max) * f32::from(scale)).round()
+}
+
+/// The x/y circular-motion step of `JE_drawEnemy` on (velocity, change,
+/// counter, counter max, reversal point, add).
+fn circle(v: &mut i8, cc: &mut i8, ccw: &mut i8, ccwmax: u8, rev: &mut i8, add: &mut i16) {
+    if *cc == 0 {
+        return;
+    }
+    *ccw = ccw.wrapping_sub(1);
+    if *ccw > 0 {
+        return;
+    }
+    let flip = |cc: &mut i8, rev: &mut i8, add: &mut i16| {
+        *cc = cc.wrapping_neg();
+        *rev = rev.wrapping_neg();
+        *add = add.wrapping_neg();
+    };
+    if *v == *rev {
+        flip(cc, rev, add);
+    } else {
+        *v = (i32::from(*v) + i32::from(*add)) as i8;
+        *ccw = ccwmax as i8;
+        if *v == *rev {
+            flip(cc, rev, add);
+        }
+    }
+}
+
+/// `JE_drawEnemy(enemyOffset)`: moves, draws, fires and launches the 25
+/// enemies before `enemy_offset` (it actually does a whole lot more than
+/// just drawing).
+#[doc(alias = "JE_drawEnemy")]
+pub fn je_draw_enemy(g: &mut Game, enemy_offset: i32) {
+    g.player.player[0].x = g.player.player[0].x.wrapping_sub(25);
+
+    for i in enemy_offset - 25..enemy_offset {
+        if g.varz.enemy_avail[i as usize] != 1 {
+            draw_one_enemy(g, enemy_offset, i as usize);
+        }
+    }
+
+    g.player.player[0].x = g.player.player[0].x.wrapping_add(25);
+}
+
+/// One live enemy of `JE_drawEnemy`; returning is `goto draw_enemy_end`.
+fn draw_one_enemy(g: &mut Game, enemy_offset: i32, i: usize) {
+    let map_x_ofs = g.backgrnd.temp_map_x_ofs;
+    g.varz.enemy[i].mapoffset = map_x_ofs;
+
+    let e = g.varz.enemy[i];
+    let px = g.player.player[0].x;
+    let exc = steer(g, e.xaccel, e.exc, px > i32::from(e.ex));
+    g.varz.enemy[i].exc = exc;
+    let e = g.varz.enemy[i];
+    let py = g.player.player[0].y;
+    let eyc = steer(g, e.yaccel, e.eyc, py > i32::from(e.ey));
+    g.varz.enemy[i].eyc = eyc;
+
+    let e = g.varz.enemy[i];
+    let on_screen_x = i32::from(e.ex) + i32::from(map_x_ofs);
+    if on_screen_x > -29 && on_screen_x < 300 {
+        let e = &mut g.varz.enemy[i];
+        if e.aniactive == 1 {
+            e.enemycycle = e.enemycycle.wrapping_add(1);
+
+            if e.enemycycle == e.animax {
+                e.aniactive = e.aniwhenfire;
+            } else if e.enemycycle > e.ani {
+                e.enemycycle = e.animin;
+            }
+        }
+
+        if e.egr[usize::from(e.enemycycle) - 1] == 999 {
+            g.varz.enemy_avail[i] = 1; // enemy_gone
+            return;
+        }
+
+        let (size, ey) = (e.size, e.ey);
+        let vga = g.video.vga_screen_id();
+        let i32_i = i as u32;
+        if size == 1 {
+            // 2x2 enemy
+            if ey > -13 {
+                blit_enemy(g, vga, i32_i, -6, -7, 0);
+                blit_enemy(g, vga, i32_i, 6, -7, 1);
+            }
+            if ey > -26 && ey < 182 {
+                blit_enemy(g, vga, i32_i, -6, 7, 19);
+                blit_enemy(g, vga, i32_i, 6, 7, 20);
+            }
+        } else if ey > -13 {
+            blit_enemy(g, vga, i32_i, 0, 0, 0);
+        }
+
+        g.varz.enemy[i].filter = 0;
+    }
+
+    let e = &mut g.varz.enemy[i];
+    circle(
+        &mut e.exc,
+        &mut e.excc,
+        &mut e.exccw,
+        e.exccwmax,
+        &mut e.exrev,
+        &mut e.exccadd,
+    );
+    circle(
+        &mut e.eyc,
+        &mut e.eycc,
+        &mut e.eyccw,
+        e.eyccwmax,
+        &mut e.eyrev,
+        &mut e.eyccadd,
+    );
+
+    e.ey = e.ey.wrapping_add(e.fixedmovey);
+
+    e.ex = (i32::from(e.ex) + i32::from(e.exc)) as i16;
+    if e.ex < -80 || e.ex > 340 {
+        g.varz.enemy_avail[i] = 1; // enemy_gone
+        return;
+    }
+
+    e.ey = (i32::from(e.ey) + i32::from(e.eyc)) as i16;
+    if e.ey < -112 || e.ey > 190 {
+        g.varz.enemy_avail[i] = 1; // enemy_gone
+        return;
+    }
+
+    // enemy_still_exists:
+
+    // X bounce
+    if e.ex <= e.xminbounce || e.ex >= e.xmaxbounce {
+        e.exc = e.exc.wrapping_neg();
+    }
+
+    // Y bounce
+    if e.ey <= e.yminbounce || e.ey >= e.ymaxbounce {
+        e.eyc = e.eyc.wrapping_neg();
+    }
+
+    // Evalue != 0 - score item at boundary
+    if e.scoreitem {
+        if e.ex < -5 {
+            e.ex += 1;
+        }
+        if e.ex > 245 {
+            e.ex -= 1;
+        }
+    }
+
+    e.ey = (i32::from(e.ey) + i32::from(g.varz.temp_back_move)) as i16;
+
+    if e.ex <= -24 || e.ex >= 296 {
+        return;
+    }
+
+    let temp_x = e.ex;
+    let temp_y = e.ey;
+
+    g.varz.temp = e.enemytype as u8;
+
+    // Enemy Shots
+    if e.edamaged {
+        return;
+    }
+
+    g.varz.enemy_on_screen = g.varz.enemy_on_screen.wrapping_add(1);
+
+    if e.iced != 0 {
+        e.iced -= 1;
+        if e.enemyground {
+            e.filter = 0x09;
+        }
+        return;
+    }
+
+    for j in (1..=3usize).rev() {
+        if g.varz.enemy[i].freq[j - 1] == 0 {
+            continue;
+        }
+        let temp3 = g.varz.enemy[i].tur[j - 1];
+        g.varz.temp3 = temp3;
+
+        let e = &mut g.varz.enemy[i];
+        e.eshotwait[j - 1] = e.eshotwait[j - 1].wrapping_sub(1);
+        if e.eshotwait[j - 1] != 0 || temp3 == 0 {
+            continue;
+        }
+
+        let difficulty = g.config.difficulty_level;
+        e.eshotwait[j - 1] = e.freq[j - 1];
+        if difficulty > DIFFICULTY_NORMAL {
+            e.eshotwait[j - 1] = (e.eshotwait[j - 1] / 2) + 1;
+            if difficulty > DIFFICULTY_MANIACAL {
+                e.eshotwait[j - 1] = (e.eshotwait[j - 1] / 2) + 1;
+            }
+        }
+
+        if g.config.galaga_mode
+            && (g.varz.enemy[i].eyc == 0 || mt_rand(g) % 400 >= u64::from(g.varz.galaga_shot_freq))
+        {
+            return;
+        }
+
+        let p0 = g.player.player[0];
+        let dist = |p: &crate::player::Player| {
+            (p.x - i32::from(temp_x)).abs() + (p.y - i32::from(temp_y)).abs()
+        };
+        let near_magnet = |p: &crate::player::Player, dx: i32| {
+            (p.x + dx - 14 - i32::from(temp_x)).abs() < 24 && (p.y - i32::from(temp_y)).abs() < 28
+        };
+        match temp3 {
+            252 => {
+                // Savara Boss DualMissile
+                if g.varz.enemy[i].ey > 20 {
+                    let back = i32::from(g.backgrnd.back_move) * 8;
+                    let y = (i32::from(temp_y) - 20 - back) as i16;
+                    let x1 = (i32::from(temp_x) - 8 + i32::from(map_x_ofs)) as i16;
+                    let x2 = (i32::from(temp_x) + 4 + i32::from(map_x_ofs)) as i16;
+                    crate::varz::je_setup_explosion(g, x1, y, -2, 6, false, false);
+                    crate::varz::je_setup_explosion(g, x2, y, -2, 6, false, false);
+                }
+            }
+            251 => {
+                // Suck-O-Magnet
+                let attraction = (4 - dist(&p0) / 100) as i16;
+                if attraction > 0 {
+                    let a = i32::from(attraction);
+                    let p = &mut g.player.player[0];
+                    p.x_velocity += if p.x > i32::from(temp_x) { -a } else { a };
+                }
+            }
+            253 | 254 => {
+                // Left ShortRange Magnet
+                let d = if temp3 == 253 { 2 } else { -2 };
+                if near_magnet(&p0, 25) {
+                    g.player.player[0].x_velocity += d;
+                }
+                let p1 = g.player.player[1];
+                if g.config.two_player_mode && near_magnet(&p1, 0) {
+                    g.player.player[1].x_velocity += d;
+                }
+            }
+            255 => {
+                // Magneto RePulse!!
+                if difficulty != crate::config::DIFFICULTY_EASY {
+                    if j == 3 {
+                        g.varz.enemy[i].filter = 0x70;
+                    } else {
+                        let repulsion = (4 - dist(&p0) / 20) as i16;
+                        if repulsion > 0 {
+                            let r = i32::from(repulsion);
+                            let p = &mut g.player.player[0];
+                            p.x_velocity += if p.x > i32::from(temp_x) { r } else { -r };
+                        }
+                    }
+                }
+            }
+            _ => {
+                // Rot
+                let w = g.episodes.weapons[usize::from(temp3)];
+                for _ in 0..w.multi {
+                    g.varz.b = 0;
+                    while (g.varz.b as usize) < ENEMY_SHOT_MAX {
+                        if g.varz.enemy_shot_avail[g.varz.b as usize] {
+                            break;
+                        }
+                        g.varz.b += 1;
+                    }
+                    if g.varz.b as usize == ENEMY_SHOT_MAX {
+                        return;
+                    }
+                    let b = g.varz.b as usize;
+
+                    g.varz.enemy_shot_avail[b] = !g.varz.enemy_shot_avail[b];
+
+                    if w.sound > 0 {
+                        loop {
+                            g.varz.temp = (mt_rand(g) % 8) as u8;
+                            if g.varz.temp != 3 {
+                                break;
+                            }
+                        }
+                        g.varz.sound_queue[usize::from(g.varz.temp)] = w.sound;
+                    }
+
+                    let e = &mut g.varz.enemy[i];
+                    if e.aniactive == 2 {
+                        e.aniactive = 1;
+                    }
+
+                    e.eshotmultipos[j - 1] = e.eshotmultipos[j - 1].wrapping_add(1);
+                    if e.eshotmultipos[j - 1] > w.max {
+                        e.eshotmultipos[j - 1] = 1;
+                    }
+
+                    let pos = usize::from(e.eshotmultipos[j - 1]) - 1;
+
+                    if j == 1 {
+                        g.varz.temp2 = 4;
+                    }
+
+                    let s = &mut g.varz.enemy_shot[b];
+                    s.sx = (i32::from(temp_x) + i32::from(w.bx[pos]) + i32::from(map_x_ofs)) as i16;
+                    s.sy = (i32::from(temp_y) + i32::from(w.by[pos])) as i16;
+                    s.sdmg = w.attack[pos];
+                    s.tx = w.tx;
+                    s.ty = w.ty;
+                    s.duration = w.del[pos];
+                    s.animate = 0;
+                    s.animax = w.weapani;
+
+                    s.sgr = w.sg[pos];
+                    match j {
+                        1 => {
+                            s.syc = w.acceleration;
+                            s.sxc = w.accelerationx;
+
+                            s.sxm = i16::from(w.sx[pos]);
+                            s.sym = i16::from(w.sy[pos]);
+                        }
+                        3 => {
+                            s.sxc = w.acceleration.wrapping_neg();
+                            s.syc = w.accelerationx;
+
+                            s.sxm = -i16::from(w.sy[pos]);
+                            s.sym = -i16::from(w.sx[pos]);
+                        }
+                        _ => {
+                            s.sxc = w.acceleration;
+                            s.syc = w.acceleration.wrapping_neg();
+
+                            s.sxm = i16::from(w.sy[pos]);
+                            s.sym = -i16::from(w.sx[pos]);
+                        }
+                    }
+
+                    if w.aim > 0 {
+                        let mut aim_strength = w.aim;
+
+                        // DIF
+                        if difficulty > DIFFICULTY_NORMAL {
+                            aim_strength = aim_strength.wrapping_add((difficulty - 2) as u8);
+                        }
+
+                        let p = g.player.player;
+                        let mut target_x = p[0].x as u16;
+                        let mut target_y = p[0].y as u16;
+
+                        if g.config.two_player_mode {
+                            // fire at live player(s)
+                            g.varz.temp = if p[0].is_alive && !p[1].is_alive {
+                                0
+                            } else if p[1].is_alive && !p[0].is_alive {
+                                1
+                            } else {
+                                (mt_rand(g) % 2) as u8
+                            };
+
+                            if g.varz.temp == 1 {
+                                target_x = (p[1].x - 25) as u16;
+                                target_y = p[1].y as u16;
+                            }
+                        }
+
+                        let (ax, ay, max) = aim(
+                            i32::from(target_x),
+                            i32::from(target_y),
+                            temp_x,
+                            temp_y,
+                            map_x_ofs,
+                        );
+                        let s = &mut g.varz.enemy_shot[b];
+                        s.sxm = aimed(ax, max, aim_strength) as i16;
+                        s.sym = aimed(ay, max, aim_strength) as i16;
+                    }
+                }
+            }
+        }
+    }
+
+    // Enemy Launch Routine
+    let e = &mut g.varz.enemy[i];
+    if e.launchfreq == 0 {
+        return;
+    }
+    e.launchwait = e.launchwait.wrapping_sub(1);
+    if e.launchwait != 0 {
+        return;
+    }
+    e.launchwait = e.launchfreq;
+
+    if e.launchspecial != 0 {
+        // Type 1: Must be inline with player
+        if (i32::from(e.ey) - g.player.player[0].y).abs() > 5 {
+            return;
+        }
+    }
+
+    if e.aniactive == 2 {
+        e.aniactive = 1;
+    }
+
+    if e.launchtype == 0 {
+        return;
+    }
+
+    g.varz.temp_w = e.launchtype;
+    let (launchspecial, linknum) = (e.launchspecial, e.linknum);
+    let offset = if enemy_offset == 50 {
+        75
+    } else {
+        enemy_offset - 25
+    };
+    g.varz.b = je_new_enemy(g, offset, g.varz.temp_w, 0);
+
+    // Launch Enemy Placement
+    if g.varz.b > 0 {
+        let bi = (g.varz.b - 1) as usize;
+        let startyc = g.episodes.enemy_dat[usize::from(g.varz.enemy[bi].enemytype)].startyc;
+        let e = &mut g.varz.enemy[bi];
+
+        e.ex = temp_x;
+        e.ey = (i32::from(temp_y) + i32::from(startyc)) as i16;
+        if e.size == 0 {
+            e.ey = e.ey.wrapping_sub(7);
+        }
+
+        if e.launchtype > 0 && e.launchfreq == 0 {
+            if e.launchtype > 90 {
+                let k = i32::from(e.launchtype) - 90;
+                let r = mt_rand(g) % (k * 4) as u64;
+                let e = &mut g.varz.enemy[bi];
+                e.ex = (i64::from(e.ex) as u64)
+                    .wrapping_add(r)
+                    .wrapping_sub((k * 2) as u64) as i16;
+            } else {
+                let p0 = g.player.player[0];
+                let (ax, ay, max) = aim(p0.x, p0.y, temp_x, temp_y, map_x_ofs);
+                let lt = e.launchtype as u8;
+                e.exc = aimed(ax, max, lt) as i8;
+                e.eyc = aimed(ay, max, lt) as i8;
+            }
+        }
+
+        loop {
+            g.varz.temp = (mt_rand(g) % 8) as u8;
+            if g.varz.temp != 3 {
+                break;
+            }
+        }
+        let sound = crate::varz::RANDOM_ENEMY_LAUNCH_SOUNDS[(mt_rand(g) % 3) as usize];
+        g.varz.sound_queue[usize::from(g.varz.temp)] = sound;
+
+        if launchspecial == 1 && linknum < 100 {
+            g.varz.enemy[bi].linknum = linknum;
+        }
+    }
 }
 
 #[doc(alias = "JE_newEnemy")]
