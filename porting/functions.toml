@@ -1405,7 +1405,7 @@ c = "file.c::fileOpen"
 c_sha = "4fdf11abcabc"
 rust = "rustyrian_core::file::file_open"
 status = "verified"
-verify = ["diff:file::file_open_matches", "diff:file::file_operations_match"]
+verify = ["diff:file::file_open_matches", "diff:file::file_operations_match", "diff:rustyrian_core::file::tests::missing_file_errno_and_message_match_c"]
 notes = ""
 
 [[fn]]
@@ -1529,7 +1529,7 @@ c = "file.c::fileGetError"
 c_sha = "20c72b492138"
 rust = "rustyrian_core::file::file_get_error"
 status = "verified"
-verify = ["diff:file::file_get_error_matches", "diff:file::file_get_error_unknown_error_matches", "diff:file::file_operations_match", "diff:file::reading_a_directory_matches"]
+verify = ["diff:file::file_get_error_matches", "diff:file::file_get_error_unknown_error_matches", "diff:file::file_operations_match", "diff:file::reading_a_directory_matches", "diff:rustyrian_core::file::tests::missing_file_errno_and_message_match_c", "diff:rustyrian_core::file::tests::crt_tables_map_the_common_win32_errors"]
 notes = ""
 
 [[fn]]
