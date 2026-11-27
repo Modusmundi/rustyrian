@@ -440,6 +440,187 @@ proptest! {
     }
 }
 
+/// After a load: every state the load functions touch agrees, plus calls.
+fn check_load(d: &mut Diff) -> Result<(), TestCaseError> {
+    let c = d.c_game_state();
+    let r = d.game.snapshot();
+    prop_assert_eq!(c.config, r.config);
+    prop_assert_eq!(c.nortsong, r.nortsong);
+    prop_assert_eq!(c.loudness, r.loudness);
+    prop_assert_eq!(c.audio, r.audio);
+    prop_assert_eq!(c.video_scale, r.video_scale);
+    prop_assert_eq!(c.video.fullscreen_display, r.video.fullscreen_display);
+    prop_assert_eq!(c.video.scaling_mode, r.video.scaling_mode);
+    prop_assert_eq!(d.c_calls(), d.rust_calls());
+    Ok(())
+}
+
+/// `opentyrian.cfg` contents: valid sections, unknown names and values,
+/// odd text, or a directory (read error); `None` is a missing file.
+fn any_opentyrian_cfg() -> impl Strategy<Value = Option<Vec<u8>>> {
+    let video = (
+        prop::sample::select(vec![
+            "",
+            "  item fullscreen 1\n",
+            "  item fullscreen -1\n",
+            "  item fullscreen x\n",
+        ]),
+        prop::sample::select(vec![
+            "",
+            "  item scaler 'hq4x'\n",
+            "  item scaler 'None'\n",
+            "  item scaler 'bogus'\n",
+        ]),
+        prop::sample::select(vec![
+            "",
+            "  item scaling_mode 'Center'\n",
+            "  item scaling_mode 'Fit 4:3'\n",
+            "  item scaling_mode 'nope'\n",
+        ]),
+    )
+        .prop_map(|(a, b, c)| format!("section video\n{a}{b}{c}"));
+    let keyboard = prop::collection::vec(
+        (
+            prop::sample::select(vec![
+                "up",
+                "down",
+                "left",
+                "right",
+                "fire",
+                "'change fire'",
+                "'left sidekick'",
+                "'right sidekick'",
+                "bogus",
+            ]),
+            prop::sample::select(vec![
+                "W",
+                "'Left Ctrl'",
+                "Space",
+                "'not a key'",
+                "''",
+                "return",
+            ]),
+        ),
+        0..8,
+    )
+    .prop_map(|v| {
+        let mut s = String::from("section keyboard\n");
+        for (k, v) in v {
+            s.push_str(&format!("  item {k} {v}\n"));
+        }
+        s
+    });
+    prop_oneof![
+        1 => Just(None),
+        1 => Just(Some(b"section 'unterminated\n".to_vec())),
+        1 => Just(Some(b"\x01dir".to_vec())),
+        6 => (prop::option::of(video), prop::option::of(keyboard))
+            .prop_map(|(v, k)| Some(format!("{}{}", v.unwrap_or_default(), k.unwrap_or_default()).into_bytes())),
+    ]
+}
+
+/// Writes `cfg` (see [`any_opentyrian_cfg`]) as `opentyrian.cfg` in `dir`.
+fn write_opentyrian_cfg(dir: &Path, cfg: &Option<Vec<u8>>) {
+    match cfg.as_deref() {
+        None => {}
+        Some(b"\x01dir") => std::fs::create_dir(dir.join("opentyrian.cfg")).expect("mkdir"),
+        Some(text) => std::fs::write(dir.join("opentyrian.cfg"), text).expect("write"),
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig { cases: 64, ..ProptestConfig::default() })]
+
+    #[test]
+    fn load_open_tyrian_config_matches(cfg in any_opentyrian_cfg(), fullscreen in -1i32..3, keys: [u32; 8]) {
+        let (c_dir, r_dir) = (tmp("otc-c"), tmp("otc-r"));
+        for dir in [&c_dir, &r_dir] {
+            write_opentyrian_cfg(dir, &cfg);
+        }
+        let mut d = Diff::new();
+        d.game.video.fullscreen_display = fullscreen;
+        d.game.config.key_settings = keys;
+        split_user_dirs(&mut d, &c_dir, &r_dir);
+        // SAFETY: plain C call.
+        unsafe { b::ot_s_config_loadOpenTyrianConfig() };
+        cfg::load_open_tyrian_config(&mut d.game);
+        check_load(&mut d)?;
+    }
+
+    /// `tyrian.cfg` of any length and content (with in-range and over-range
+    /// volumes), together with any `opentyrian.cfg`, with audio enabled or
+    /// disabled.
+    #[test]
+    fn load_configuration_matches(
+        data in prop_oneof![
+            1 => Just(None),
+            6 => prop::collection::vec(any::<u8>(), 28).prop_map(Some),
+            2 => prop::collection::vec(any::<u8>(), 0..40).prop_map(Some),
+        ],
+        small_volumes: bool,
+        cfg in any_opentyrian_cfg(),
+        audio_disabled: bool,
+    ) {
+        let (c_dir, r_dir) = (tmp("lc-c"), tmp("lc-r"));
+        let mut data = data;
+        if let Some(v) = data.as_mut().filter(|v| v.len() == 28 && small_volumes) {
+            v[15] = 0;
+            v[17] = 0;
+        }
+        for dir in [&c_dir, &r_dir] {
+            write_opentyrian_cfg(dir, &cfg);
+            if let Some(v) = &data {
+                std::fs::write(dir.join("tyrian.cfg"), v).expect("write");
+            }
+        }
+        let mut d = Diff::new();
+        d.game.loudness.audio_disabled = audio_disabled;
+        d.game.config.fast_play = 9;
+        split_user_dirs(&mut d, &c_dir, &r_dir);
+        // SAFETY: plain C call.
+        unsafe { b::loadConfiguration() };
+        cfg::load_configuration(&mut d.game);
+        check_load(&mut d)?;
+    }
+
+    #[test]
+    fn je_set_new_game_speed_matches(fast_play in 0u8..8, smooth: bool, count_max: u16) {
+        let mut d = Diff::new();
+        d.game.config.fast_play = fast_play;
+        d.game.config.smooth_scroll = smooth;
+        d.game.nortsong.frame_count_max = count_max;
+        d.store_to_c();
+        // SAFETY: plain C call.
+        unsafe { b::JE_setNewGameSpeed() };
+        cfg::je_set_new_game_speed(&mut d.game);
+        check_load(&mut d)?;
+    }
+}
+
+/// A valid `opentyrian.cfg` changes every setting it names, in both engines.
+#[test]
+fn load_open_tyrian_config_applies_options() {
+    let text = b"section video\n  item fullscreen 1\n  item scaler 'hq4x'\n  item scaling_mode 'Fit 4:3'\nsection keyboard\n  item fire W\n";
+    let (c_dir, r_dir) = (tmp("apply-c"), tmp("apply-r"));
+    for dir in [&c_dir, &r_dir] {
+        std::fs::write(dir.join("opentyrian.cfg"), text).expect("write");
+    }
+    let mut d = Diff::new();
+    split_user_dirs(&mut d, &c_dir, &r_dir);
+    // SAFETY: plain C call.
+    unsafe { b::ot_s_config_loadOpenTyrianConfig() };
+    cfg::load_open_tyrian_config(&mut d.game);
+    check_load(&mut d).expect("engines agree");
+    let g = &d.game;
+    assert_eq!(g.video.fullscreen_display, 1);
+    assert_eq!(
+        rustyrian_core::video_scale::SCALERS[g.video_scale.scaler as usize].name,
+        "hq4x"
+    );
+    assert_eq!(g.video.scaling_mode.to_c(), 3);
+    assert_ne!(g.config.key_settings[4], DEFAULT_KEY_SETTINGS[4]);
+}
+
 #[test]
 fn initial_state_matches_c() {
     let _d = Diff::new();

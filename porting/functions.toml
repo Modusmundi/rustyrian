@@ -250,9 +250,10 @@ notes = ""
 c = "config.c::loadOpenTyrianConfig"
 c_sha = "a70b46effbe3"
 rust = "rustyrian_core::config::load_open_tyrian_config"
-status = "todo"
-verify = []
-notes = "blocked on video_scale.c::set_scaler_by_name and video.c::set_scaling_mode_by_name (not verified on main)"
+status = "verified"
+verify = ["diff:config::load_open_tyrian_config_matches", "diff:config::load_configuration_matches"]
+waived_lines = [{ line = 270, reason = "unreachable: config_parse only returns true (its failures exit through config_oom)" }, { line = 275, reason = "unreachable: config_parse only returns true (its failures exit through config_oom)" }]
+notes = "key names reach SDL_GetScancodeFromName through from_utf8_lossy (the Platform method takes &str); SDL's names are ASCII, so non-UTF-8 names match nothing either way"
 
 [[fn]]
 c = "config.c::saveOpenTyrianConfig"
@@ -307,17 +308,17 @@ notes = ""
 c = "config.c::JE_setNewGameSpeed"
 c_sha = "dddc846424a8"
 rust = "rustyrian_core::config::je_set_new_game_speed"
-status = "todo"
-verify = []
-notes = "blocked on nortsong.c::setFrameSpeed and nortsong.c::setFrameCount (not verified on main)"
+status = "verified"
+verify = ["diff:config::je_set_new_game_speed_matches"]
+notes = ""
 
 [[fn]]
 c = "config.c::loadConfiguration"
 c_sha = "5dc24cedaefc"
 rust = "rustyrian_core::config::load_configuration"
-status = "todo"
-verify = []
-notes = "blocked on loudness.c::set_volume (not verified on main) and config.c::loadOpenTyrianConfig"
+status = "verified"
+verify = ["diff:config::load_configuration_matches"]
+notes = "upstream's data[28] is uninitialized; the port zero-fills it like the oracle, and every value read from it is overwritten when the read fails"
 
 [[fn]]
 c = "config.c::saveConfiguration"
@@ -4008,25 +4009,25 @@ notes = ""
 c = "player.h::all_players_dead"
 c_sha = "5e02a24b669c"
 rust = "rustyrian_core::player::all_players_dead"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:player::all_players_alive_and_dead_match"]
 notes = ""
 
 [[fn]]
 c = "player.h::all_players_alive"
 c_sha = "9fea4cbf9366"
 rust = "rustyrian_core::player::all_players_alive"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:player::all_players_alive_and_dead_match"]
 notes = ""
 
 [[fn]]
 c = "shots.c::simulate_player_shots"
 c_sha = "996feb306dcc"
 rust = "rustyrian_core::shots::simulate_player_shots"
-status = "todo"
-verify = []
-notes = "blocked on sprite.c::blit_sprite2 (not verified on main)"
+status = "verified"
+verify = ["diff:shots::simulate_player_shots_matches"]
+notes = ""
 
 [[fn]]
 c = "shots.c::player_shot_set_direction"

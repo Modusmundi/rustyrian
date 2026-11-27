@@ -81,6 +81,21 @@ proptest! {
     }
 }
 
+proptest! {
+    #[test]
+    fn all_players_alive_and_dead_match(alive: [bool; 2], two_player: bool) {
+        let mut d = Diff::new();
+        d.game.player.player[0].is_alive = alive[0];
+        d.game.player.player[1].is_alive = alive[1];
+        d.game.config.two_player_mode = two_player;
+        d.store_to_c();
+        // SAFETY: plain C calls.
+        let (cd, ca) = unsafe { (b::ot_i_player_all_players_dead(), b::ot_i_player_all_players_alive()) };
+        prop_assert_eq!(cd, pl::all_players_dead(&d.game));
+        prop_assert_eq!(ca, pl::all_players_alive(&d.game));
+    }
+}
+
 #[test]
 fn initial_state_matches_c() {
     let _d = Diff::new();

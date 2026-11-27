@@ -98,6 +98,105 @@ proptest! {
     }
 }
 
+/// A shot in or near the playfield, with graphics in every range the
+/// function distinguishes (sheet 8, sheet 12, `% 1000`, not drawn).
+fn any_shot() -> impl Strategy<Value = PlayerShotDataType> {
+    (
+        (
+            -20i16..170,
+            -20i16..200,
+            -6i16..120,
+            -6i16..120,
+            -3i16..4,
+            -3i16..4,
+        ),
+        (
+            any::<bool>(),
+            -5i16..6,
+            prop_oneof![Just(1i16), Just(-1i16)],
+            0i16..12,
+            0i16..12,
+        ),
+        (
+            prop_oneof![1u16..500, 501u16..900, 1001u16..1600, 59990u16..=65535],
+            0u16..6,
+            1u16..7,
+        ),
+    )
+        .prop_map(
+            |((x, y, xm, ym, xc, yc), (comp, dev, dir, cx, cy), (gr, ani, ani_max))| {
+                PlayerShotDataType {
+                    shot_x: x,
+                    shot_y: y,
+                    shot_xm: xm,
+                    shot_ym: ym,
+                    shot_xc: xc,
+                    shot_yc: yc,
+                    shot_complicated: comp,
+                    shot_dev_x: dev,
+                    shot_dir_x: dir,
+                    shot_dev_y: -dev,
+                    shot_dir_y: -dir,
+                    shot_cir_size_x: cx,
+                    shot_cir_size_y: cy,
+                    shot_gr: gr,
+                    shot_ani: ani,
+                    shot_ani_max: ani_max,
+                    ..PlayerShotDataType::default()
+                }
+            },
+        )
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig { cases: 32, ..ProptestConfig::default() })]
+
+    /// From mid-level fixtures (sprite sheets loaded) with every shot slot
+    /// perturbed; the screen, shots and players must agree.
+    #[test]
+    fn simulate_player_shots_matches(
+        frame in prop::sample::select(vec![500u64, 2000]),
+        shots in prop::collection::vec(any_shot(), MAX_PWEAPON + 1),
+        avail in prop::collection::vec(prop_oneof![Just(0u8), 1u8..4, any::<u8>()], MAX_PWEAPON),
+        delta: i32,
+    ) {
+        let mut d = Diff::new();
+        d.game.restore(diff::fixture("demo-cycle", frame));
+        // Sprite indices past a sheet's offset table make C read outside the
+        // sheet, so each drawn frame is mapped into its sheet's real range.
+        let count = |s: &rustyrian_core::sprite::Sprite2Array| {
+            let data = s.data.as_deref().expect("sheet loaded by the fixture");
+            u16::from_le_bytes([data[0], data[1]]) / 2
+        };
+        let (n8, n12) = (
+            count(&d.game.sprite.sprite_sheet8).min(500),
+            count(&d.game.sprite.sprite_sheet12).min(499),
+        );
+        prop_assert!(n8 > 6 && n12 > 6);
+        let mut shots = shots;
+        for s in shots.iter_mut() {
+            s.shot_gr = match s.shot_gr {
+                g @ 1..=500 => 1 + g % (n8 - 6),
+                g @ 501..=1000 => 501 + g % (n12 - 6),
+                g @ 1001..=1600 => 1001 + g % (n8 - 6),
+                g => g,
+            };
+        }
+        d.game.shots.player_shot_data.copy_from_slice(&shots);
+        d.game.shots.shot_avail.copy_from_slice(&avail);
+        d.game.player.player[0].delta_y_shot_move = delta % 200;
+        d.store_to_c();
+        // SAFETY: plain C call on fixture state.
+        unsafe { b::simulate_player_shots() };
+        sh::simulate_player_shots(&mut d.game);
+        check(&d)?;
+        prop_assert!(
+            diff::load::<rustyrian_core::video::State>() == d.game.video,
+            "surfaces differ"
+        );
+    }
+}
+
 #[test]
 fn initial_state_matches_c() {
     let _d = Diff::new();

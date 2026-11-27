@@ -170,3 +170,13 @@ pub fn handle_got_purple_ball(g: &mut Game, p: usize) {
         power_up_weapon(g, p, port as u32);
     }
 }
+
+pub fn all_players_dead(g: &Game) -> bool {
+    let p = &g.player.player;
+    !p[0].is_alive && (!g.config.two_player_mode || !p[1].is_alive)
+}
+
+pub fn all_players_alive(g: &Game) -> bool {
+    let p = &g.player.player;
+    p[0].is_alive && (!g.config.two_player_mode || p[1].is_alive)
+}
