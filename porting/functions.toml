@@ -2574,248 +2574,249 @@ notes = ""
 c = "mainint.c::JE_drawTextWindow"
 c_sha = "a004cbc72bf3"
 rust = "rustyrian_core::mainint::je_draw_text_window"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::hud_drawing_matches_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_outCharGlow"
 c_sha = "df56c10ae45a"
 rust = "rustyrian_core::mainint::je_out_char_glow"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::out_char_glow_matches_c", "diff:mainint::out_char_glow_of_empty_text_draws_nothing"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_drawPortConfigButtons"
 c_sha = "aa62b4a5d3d1"
 rust = "rustyrian_core::mainint::je_draw_port_config_buttons"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::hud_drawing_matches_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_helpSystem"
 c_sha = "f8caad887ace"
 rust = "rustyrian_core::mainint::je_help_system"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::help_system_keyboard_matches_c", "diff:mainint::help_system_page_edges_match_c", "diff:mainint::help_system_mouse_matches_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::helpSystemPage"
 c_sha = "5aae61cc131c"
 rust = "rustyrian_core::mainint::help_system_page"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::help_system_keyboard_matches_c", "diff:mainint::help_system_page_edges_match_c", "diff:mainint::help_system_mouse_matches_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::weapon_upgrade_cost"
 c_sha = "745b3245616c"
 rust = "rustyrian_core::mainint::weapon_upgrade_cost"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::weapon_upgrade_cost_matches_c", "diff:mainint::item_costs_and_scores_match_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_getCost"
 c_sha = "2e4250ff7ad7"
 rust = "rustyrian_core::mainint::je_get_cost"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::item_costs_and_scores_match_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_loadScreen"
 c_sha = "f611470cfcde"
 rust = "rustyrian_core::mainint::je_load_screen"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::load_screen_keyboard_matches_c", "diff:mainint::load_screen_exits_match_c", "diff:mainint::load_screen_mouse_matches_c", "diff:mainint::screens_load_the_shop_sheet_when_missing_match_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_totalScore"
 c_sha = "fbb2aa0dbfff"
 rust = "rustyrian_core::mainint::je_total_score"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::item_costs_and_scores_match_c", "diff:mainint::adjust_difficulty_matches_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_getValue"
 c_sha = "df8ba8b94d3e"
 rust = "rustyrian_core::mainint::je_get_value"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::item_costs_and_scores_match_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_nextEpisode"
 c_sha = "9c8fdf652c38"
 rust = "rustyrian_core::mainint::je_next_episode"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::next_episode_matches_c", "diff:mainint::next_episode_with_high_score_matches_c", "diff:mainint::next_episode_super_carrot_matches_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_initPlayerData"
 c_sha = "0c716143a0e2"
 rust = "rustyrian_core::mainint::je_init_player_data"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::init_player_data_matches_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_sortHighScores"
 c_sha = "8973fd648755"
 rust = "rustyrian_core::mainint::je_sort_high_scores"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::sort_high_scores_match_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_highScoreScreen"
 c_sha = "e2778a7474f6"
 rust = "rustyrian_core::mainint::je_high_score_screen"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::high_score_screen_matches_c", "diff:mainint::screens_load_the_shop_sheet_when_missing_match_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_gammaCorrect_func"
 c_sha = "5027d8709512"
 rust = "rustyrian_core::mainint::je_gamma_correct_func"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::gamma_correct_matches_c", "diff:mainint::gamma_check_matches_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_gammaCorrect"
 c_sha = "a838f8c7a4ec"
 rust = "rustyrian_core::mainint::je_gamma_correct"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::gamma_correct_matches_c", "diff:mainint::gamma_check_matches_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_gammaCheck"
 c_sha = "0f2964c130f0"
 rust = "rustyrian_core::mainint::je_gamma_check"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::gamma_check_matches_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_doInGameSetup"
 c_sha = "f6c57f1b37f2"
 rust = "rustyrian_core::mainint::je_do_in_game_setup"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::in_game_setup_keyboard_matches_c", "diff:mainint::in_game_setup_quit_and_escape_match_c", "diff:mainint::in_game_setup_netplay_matches_c", "diff:mainint::in_game_setup_netplay_waits_match_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_inGameSetup"
 c_sha = "ae2a65a2c2d4"
 rust = "rustyrian_core::mainint::je_in_game_setup"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::in_game_setup_keyboard_matches_c", "diff:mainint::in_game_setup_quit_and_escape_match_c", "diff:mainint::in_game_setup_mouse_matches_c", "diff:mainint::in_game_setup_quit_in_constant_play_halts_like_c", "diff:mainint::in_game_setup_netplay_matches_c", "diff:mainint::screens_load_the_shop_sheet_when_missing_match_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_inGameHelp"
 c_sha = "3465d938c08b"
 rust = "rustyrian_core::mainint::je_in_game_help"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::in_game_help_matches_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_highScoreCheck"
 c_sha = "318746664938"
 rust = "rustyrian_core::mainint::je_high_score_check"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::high_score_check_matches_c", "diff:mainint::high_score_check_long_name_matches_c", "diff:mainint::next_episode_with_high_score_matches_c", "diff:mainint::screens_load_the_shop_sheet_when_missing_match_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::adjust_difficulty"
 c_sha = "817e01d93729"
 rust = "rustyrian_core::mainint::adjust_difficulty"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::adjust_difficulty_matches_c", "diff:mainint::adjust_difficulty_thresholds_match_c", "diff:mainint::end_level_ani_matches_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_SFCodes"
 c_sha = "37be49aee8cd"
 rust = "rustyrian_core::mainint::je_sf_codes"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::sf_codes_match_c", "diff:mainint::sf_codes_ship_without_combo_row_cancels_combos"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_sort"
 c_sha = "523e853c6d14"
 rust = "rustyrian_core::mainint::je_sort"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::sort_high_scores_match_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_playCredits"
 c_sha = "38783e0b0976"
 rust = "rustyrian_core::mainint::je_play_credits"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::play_credits_matches_c", "diff:mainint::play_credits_for_a_minute_matches_c", "diff:mainint::play_credits_missing_file_halts_like_c", "diff:mainint::play_credits_truncated_file_halts_like_c"]
+waived_lines = [{ line = 2499, reason = "end of the 7860-tick roll only; covered by the ignored ~160 s diff:mainint::play_credits_to_the_end_matches_c" }, { line = 2502, reason = "end of the roll only; see diff:mainint::play_credits_to_the_end_matches_c (ignored, slow)" }, { line = 2506, reason = "end of the roll only; see diff:mainint::play_credits_to_the_end_matches_c (ignored, slow)" }, { line = 2507, reason = "end of the roll only; see diff:mainint::play_credits_to_the_end_matches_c (ignored, slow)" }, { line = 2508, reason = "end of the roll only; see diff:mainint::play_credits_to_the_end_matches_c (ignored, slow)" }]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_endLevelAni"
 c_sha = "a113114fa00f"
 rust = "rustyrian_core::mainint::je_end_level_ani"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::end_level_ani_matches_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_drawCube"
 c_sha = "a37193ce6fa4"
 rust = "rustyrian_core::mainint::je_draw_cube"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::hud_drawing_matches_c", "diff:mainint::end_level_ani_matches_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_handleChat"
 c_sha = "081854595424"
 rust = "rustyrian_core::mainint::je_handle_chat"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::handle_chat_does_nothing"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::str_pop_int"
 c_sha = "b56e9cfa9a6a"
 rust = "rustyrian_core::mainint::str_pop_int"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::str_pop_int_matches_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_operation"
 c_sha = "be8cd06b1424"
 rust = "rustyrian_core::mainint::je_operation"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::operation_load_matches_c", "diff:mainint::operation_save_matches_c", "diff:mainint::operation_on_last_slot_does_nothing", "diff:mainint::load_screen_keyboard_matches_c"]
 notes = ""
 
 [[fn]]
 c = "mainint.c::JE_inGameDisplays"
 c_sha = "d24204845622"
 rust = "rustyrian_core::mainint::je_in_game_displays"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::hud_drawing_matches_c"]
 notes = ""
 
 [[fn]]
@@ -2824,14 +2825,14 @@ c_sha = "2e5845f8e9e9"
 rust = "rustyrian_core::mainint::je_main_keyboard_input"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: varz/demo callees being ported in wave 4a (JE_mainKeyboardInput reaches varz.c and demo.c)"
 
 [[fn]]
 c = "mainint.c::JE_pauseGame"
 c_sha = "c21133529ebc"
 rust = "rustyrian_core::mainint::je_pause_game"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::pause_game_matches_c", "diff:mainint::pause_game_netplay_matches_c"]
 notes = ""
 
 [[fn]]
@@ -2840,7 +2841,7 @@ c_sha = "109a2c331abc"
 rust = "rustyrian_core::mainint::je_player_movement"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: varz/demo callees being ported in wave 4a"
 
 [[fn]]
 c = "mainint.c::JE_mainGamePlayerFunctions"
@@ -2848,14 +2849,14 @@ c_sha = "46277c11a927"
 rust = "rustyrian_core::mainint::je_main_game_player_functions"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: varz/demo callees being ported in wave 4a"
 
 [[fn]]
 c = "mainint.c::JE_getName"
 c_sha = "27f9223ba1be"
 rust = "rustyrian_core::mainint::je_get_name"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mainint::get_name_matches_c", "diff:mainint::hud_drawing_matches_c"]
 notes = ""
 
 [[fn]]
@@ -2864,7 +2865,7 @@ c_sha = "aa7852698c7f"
 rust = "rustyrian_core::mainint::je_player_collide"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: varz/demo callees being ported in wave 4a"
 
 [[fn]]
 c = "memreader.c::memReaderSplit"
