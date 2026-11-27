@@ -217,8 +217,8 @@ fn main() {
         let handles: Vec<_> = tus
             .iter()
             .map(|tu| {
-                let (cc, common, obj_dir, lsv) = (&cc, &common, &obj_dir, &lsv);
-                s.spawn(move || compile_tu(cc, common, obj_dir, tu, lsv))
+                let (cc, common, obj_dir, lsv, root) = (&cc, &common, &obj_dir, &lsv, &root);
+                s.spawn(move || compile_tu(cc, common, root, obj_dir, tu, lsv))
             })
             .collect();
         handles
@@ -276,9 +276,12 @@ fn main() {
         .expect("write bindings.rs");
 }
 
+/// Compiles one wrapper TU. Runs from the repository root so debug info and
+/// gcov notes name sources as `vendor/opentyrian/src/<file>.c`.
 fn compile_tu(
     cc: &str,
     common: &[String],
+    root: &Path,
     obj_dir: &Path,
     tu: &Path,
     lsv: &BTreeMap<String, Vec<(String, String, String)>>,
@@ -291,6 +294,7 @@ fn compile_tu(
     let ll = obj_dir.join(format!("{stem}.ll"));
     let obj = obj_dir.join(format!("{stem}.o"));
     run(Command::new(cc)
+        .current_dir(root)
         .args(common)
         .args(["-Xclang", "-disable-llvm-passes", "-S", "-emit-llvm", "-o"])
         .arg(&ll)
@@ -319,6 +323,7 @@ fn compile_tu(
         std::fs::write(&ll, ir).expect("write .ll");
     }
     run(Command::new(cc)
+        .current_dir(root)
         .args(common)
         .arg("-c")
         .arg("-o")

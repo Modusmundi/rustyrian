@@ -100,12 +100,15 @@ pub fn run(root: &Path) -> Result<()> {
 
     eprintln!("coverage: collecting with gcovr");
     let report = root.join(TARGET_DIR).join("gcovr.json");
-    let src = root.join("vendor/opentyrian/src");
+    // Sources are recorded relative to the repository root (the oracle's
+    // build.rs compiles from there); keep only upstream's.
     run_capture(
         Command::new("gcovr")
             .current_dir(root)
             .arg("--root")
-            .arg(&src)
+            .arg(root)
+            .arg("--filter")
+            .arg("vendor/opentyrian/src/")
             .arg("--object-directory")
             .arg(&objdir)
             .arg("--gcov-executable")
