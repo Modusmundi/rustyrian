@@ -2771,9 +2771,9 @@ notes = ""
 c = "mainint.c::JE_playCredits"
 c_sha = "38783e0b0976"
 rust = "rustyrian_core::mainint::je_play_credits"
-status = "ported"
-verify = ["diff:mainint::play_credits_matches_c", "diff:mainint::play_credits_for_a_minute_matches_c", "diff:mainint::play_credits_missing_file_halts_like_c", "diff:mainint::play_credits_truncated_file_halts_like_c"]
-notes = "lines 2499, 2502, 2506-2508 (fade_song, closing-song restart) are reached only at the end of the 7860-tick roll, by diff:mainint::play_credits_to_the_end_matches_c, which passes but is #[ignore]d (about 160 s); verified once coverage runs it or it is made cheaper"
+status = "verified"
+verify = ["diff:mainint::play_credits_matches_c", "diff:mainint::play_credits_for_a_minute_matches_c", "diff:mainint::play_credits_missing_file_halts_like_c", "diff:mainint::play_credits_truncated_file_halts_like_c", "diff:mainint::play_credits_to_the_end_matches_c"]
+notes = "lines 2499, 2502, 2506-2508 (fade_song, closing-song restart) are reached only at the end of the 7860-tick roll, by the #[ignore]d play_credits_to_the_end_matches_c (about 160 s), which coverage and nightly run"
 
 [[fn]]
 c = "mainint.c::JE_endLevelAni"
