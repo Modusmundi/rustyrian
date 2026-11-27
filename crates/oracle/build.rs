@@ -164,16 +164,19 @@ fn main() {
         // and blocks on a modal error dialog if it cannot. Under the ASan
         // runtime its own @loader_path rpath does not resolve, so give the
         // executable an rpath to SDL3 as well.
-        if env::var("CARGO_CFG_TARGET_OS").is_ok_and(|os| os == "macos")
-            && let Ok(out) = Command::new("pkg-config")
+        if env::var("CARGO_CFG_TARGET_OS").is_ok_and(|os| os == "macos") {
+            let dir = Command::new("pkg-config")
                 .args(["--variable=libdir", "sdl3"])
                 .output()
-            && out.status.success()
-        {
-            let dir = String::from_utf8_lossy(&out.stdout).trim().to_owned();
-            if !dir.is_empty() {
-                println!("cargo:rustc-link-arg=-Wl,-rpath,{dir}");
-            }
+                .ok()
+                .filter(|o| o.status.success())
+                .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
+                .filter(|d| !d.is_empty())
+                .expect(
+                    "OT_REF_SANITIZE on macOS needs `pkg-config --variable=libdir sdl3`; \
+                     without that rpath, sdl2-compat blocks on a modal dialog at startup",
+                );
+            println!("cargo:rustc-link-arg=-Wl,-rpath,{dir}");
         }
     }
     if coverage {
