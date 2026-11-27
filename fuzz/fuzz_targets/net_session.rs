@@ -6,7 +6,7 @@
 use libfuzzer_sys::fuzz_target;
 use rustyrian_core::Game;
 use rustyrian_core::network as net;
-use rustyrian_core::platform::{IpAddress, Platform};
+use rustyrian_core::platform::IpAddress;
 use rustyrian_harness::fake::Datagram;
 
 const PEER: IpAddress = IpAddress {
