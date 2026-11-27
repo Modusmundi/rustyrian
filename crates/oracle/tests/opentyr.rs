@@ -7,6 +7,11 @@ use rustyrian_oracle::diff::{self, Diff};
 use rustyrian_oracle::mirror::Mirror;
 use std::ffi::{CStr, c_char};
 
+mod net_support;
+use net_support::Rig;
+mod menus_support;
+use menus_support::{Act, any_act, output_rect, run_capped, script};
+
 #[test]
 fn initial_state_matches_c() {
     let _d = Diff::new();
@@ -100,4 +105,131 @@ fn scaler_and_scaling_mode_pickers_match() {
         let (c, _) = c_item(b::ot_s_opentyr_getScalingModePickerItem, i, 4);
         assert_eq!(c, opentyr::get_scaling_mode_picker_item(i, &mut [0; 4]));
     }
+}
+
+/// Runs `setupMenu` on both engines with `acts` (then ESC taps); compares
+/// every call and the whole state, then quits through `JE_tyrianHalt` and
+/// compares the saved `opentyrian.cfg`, `tyrian.cfg` and `tyrian.sav` bytes.
+fn run_setup(acts: &[(Act, u32)]) {
+    let mut rig = Rig::new(&script(output_rect(), 300, acts));
+    rig.video();
+    rig.clear();
+    // SAFETY: plain C call inside the guard.
+    let r = rig.run(|| unsafe { b::setupMenu() }, opentyr::setup_menu);
+    assert_eq!(r, Ok(()));
+    rig.check();
+    let r = rig.run(
+        // SAFETY: plain C call inside the guard.
+        || unsafe { b::JE_tyrianHalt(0) },
+        |g| rustyrian_core::varz::je_tyrian_halt(g, 0),
+    );
+    assert_eq!(r, Err(0));
+    rig.check_halted();
+}
+
+fn keys(k: &[&'static str]) -> Vec<(Act, u32)> {
+    k.iter().map(|&k| (Act::Key(k), 20)).collect()
+}
+
+/// Screen point of item `i`'s name column.
+fn name_at(i: i32) -> (i32, i32) {
+    (100, 43 + 21 * i)
+}
+
+/// Screen point of item `i`'s value column.
+fn value_at(i: i32) -> (i32, i32) {
+    (220, 43 + 21 * i)
+}
+
+/// Every scaler, scaling mode and display chosen through the keyboard
+/// pickers, and a picker cancelled.
+#[test]
+fn setup_menu_graphics_pickers_match() {
+    for k in 0..9 {
+        let mut a = vec!["RETURN", "DOWN", "RETURN"];
+        a.extend(std::iter::repeat_n("DOWN", k));
+        a.push("RETURN");
+        run_setup(&keys(&a));
+    }
+    for k in 0..4 {
+        let mut a = vec!["RETURN", "DOWN", "DOWN", "SPACE"];
+        a.extend(std::iter::repeat_n("UP", k));
+        a.push("RETURN");
+        run_setup(&keys(&a));
+    }
+    // Fullscreen on display 1, back to a window; then a cancelled picker.
+    run_setup(&keys(&[
+        "RETURN", "RETURN", "DOWN", "RETURN", "RETURN", "UP", "RETURN",
+    ]));
+    run_setup(&keys(&["RETURN", "RETURN", "ESCAPE", "UP", "RETURN"]));
+}
+
+/// Volume steps both ways (clamped at both ends), mute toggles and Done.
+#[test]
+fn setup_menu_sound_matches() {
+    let mut a = vec![
+        "DOWN", "RETURN", "LEFT", "RIGHT", "RIGHT", "RETURN", "RETURN", "DOWN",
+    ];
+    a.extend(std::iter::repeat_n("RIGHT", 34));
+    a.extend(["RETURN", "RETURN", "LEFT", "LEFT", "DOWN", "RETURN"]);
+    a.extend(std::iter::repeat_n("LEFT", 34));
+    run_setup(&keys(&a));
+}
+
+/// The jukebox entry, returning to the setup menu afterwards.
+#[test]
+fn setup_menu_jukebox_matches() {
+    run_setup(&keys(&["UP", "UP", "RETURN"]));
+}
+
+/// The mouse: names and values clicked, volume bars clicked at several
+/// positions, picker items hovered and clicked, right clicks backing out.
+#[test]
+fn setup_menu_mouse_matches() {
+    let at = |(x, y): (i32, i32)| (Act::Move(x, y), 20);
+    let click = |b: u8| (Act::Click(b), 20);
+    // Graphics by name, the display picker by value, its second item.
+    run_setup(&[
+        at(name_at(0)),
+        click(1),
+        at(value_at(0)),
+        click(1),
+        at((200, 43 + 15)),
+        at((200, 43)),
+        at((200, 43 + 15)),
+        click(1),
+        at(value_at(1)),
+        click(1),
+        at((200, 43 + 15)),
+        click(3),
+        click(3),
+    ]);
+    // Sound, then the volume bars at the left end, middle and right end.
+    let mut a = vec![at(name_at(1)), click(1)];
+    for (i, x) in [(0, 180), (0, 230), (0, 274), (1, 181), (1, 274), (1, 200)] {
+        a.push(at((x, 43 + 21 * i)));
+        a.push(click(1));
+    }
+    a.extend([at(value_at(2)), click(1), at(name_at(2)), click(1)]);
+    run_setup(&a);
+}
+
+/// Random keyboard and mouse sessions through every menu. Each case runs the
+/// whole setup menu (and possibly the jukebox) on both engines, so the case
+/// count is capped at 32 whatever `PROPTEST_CASES` says.
+#[test]
+fn setup_menu_matches() {
+    let targets = (0..4)
+        .flat_map(|i| [name_at(i), value_at(i), (200, 43 + 15 * i)])
+        .collect();
+    let keys = [
+        "UP", "DOWN", "LEFT", "RIGHT", "RETURN", "SPACE", "ESCAPE", "RETURN", "DOWN",
+    ]
+    .map(Act::Key)
+    .to_vec();
+    let s = prop::collection::vec((any_act(targets, keys), 20u32..200), 0..14);
+    run_capped(32, s, |acts| {
+        run_setup(&acts);
+        Ok(())
+    });
 }
