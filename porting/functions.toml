@@ -3261,17 +3261,17 @@ notes = ""
 c = "mouse.c::JE_mouseStart"
 c_sha = "49793a4f68f0"
 rust = "rustyrian_core::mouse::je_mouse_start"
-status = "todo"
-verify = []
-notes = "blocked: calls sprite.c::blit_sprite2x2_clip (not verified on main)"
+status = "verified"
+verify = ["diff:mouse::mouse_start_matches_c", "diff:mouse::mouse_pointer_sprites_match_c"]
+notes = ""
 
 [[fn]]
 c = "mouse.c::JE_mouseStartFilter"
 c_sha = "0489027a0607"
 rust = "rustyrian_core::mouse::je_mouse_start_filter"
-status = "todo"
-verify = []
-notes = "blocked: calls sprite.c::blit_sprite2x2_filter_clip (not verified on main)"
+status = "verified"
+verify = ["diff:mouse::mouse_start_matches_c"]
+notes = ""
 
 [[fn]]
 c = "mouse.c::JE_mouseReplace"
@@ -4840,9 +4840,9 @@ notes = ""
 c = "video.c::JE_showVGA"
 c_sha = "50fca445d8a3"
 rust = "rustyrian_core::video::je_show_vga"
-status = "todo"
-verify = []
-notes = "blocked: calls scale_and_render_screen (todo)"
+status = "verified"
+verify = ["diff:video::scale_and_render_screen_matches_c_on_fixture_frames"]
+notes = ""
 
 [[fn]]
 c = "video.c::calc_dst_render_rect"
@@ -4857,9 +4857,9 @@ notes = ""
 c = "video.c::scale_and_render_screen"
 c_sha = "f238a62c19bb"
 rust = "rustyrian_core::video::scale_and_render_screen"
-status = "todo"
-verify = []
-notes = "blocked: dispatches through scaler_function to video_scale_hqNx.c::hq2x_32/hq3x_32/hq4x_32 (not verified on main); agreed signature hqNx_32(g, src_surface: ScreenId, dst_texture: TextureId)"
+status = "verified"
+verify = ["diff:video::scale_and_render_screen_matches_c_on_fixture_frames"]
+notes = ""
 
 [[fn]]
 c = "video.c::present_screen"

@@ -16,7 +16,7 @@ use crate::platform::{FrameView, Rect, RendererId, TextureId, WindowId};
 use crate::sdl::{
     PIXELFORMAT_RGB565, PIXELFORMAT_RGB888, PixelFormat, Surface, alloc_format, pixel_format_name,
 };
-use crate::video_scale::{SCALERS, ScalerFunction};
+use crate::video_scale::{SCALERS, ScalerFunction, call_scaler};
 use serde::{Deserialize, Serialize};
 
 /// `vga_width`.
@@ -551,6 +551,39 @@ pub fn calc_dst_render_rect(g: &mut Game, src_surface: ScreenId, dst_rect: &mut 
 
     dst_rect.x = win_w.wrapping_sub(dst_rect.w) / 2;
     dst_rect.y = win_h.wrapping_sub(dst_rect.h) / 2;
+}
+
+/// Scales a surface and copies it to the renderer without presenting it.
+pub fn scale_and_render_screen(g: &mut Game, src_surface: ScreenId) {
+    // Do software scaling. C calls through a NULL `scaler_function` here
+    // only if `init_scaler` failed, which upstream then reverts.
+    let f = g
+        .video
+        .scaler_function
+        .expect("scale_and_render_screen before a successful init_scaler");
+    let t = texture(g);
+    call_scaler(g, f, src_surface, t);
+
+    // C's caller-uninitialised `dst_rect` (zero in the oracle) keeps its w/h
+    // when SDL_QueryTexture fails in SCALE_CENTER mode.
+    let mut dst_rect = Rect::default();
+    calc_dst_render_rect(g, src_surface, &mut dst_rect);
+
+    // Clear the window and blit the output texture to it
+    let r = renderer(g);
+    g.platform.set_render_draw_color(r, 0, 0, 0, 255);
+    g.platform.render_clear(r);
+    g.platform.render_copy(r, t, None, Some(dst_rect));
+    g.platform.render_flush(r);
+
+    g.video.next_output_rect = dst_rect;
+}
+
+#[doc(alias = "JE_showVGA")]
+pub fn je_show_vga(g: &mut Game) {
+    let screen = g.video.vga_screen_id();
+    scale_and_render_screen(g, screen);
+    present_screen(g);
 }
 
 /// `SDL_RenderPresent` with the instrumentation view of the current frame.

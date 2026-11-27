@@ -8,6 +8,7 @@
 use crate::Game;
 use crate::platform::TextureId;
 use crate::video::{ScreenId, VGA_HEIGHT, VGA_WIDTH};
+use crate::video_scale_hqnx::{hq2x_32, hq3x_32, hq4x_32};
 use serde::{Deserialize, Serialize};
 
 /// `ScalerFunction` (rule R8): one variant per function upstream stores in
@@ -331,4 +332,19 @@ pub fn scale3x_32(g: &mut Game, src_surface: ScreenId, dst_texture: TextureId) {
 
 pub fn scale3x_16(g: &mut Game, src_surface: ScreenId, dst_texture: TextureId) {
     scale3x::<2>(g, src_surface, dst_texture);
+}
+
+/// Calls the function a `ScalerFunction` pointer names (rule R8).
+pub fn call_scaler(g: &mut Game, f: ScalerFunction, src_surface: ScreenId, dst_texture: TextureId) {
+    match f {
+        Nn16 => nn_16(g, src_surface, dst_texture),
+        Nn32 => nn_32(g, src_surface, dst_texture),
+        Scale2x16 => scale2x_16(g, src_surface, dst_texture),
+        Scale2x32 => scale2x_32(g, src_surface, dst_texture),
+        Scale3x16 => scale3x_16(g, src_surface, dst_texture),
+        Scale3x32 => scale3x_32(g, src_surface, dst_texture),
+        Hq2x32 => hq2x_32(g, src_surface, dst_texture),
+        Hq3x32 => hq3x_32(g, src_surface, dst_texture),
+        Hq4x32 => hq4x_32(g, src_surface, dst_texture),
+    }
 }
