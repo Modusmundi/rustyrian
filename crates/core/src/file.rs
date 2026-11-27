@@ -170,6 +170,174 @@ fn getenv(name: &str) -> Option<Vec<u8>> {
 
 const STREAM_BUFFER_SIZE: usize = 4096;
 
+/// Whether `fopen(path, mode)` opens a text-mode stream: on Windows the
+/// Microsoft CRT translates line ends of every stream whose mode has no `b`
+/// (upstream's `opentyrian.cfg`, `config.c:256,337`); elsewhere text and
+/// binary streams are the same.
+fn crt_text_mode(mode: &str) -> bool {
+    cfg!(windows) && !mode.contains('b')
+}
+
+/// Ctrl+Z, end of file for a text-mode read.
+const CTRL_Z: u8 = 0x1A;
+
+/// The outcome of [`text_read`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct TextRead {
+    /// Bytes of translated text at the start of the buffer.
+    len: usize,
+    /// A Ctrl+Z ended the text: the CRT sets the handle's end-of-file flag
+    /// (`FEOFLAG`), and every further read returns 0 until a seek.
+    ctrl_z: bool,
+    /// The byte peeked after a final CR must be read again: the CRT seeks the
+    /// handle back one byte.
+    unread: bool,
+}
+
+/// The Microsoft CRT's text-mode read translation (UCRT `lowio/read.cpp`,
+/// `translate_text_mode_nolock`, for a seekable file) of the raw bytes just
+/// read into `buf`, in place: CR LF becomes LF, a lone CR stays, and a
+/// Ctrl+Z ends the text (it and everything after it are dropped). A CR that
+/// ends the buffer is decided by `peek`, the next byte of the file (`None`
+/// when it cannot be read): an LF there makes it an LF, read now if nothing
+/// else was translated and otherwise left for the next read.
+fn text_read(buf: &mut [u8], mut peek: impl FnMut() -> Option<u8>) -> TextRead {
+    let n = buf.len();
+    let mut out = TextRead {
+        len: 0,
+        ctrl_z: false,
+        unread: false,
+    };
+    let mut s = 0;
+    while s < n {
+        let c = buf[s];
+        if c == CTRL_Z {
+            out.ctrl_z = true;
+            break;
+        }
+        if c != b'\r' {
+            buf[out.len] = c;
+            out.len += 1;
+            s += 1;
+            continue;
+        }
+        if s + 1 < n {
+            if buf[s + 1] == b'\n' {
+                s += 2;
+                buf[out.len] = b'\n';
+            } else {
+                s += 1;
+                buf[out.len] = b'\r';
+            }
+            out.len += 1;
+            continue;
+        }
+        // The CR ends the buffer.
+        s += 1;
+        match peek() {
+            None => {
+                buf[out.len] = b'\r';
+                out.len += 1;
+            }
+            Some(b'\n') if out.len == 0 => {
+                buf[out.len] = b'\n';
+                out.len += 1;
+            }
+            Some(p) => {
+                out.unread = true;
+                if p != b'\n' {
+                    buf[out.len] = b'\r';
+                    out.len += 1;
+                }
+            }
+        }
+    }
+    out
+}
+
+/// The CRT's LF → CR LF translation buffer (UCRT `lowio/write.cpp`,
+/// `BUF_SIZE`); a chunk holds at most one byte less, so an LF at its end
+/// still fits with its CR.
+const TEXT_WRITE_CHUNK: usize = 5 * 1024;
+
+/// The Microsoft CRT's text-mode write (UCRT `lowio/write.cpp`,
+/// `write_text_ansi_nolock` and `_write_nolock`): `data` is translated LF →
+/// CR LF a chunk at a time and each chunk passed to `write`, stopping at the
+/// first short or failed write. Returns the bytes written to the file less
+/// the LFs translated (the CRT's count of `data` bytes written); an error
+/// only when nothing was written.
+fn text_write(
+    data: &[u8],
+    mut write: impl FnMut(&[u8]) -> std::io::Result<usize>,
+) -> std::io::Result<usize> {
+    let mut chunk = Vec::with_capacity(TEXT_WRITE_CHUNK);
+    let (mut written, mut lf_count) = (0usize, 0usize);
+    let mut s = 0;
+    while s < data.len() {
+        chunk.clear();
+        while chunk.len() < TEXT_WRITE_CHUNK - 1 && s < data.len() {
+            let c = data[s];
+            s += 1;
+            if c == b'\n' {
+                lf_count += 1;
+                chunk.push(b'\r');
+            }
+            chunk.push(c);
+        }
+        match write(&chunk) {
+            Ok(k) => {
+                written += k;
+                if k < chunk.len() {
+                    break;
+                }
+            }
+            Err(e) if written == 0 => return Err(e),
+            Err(_) => break,
+        }
+    }
+    Ok(written.saturating_sub(lf_count))
+}
+
+/// `_read` on the stream's handle: the CRT's text-mode translation when
+/// `text`, with `ctrl_z` as the handle's end-of-file flag.
+fn os_read(
+    file: &mut std::fs::File,
+    text: bool,
+    ctrl_z: &mut bool,
+    out: &mut [u8],
+) -> std::io::Result<usize> {
+    if !text {
+        return file.read(out);
+    }
+    if *ctrl_z || out.is_empty() {
+        return Ok(0);
+    }
+    let n = file.read(out)?;
+    let r = text_read(&mut out[..n], || {
+        let mut b = [0u8];
+        match file.read(&mut b) {
+            Ok(1) => Some(b[0]),
+            _ => None,
+        }
+    });
+    if r.unread {
+        // The CRT ignores the result of this seek.
+        let _ = file.seek(SeekFrom::Current(-1));
+    }
+    *ctrl_z |= r.ctrl_z;
+    Ok(r.len)
+}
+
+/// `_write` on the stream's handle: the CRT's text-mode translation when
+/// `text`.
+fn os_write(file: &mut std::fs::File, text: bool, data: &[u8]) -> std::io::Result<usize> {
+    if text {
+        text_write(data, |chunk| file.write(chunk))
+    } else {
+        file.write(data)
+    }
+}
+
 /// C's `FILE`: an open stdio stream.
 ///
 /// Fully buffered like stdio: reads go through a read-ahead buffer and
@@ -193,6 +361,17 @@ pub struct Stream {
     eof: bool,
     path: PathBuf,
     mode: OpenMode,
+    /// A Windows text-mode stream ([`crt_text_mode`]): line ends are
+    /// translated between the buffers and the file. `tell` counts each
+    /// pending LF as the two bytes it becomes; with read-ahead pending it
+    /// gives the OS offset less the translated bytes not yet returned (the
+    /// CRT's own estimate, UCRT `stdio/ftell.cpp`, is not mirrored), and a
+    /// switch from reading to writing seeks back by those bytes too. No
+    /// upstream text stream reads its position or is opened for update.
+    text: bool,
+    /// The text-mode handle's end-of-file flag after a Ctrl+Z (`FEOFLAG`),
+    /// cleared by a seek.
+    ctrl_z: bool,
 }
 
 impl Drop for Stream {
@@ -204,6 +383,12 @@ impl Drop for Stream {
 impl Stream {
     /// `fopen(path, mode)`; `Err(errno)` where it returns `NULL`.
     pub fn open(path: PathBuf, mode: &str) -> Result<Stream, i32> {
+        Stream::open_as(path, mode, crt_text_mode(mode))
+    }
+
+    /// `fopen` with the line-end translation chosen by the caller (tests
+    /// exercise text mode on every OS).
+    fn open_as(path: PathBuf, mode: &str, text: bool) -> Result<Stream, i32> {
         let mode = OpenMode::parse(mode).ok_or(EINVAL)?;
         let mut file = mode.options().open(&path).map_err(|e| errno_of(&e))?;
         // stdio positions append streams at the end when opening them (BSD
@@ -211,7 +396,9 @@ impl Stream {
         if mode.append && (cfg!(not(target_os = "linux")) || !mode.read) {
             file.seek(SeekFrom::End(0)).map_err(|e| errno_of(&e))?;
         }
-        Ok(Stream::from_std(file, path, mode))
+        let mut s = Stream::from_std(file, path, mode);
+        s.text = text;
+        Ok(s)
     }
 
     /// Wraps an already open file positioned where the stream should start.
@@ -225,6 +412,8 @@ impl Stream {
             eof: false,
             path,
             mode,
+            text: false,
+            ctrl_z: false,
         }
     }
 
@@ -273,11 +462,11 @@ impl Stream {
             }
             let want = data.len() - n;
             let r = if want >= STREAM_BUFFER_SIZE {
-                self.file.read(&mut data[n..])
+                os_read(&mut self.file, self.text, &mut self.ctrl_z, &mut data[n..])
             } else {
                 self.buf.resize(STREAM_BUFFER_SIZE, 0);
                 self.pos = 0;
-                let r = self.file.read(&mut self.buf);
+                let r = os_read(&mut self.file, self.text, &mut self.ctrl_z, &mut self.buf);
                 self.buf.truncate(*r.as_ref().unwrap_or(&0));
                 r
             };
@@ -325,7 +514,7 @@ impl Stream {
             if n == self.pending.len() {
                 break Ok(());
             }
-            match self.file.write(&self.pending[n..]) {
+            match os_write(&mut self.file, self.text, &self.pending[n..]) {
                 Ok(0) => break Err(0),
                 Ok(k) => n += k,
                 Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
@@ -375,7 +564,7 @@ impl Stream {
         let direct = rest.len() / STREAM_BUFFER_SIZE * STREAM_BUFFER_SIZE;
         let mut n = 0;
         while n < direct {
-            match self.file.write(&rest[n..direct]) {
+            match os_write(&mut self.file, self.text, &rest[n..direct]) {
                 Ok(0) => {
                     self.error = true;
                     return (space + n, 0);
@@ -411,6 +600,7 @@ impl Stream {
         self.pos = 0;
         self.file.seek(to).map_err(|e| errno_of(&e))?;
         self.eof = false;
+        self.ctrl_z = false;
         Ok(())
     }
 
@@ -431,7 +621,19 @@ impl Stream {
     pub fn tell(&self) -> Result<i64, i32> {
         let mut f = &self.file;
         let p = f.stream_position().map_err(|e| errno_of(&e))?;
-        Ok(p as i64 - (self.buf.len() - self.pos) as i64 + self.pending.len() as i64)
+        Ok(p as i64 - (self.buf.len() - self.pos) as i64 + self.pending_file_len())
+    }
+
+    /// The bytes the pending writes take in the file: a text-mode stream's
+    /// LFs become CR LF (the CRT's `ftell` counts them so, UCRT
+    /// `stdio/ftell.cpp`).
+    fn pending_file_len(&self) -> i64 {
+        let lfs = if self.text {
+            self.pending.iter().filter(|&&c| c == b'\n').count()
+        } else {
+            0
+        };
+        (self.pending.len() + lfs) as i64
     }
 
     /// `fflush(f)`; `Err(errno)` where it returns `EOF`.
@@ -460,12 +662,14 @@ impl Stream {
             ..self.mode
         };
         let mut file = m.options().open(&self.path)?;
-        let os_position = position - self.pending.len() as i64;
+        let os_position = position - self.pending_file_len();
         file.seek(SeekFrom::Start(os_position.max(0) as u64))?;
         let mut s = Stream::from_std(file, self.path.clone(), self.mode);
         s.pending = self.pending.clone();
         s.error = self.error;
         s.eof = self.eof;
+        s.text = self.text;
+        s.ctrl_z = self.ctrl_z;
         Ok(s)
     }
 }
@@ -492,6 +696,8 @@ impl Clone for Stream {
             eof: self.eof,
             path: self.path.clone(),
             mode: self.mode,
+            text: self.text,
+            ctrl_z: self.ctrl_z,
         }
     }
 }
@@ -1196,5 +1402,217 @@ mod tests {
         );
         assert_eq!(crt_strerror(-1), "Unknown error");
         assert_eq!(crt_strerror(43), "Unknown error");
+    }
+
+    /// A fresh scratch directory for one test.
+    fn scratch(test: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("rr-text-{}-{test}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create the scratch directory");
+        dir
+    }
+
+    fn translate(raw: &[u8], peek: Option<u8>) -> (Vec<u8>, TextRead) {
+        let mut buf = raw.to_vec();
+        let mut peeked = false;
+        let r = text_read(&mut buf, || {
+            assert!(!peeked, "the CRT peeks at most once per read");
+            peeked = true;
+            peek
+        });
+        buf.truncate(r.len);
+        (buf, r)
+    }
+
+    #[test]
+    fn text_read_translates_like_the_crt() {
+        let plain = |len, ctrl_z| TextRead {
+            len,
+            ctrl_z,
+            unread: false,
+        };
+        // CR LF -> LF; a lone CR stays; CR CR LF -> CR LF.
+        assert_eq!(
+            translate(b"a\r\nb", None),
+            (b"a\nb".to_vec(), plain(3, false))
+        );
+        assert_eq!(
+            translate(b"a\rb", None),
+            (b"a\rb".to_vec(), plain(3, false))
+        );
+        assert_eq!(
+            translate(b"\r\r\n", None),
+            (b"\r\n".to_vec(), plain(2, false))
+        );
+        // Ctrl+Z ends the text and is dropped with everything after it.
+        assert_eq!(
+            translate(b"ab\x1acd", None),
+            (b"ab".to_vec(), plain(2, true))
+        );
+        assert_eq!(translate(b"\x1a", None), (Vec::new(), plain(0, true)));
+        // A final CR: unreadable next byte -> CR.
+        assert_eq!(translate(b"a\r", None), (b"a\r".to_vec(), plain(2, false)));
+        // Next byte LF after other text: the CR is dropped, the LF re-read.
+        assert_eq!(
+            translate(b"a\r", Some(b'\n')),
+            (
+                b"a".to_vec(),
+                TextRead {
+                    len: 1,
+                    ctrl_z: false,
+                    unread: true
+                }
+            )
+        );
+        // A lone CR read on its own followed by LF: the LF is taken now.
+        assert_eq!(
+            translate(b"\r", Some(b'\n')),
+            (b"\n".to_vec(), plain(1, false))
+        );
+        // Next byte not LF: the CR stays and that byte is re-read.
+        assert_eq!(
+            translate(b"a\r", Some(b'x')),
+            (
+                b"a\r".to_vec(),
+                TextRead {
+                    len: 2,
+                    ctrl_z: false,
+                    unread: true
+                }
+            )
+        );
+        // Bytes other than CR and Ctrl+Z pass unchanged.
+        assert_eq!(
+            translate(b"\n\n\0", None),
+            (b"\n\n\0".to_vec(), plain(3, false))
+        );
+    }
+
+    #[test]
+    fn text_write_translates_like_the_crt() {
+        let mut chunks: Vec<Vec<u8>> = Vec::new();
+        let n = text_write(b"a\nb\r\n", |c| {
+            chunks.push(c.to_vec());
+            Ok(c.len())
+        })
+        .expect("write");
+        assert_eq!((n, chunks), (5, vec![b"a\r\nb\r\r\n".to_vec()]));
+
+        // Chunks of at most 5119 bytes; an LF at the last place still fits.
+        let mut data = vec![b'x'; 5117];
+        data.extend_from_slice(b"\nyz");
+        let mut chunks: Vec<Vec<u8>> = Vec::new();
+        let n = text_write(&data, |c| {
+            chunks.push(c.to_vec());
+            Ok(c.len())
+        })
+        .expect("write");
+        assert_eq!(n, data.len());
+        assert_eq!(chunks.iter().map(Vec::len).collect::<Vec<_>>(), [5119, 2]);
+        assert_eq!(&chunks[0][5115..], b"xx\r\n");
+
+        // A short write stops there: bytes written less every LF translated.
+        let n = text_write(b"a\n\nb", |c| Ok(c.len() - 2)).expect("write");
+        assert_eq!(n, 4 - 2);
+        // A failure before anything was written is an error.
+        let e = text_write(b"a\n", |_| Err(std::io::Error::from_raw_os_error(28)));
+        assert_eq!(e.map_err(|e| e.raw_os_error()), Err(Some(28)));
+    }
+
+    #[test]
+    fn text_streams_translate_through_the_buffer() {
+        let dir = scratch("stream");
+        let path = dir.join("opentyrian.cfg");
+
+        let mut w = Stream::open_as(path.clone(), "w", true).expect("open for writing");
+        w.puts(b"a\nb\r\nc\n");
+        assert_eq!(w.tell(), Ok(10), "pending LFs count as CR LF");
+        w.close().expect("close");
+        assert_eq!(std::fs::read(&path).expect("read"), b"a\r\nb\r\r\nc\r\n");
+
+        let mut r = Stream::open_as(path.clone(), "r", true).expect("open for reading");
+        let mut out = [0u8; 16];
+        assert_eq!(r.read(&mut out), (7, 0));
+        assert_eq!(&out[..7], b"a\nb\r\nc\n");
+        assert!(r.feof());
+
+        // A CR LF across the end of the read-ahead buffer, through the buffer
+        // and through a direct read.
+        let mut raw = vec![b'a'; STREAM_BUFFER_SIZE - 1];
+        raw.extend_from_slice(b"\r\nz");
+        std::fs::write(&path, &raw).expect("write");
+        let mut expected = vec![b'a'; STREAM_BUFFER_SIZE - 1];
+        expected.extend_from_slice(b"\nz");
+        let mut r = Stream::open_as(path.clone(), "r", true).expect("open");
+        let mut got = Vec::new();
+        let mut chunk = [0u8; 1000];
+        loop {
+            let (n, e) = r.read(&mut chunk);
+            assert_eq!(e, 0);
+            got.extend_from_slice(&chunk[..n]);
+            if n < chunk.len() {
+                break;
+            }
+        }
+        assert_eq!(got, expected);
+        let mut r = Stream::open_as(path.clone(), "r", true).expect("open");
+        let mut big = vec![0u8; 2 * STREAM_BUFFER_SIZE];
+        let (n, _) = r.read(&mut big);
+        assert_eq!(&big[..n], &expected[..]);
+
+        // Ctrl+Z ends the text until a seek; positions are file offsets.
+        std::fs::write(&path, b"ab\x1acd\r\n").expect("write");
+        let mut r = Stream::open_as(path.clone(), "r", true).expect("open");
+        let mut out = [0u8; 8];
+        assert_eq!(r.read(&mut out), (2, 0));
+        assert_eq!(&out[..2], b"ab");
+        assert!(r.feof());
+        assert_eq!(r.read(&mut out), (0, 0));
+        r.seek_end().expect("seek to the end");
+        assert_eq!(r.tell(), Ok(7));
+        r.seek_set(3).expect("seek past the Ctrl+Z");
+        assert_eq!(r.read(&mut out), (3, 0));
+        assert_eq!(&out[..3], b"cd\n");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// `fopen` modes without `b` translate line ends on Windows only;
+    /// binary modes never do.
+    #[test]
+    fn text_mode_applies_to_modes_without_b_on_windows() {
+        let dir = scratch("modes");
+        let write = |name: &str, mode: &str| {
+            let path = dir.join(name);
+            let mut s = Stream::open(path.clone(), mode).expect("open");
+            s.puts(b"x\ny\n");
+            s.close().expect("close");
+            std::fs::read(path).expect("read")
+        };
+        let text: &[u8] = if cfg!(windows) {
+            b"x\r\ny\r\n"
+        } else {
+            b"x\ny\n"
+        };
+        assert_eq!(write("text.cfg", "w"), text);
+        assert_eq!(write("binary.sav", "wb"), b"x\ny\n");
+
+        let path = dir.join("crlf.cfg");
+        std::fs::write(&path, b"x\r\ny\r\n").expect("write");
+        let read = |mode: &str| {
+            let mut s = Stream::open(path.clone(), mode).expect("open");
+            let mut out = [0u8; 16];
+            let (n, _) = s.read(&mut out);
+            out[..n].to_vec()
+        };
+        let text: &[u8] = if cfg!(windows) {
+            b"x\ny\n"
+        } else {
+            b"x\r\ny\r\n"
+        };
+        assert_eq!(read("r"), text);
+        assert_eq!(read("rb"), b"x\r\ny\r\n");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
