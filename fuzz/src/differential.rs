@@ -11,7 +11,7 @@
 //! [`CHILD_DEADLINE`]. Everything else must agree; a difference panics in the
 //! fuzzer process, which reports the input.
 //!
-//! Run (Linux):
+//! Run with the sanitized oracle (Linux, as the nightly `fuzz-diff` job does):
 //! `OT_REF_SANITIZE=1 ASAN_OPTIONS=detect_leaks=0:allocator_may_return_null=1:verify_asan_link_order=0
 //! UBSAN_OPTIONS=halt_on_error=1 cargo +nightly fuzz run -s none --features differential
 //! diff_<target> -- -timeout=5 -malloc_limit_mb=1048576`.
@@ -19,6 +19,10 @@
 //! share the process with rustc's; the Rust side is safe code. The malloc
 //! limit is lifted because libFuzzer's malloc hook would otherwise report
 //! the C side's huge (NULL-returning) requests from the child.
+//! Without `OT_REF_SANITIZE` (for example on macOS, where `build.rs` gives the
+//! binaries their SDL3 rpath), `cargo +nightly fuzz run --features
+//! differential diff_<target> -- -timeout=5` compares without sanitizers;
+//! only C crashes are skipped then.
 
 use rustyrian_core::Game;
 use rustyrian_core::game::{Flow, Halt, Snapshot};

@@ -1,16 +1,7 @@
 //! Shared helpers for the fuzz targets. Every target's invariant: no panic and
 //! no hang on arbitrary input (plan step 9).
 
-// The differential targets link the C oracle (and through it SDL2), which
-// only runs in Linux CI and the amd64 container; on macOS sdl2-compat cannot
-// load SDL3 in cargo-fuzz builds and blocks on a dialog. Refuse to build.
-#[cfg(all(feature = "differential", not(target_os = "linux")))]
-compile_error!(
-    "the `differential` feature (the diff_* fuzz targets) builds only on Linux; \
-     run it in CI or the amd64 container (see fuzz/src/differential.rs)"
-);
-
-#[cfg(all(feature = "differential", target_os = "linux"))]
+#[cfg(all(feature = "differential", unix))]
 pub mod differential;
 
 use rustyrian_core::Game;

@@ -4,6 +4,7 @@ version = "0.0.0"
 edition = "2024"
 license = "GPL-2.0-or-later"
 publish = false
+build = "build.rs"
 
 [package.metadata]
 cargo-fuzz = true
@@ -12,10 +13,7 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 rustyrian-core = { path = "../crates/core" }
 rustyrian-harness = { path = "../crates/harness" }
-
-# `differential`: the C oracle and what the forked C side needs. Linux only:
-# elsewhere the oracle is never built (and `src/lib.rs` refuses the feature).
-[target.'cfg(target_os = "linux")'.dependencies]
+# `differential`: the C oracle and what the forked C side needs.
 rustyrian-oracle = { path = "../crates/oracle", optional = true }
 libc = { version = "0.2", optional = true }
 postcard = { version = "1", features = ["use-std"], optional = true }
@@ -24,9 +22,9 @@ serde_json = { version = "1", optional = true }
 
 [features]
 # The `diff_*` targets (`diff_targets/`): each input through the C oracle as
-# well, outputs compared. Linux only (CI and the amd64 container); needs the
-# oracle's build dependencies (clang, libclang, SDL2 headers). See
-# `src/differential.rs` for how to run them.
+# well, outputs compared. Needs the oracle's build dependencies (clang,
+# libclang, SDL2 headers); see `src/differential.rs` for how to run them and
+# `build.rs` for their link arguments.
 differential = ["dep:rustyrian-oracle", "dep:libc", "dep:postcard", "dep:serde", "dep:serde_json"]
 
 # Not part of the main workspace (cargo-fuzz needs nightly and its own profile).
