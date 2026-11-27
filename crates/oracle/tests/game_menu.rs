@@ -1095,3 +1095,440 @@ fn items_outside_the_tables_draw_nothing() {
     g.player.player[0].items.ship = 1;
     gm::je_weapon_sim_update(g);
 }
+
+// ---------------------------------------------------------------------------
+// Upgrade costs, data cubes and menu actions: both engines on a timed input
+// script (`mainint_support::Rig`), compared by state, calls and saved files.
+// ---------------------------------------------------------------------------
+
+#[path = "mainint_support/mod.rs"]
+mod mainint_support;
+
+use mainint_support::Rig as ScriptRig;
+
+/// Runs `test` for each generated case on one fixture rig (each case stores
+/// the whole game into both engines first).
+///
+/// Hard cap (not scaled by `PROPTEST_CASES`): every case stores the whole
+/// game and compares the whole state. A fixed seed keeps the C line coverage
+/// of these functions reproducible.
+fn run_on_rig<S: Strategy>(
+    cases: u32,
+    strategy: S,
+    test: impl Fn(&mut ScriptRig, S::Value) -> Result<(), TestCaseError>,
+) where
+    S::Value: std::fmt::Debug,
+{
+    use proptest::test_runner::{Config, TestRng, TestRunner};
+    let rig = std::cell::RefCell::new(ScriptRig::from_fixture("ots 1\n", 500));
+    let base = rig.borrow().g.snapshot();
+    let config = Config {
+        cases,
+        ..Config::default()
+    };
+    let rng = TestRng::deterministic_rng(config.rng_algorithm);
+    TestRunner::new_with_rng(config, rng)
+        .run(&strategy, |v| {
+            let mut rig = rig.borrow_mut();
+            rig.g.restore(base.clone());
+            rig.store();
+            rig.clear();
+            test(&mut rig, v)
+        })
+        .unwrap();
+}
+
+/// Real items for each upgrade row (2 = ship .. 8 = right sidekick).
+fn upgrade_items() -> impl Strategy<Value = (u8, [u8; 7], (u8, u8), u64)> {
+    (
+        2u8..=8,
+        (
+            1u8..=SHIP_NUM as u8,
+            0u8..=PORT_NUM as u8,
+            0u8..=PORT_NUM as u8,
+            1u8..=SHIELD_NUM as u8,
+            1u8..=POWER_NUM as u8,
+            0u8..=OPTION_NUM as u8,
+            0u8..=OPTION_NUM as u8,
+        ),
+        (1u8..=11, 1u8..=11),
+        prop_oneof![0u64..100_000, any::<u64>()],
+    )
+        .prop_map(|(row, it, powers, cash)| {
+            (
+                row,
+                [it.0, it.1, it.2, it.3, it.4, it.5, it.6],
+                powers,
+                cash,
+            )
+        })
+}
+
+fn set_upgrade(g: &mut Game, row: u8, it: [u8; 7], powers: (u8, u8), cash: u64) {
+    g.game_menu.cur_sel[usize::from(gm::MENU_UPGRADES)] = row;
+    let p = &mut g.player.player[0];
+    for (i, &v) in it.iter().enumerate() {
+        *gm::playeritem_map(&mut p.items, i as u32) = v;
+    }
+    p.items.weapon[0].power = powers.0;
+    p.items.weapon[1].power = powers.1;
+    p.cash = cash;
+}
+
+#[test]
+fn je_cash_left_and_draw_score_match() {
+    run_on_rig(
+        48,
+        (upgrade_items(), any::<bool>()),
+        |rig, ((row, it, powers, cash), sub)| {
+            set_upgrade(&mut rig.g, row, it, powers, cash);
+            rig.g.game_menu.cur_menu = if sub { 4 } else { 1 };
+            rig.store();
+            rig.clear();
+            // SAFETY: plain C call; item numbers inside the item tables.
+            let r = rig.run(|| unsafe { b::JE_cashLeft() }, |g| Ok(gm::je_cash_left(g)));
+            prop_assert!(r.is_ok());
+            // SAFETY: as above.
+            rig.run(
+                || unsafe { b::JE_drawScore() },
+                |g| {
+                    gm::je_draw_score(g);
+                    Ok(())
+                },
+            )
+            .expect("returns");
+            rig.check();
+            Ok(())
+        },
+    );
+}
+
+/// Every cube of every episode's cube file, into every slot, until the file
+/// runs out (where both engines exit with the read error); then
+/// `load_cubes` for every collected-cube count.
+#[test]
+fn load_cube_and_load_cubes_match_on_every_cube_file() {
+    let mut rig = ScriptRig::from_fixture("ots 1\n", 500);
+    for episode in 1..=4u8 {
+        let name = format!("cubetxt{episode}.dat");
+        let mut cubes = 0;
+        for index in 0..200i32 {
+            let f = &mut rig.g.episodes.cube_filename;
+            *f = [0; 13];
+            f[..name.len()].copy_from_slice(name.as_bytes());
+            let slot = index % 4;
+            // as `load_cubes` does: text is appended to, so start from empty
+            // lines (text left in a slot would run past its last line)
+            rig.g.game_menu.cube[slot as usize].text = [[0; 36]; 90];
+            rig.store();
+            rig.clear();
+            let r = rig.run(
+                // SAFETY: plain C call; exit is caught by the guard.
+                || unsafe { b::load_cube(slot, index) },
+                |g| gm::load_cube(g, slot, index),
+            );
+            let c_state = diff::load::<State>();
+            for (k, (c, r)) in c_state
+                .cube
+                .iter()
+                .zip(rig.g.game_menu.cube.iter())
+                .enumerate()
+            {
+                for (l, (x, y)) in c.text.iter().zip(r.text.iter()).enumerate() {
+                    assert_eq!(
+                        String::from_utf8_lossy(x),
+                        String::from_utf8_lossy(y),
+                        "{name} cube {index} slot {k} line {l}"
+                    );
+                }
+                assert_eq!(
+                    (c.face_sprite, c.last_line, c.title, c.header),
+                    (r.face_sprite, r.last_line, r.title, r.header),
+                    "{name} cube {index} slot {k}"
+                );
+            }
+            assert_eq!(c_state, rig.g.game_menu, "{name} cube {index}");
+            assert_eq!(rig.c_calls(), rig.rust_calls(), "{name} cube {index}");
+            if r.is_err() {
+                break;
+            }
+            cubes += 1;
+        }
+        assert!(cubes >= 4, "{name}: {cubes} cubes");
+
+        for max in 0..=4u16 {
+            rig.g.config.cube_max = max;
+            rig.g.config.cube_list = [3, 0, 7, 1];
+            rig.store();
+            rig.clear();
+            let r = rig.run(
+                // SAFETY: plain C call; exit is caught by the guard.
+                || unsafe { b::load_cubes() },
+                gm::load_cubes,
+            );
+            assert_eq!(r, Ok(()), "{name} {max} cubes");
+            rig.check();
+        }
+    }
+}
+
+/// Rust only: a missing cube file exits as upstream's open error does, and
+/// a collected-cube count past the 4 slots (C writes past `cube`) loads the
+/// 4 slots (`D-UB-GAMEMENU-3`).
+#[test]
+fn load_cubes_guards() {
+    let mut rig = ScriptRig::from_fixture("ots 1\n", 500);
+    rig.g.config.cube_max = 9;
+    rig.g.config.cube_list = [0, 1, 2, 3];
+    assert_eq!(gm::load_cubes(&mut rig.g), Ok(()));
+    rig.g.episodes.cube_filename[..6].copy_from_slice(b"nope\0\0");
+    assert_eq!(gm::load_cube(&mut rig.g, 0, 0), Err(Halt { code: 1 }));
+}
+
+/// One `JE_menuFunction` case: the input script, the state before, the
+/// selected row, and whether a virtual joystick is attached.
+struct MenuCase {
+    label: &'static str,
+    script: String,
+    joystick: bool,
+    select: u8,
+    setup: Box<dyn Fn(&mut Game)>,
+}
+
+fn menu_case(
+    label: &'static str,
+    menu: u8,
+    select: u8,
+    setup: impl Fn(&mut Game) + 'static,
+) -> MenuCase {
+    MenuCase {
+        label,
+        script: "ots 1\n".to_owned(),
+        joystick: false,
+        select,
+        setup: Box::new(move |g| {
+            g.game_menu.cur_menu = i16::from(menu);
+            g.game_menu.cur_sel[usize::from(menu)] = select;
+            setup(g);
+        }),
+    }
+}
+
+impl MenuCase {
+    fn script(mut self, s: String) -> MenuCase {
+        self.script = s;
+        self
+    }
+
+    fn joystick(mut self) -> MenuCase {
+        self.joystick = true;
+        self
+    }
+}
+
+fn keys(keys: &[(u32, &str)]) -> String {
+    mainint_support::taps(keys, &[])
+}
+
+/// Every action of every menu.
+fn menu_cases() -> Vec<MenuCase> {
+    use gm::*;
+    let pad = |extra: &str| format!("ots 1\njoystick \"Pad\" 2 4 1\n{extra}");
+    let mut v = vec![
+        menu_case("full: cubes", MENU_FULL_GAME, 2, |_| {}),
+        menu_case("full: ship specs", MENU_FULL_GAME, 3, |_| {})
+            .script(keys(&[(500, "SPACE"), (1500, "SPACE")])),
+        menu_case("full: upgrade", MENU_FULL_GAME, 4, |_| {}),
+        menu_case("full: options", MENU_FULL_GAME, 5, |_| {}),
+        menu_case("full: next level", MENU_FULL_GAME, 6, |g| {
+            g.varz.map_origin = 3;
+            g.varz.map_p_num = 4;
+            g.varz.map_planet = [1, 7, 12, 20, 2];
+        }),
+        menu_case("full: quit confirmed", MENU_FULL_GAME, 7, |_| {})
+            .script(keys(&[(500, "RETURN")])),
+        menu_case("full: quit cancelled", MENU_FULL_GAME, 7, |_| {})
+            .script(keys(&[(500, "ESCAPE")])),
+        menu_case("full: other row", MENU_FULL_GAME, 8, |_| {}),
+        menu_case("upgrades: done", MENU_UPGRADES, 9, |_| {}),
+        menu_case("options: load", MENU_OPTIONS, 2, |_| {}),
+        menu_case("options: save", MENU_OPTIONS, 3, |_| {}),
+        menu_case("options: joystick", MENU_OPTIONS, 6, |_| {}),
+        menu_case("options: keyboard", MENU_OPTIONS, 7, |_| {}),
+        menu_case("options: done", MENU_OPTIONS, 8, |_| {}),
+        menu_case("options: other row", MENU_OPTIONS, 4, |_| {}),
+        menu_case("next level: exit", MENU_PLAY_NEXT_LEVEL, 5, |g| {
+            g.game_menu.menu_choices[usize::from(MENU_PLAY_NEXT_LEVEL)] = 5;
+        }),
+        menu_case("next level: go", MENU_PLAY_NEXT_LEVEL, 3, |g| {
+            g.game_menu.menu_choices[usize::from(MENU_PLAY_NEXT_LEVEL)] = 5;
+            g.varz.map_section = [4, 9, 13, 2, 7];
+        }),
+        menu_case("upgrade sub: to done", MENU_UPGRADE_SUB, 3, |g| {
+            g.game_menu.menu_choices[usize::from(MENU_UPGRADE_SUB)] = 6;
+            g.game_menu.cur_sel[usize::from(MENU_UPGRADES)] = 3;
+        }),
+        menu_case("upgrade sub: done", MENU_UPGRADE_SUB, 6, |g| {
+            g.game_menu.menu_choices[usize::from(MENU_UPGRADE_SUB)] = 6;
+            g.game_menu.cur_sel[usize::from(MENU_UPGRADES)] = 4;
+        }),
+        menu_case("keyboard: defaults", MENU_KEYBOARD_CONFIG, 10, |g| {
+            g.config.key_settings = [1, 2, 3, 4, 5, 6, 7, 8]
+        }),
+        menu_case("keyboard: done", MENU_KEYBOARD_CONFIG, 11, |_| {}),
+        menu_case("keyboard: done (network)", MENU_KEYBOARD_CONFIG, 11, |g| {
+            g.network.is_network_game = true
+        }),
+        menu_case("keyboard: new key", MENU_KEYBOARD_CONFIG, 3, |_| {}).script(keys(&[(700, "A")])),
+        menu_case("keyboard: key in use", MENU_KEYBOARD_CONFIG, 2, |_| {})
+            .script(keys(&[(300, "DOWN")])),
+        menu_case("keyboard: reserved key", MENU_KEYBOARD_CONFIG, 5, |_| {})
+            .script(keys(&[(300, "ESCAPE")])),
+        menu_case("keyboard: reserved F11", MENU_KEYBOARD_CONFIG, 6, |_| {})
+            .script(keys(&[(300, "F11")])),
+        menu_case("keyboard: reserved P", MENU_KEYBOARD_CONFIG, 9, |_| {})
+            .script(keys(&[(300, "P")])),
+        menu_case("keyboard: click cancels", MENU_KEYBOARD_CONFIG, 4, |_| {}).script(
+            mainint_support::script(&[(400, "mouse-down 1"), (450, "mouse-up 1")]),
+        ),
+        menu_case("load/save: back (quick)", MENU_LOAD_SAVE, 13, |g| {
+            g.game_menu.quik_save = true;
+            g.game_menu.old_menu = 2;
+            g.game_menu.old_pal = 7;
+        }),
+        menu_case("load/save: back", MENU_LOAD_SAVE, 13, |_| {}),
+        menu_case("load/save: load empty slot", MENU_LOAD_SAVE, 4, |g| {
+            g.mainint.perform_save = false;
+            g.game_menu.quik_save = true;
+            g.game_menu.old_menu = 1;
+        }),
+        menu_case("load/save: save (two players)", MENU_LOAD_SAVE, 3, |g| {
+            g.mainint.perform_save = true;
+            g.config.two_player_mode = true;
+        })
+        .script(keys(&[(500, "RETURN"), (1500, "RETURN")])),
+        menu_case("cubes: back", MENU_DATA_CUBES, 4, |g| {
+            g.game_menu.menu_choices[usize::from(MENU_DATA_CUBES)] = 4;
+        }),
+        menu_case("cubes: read", MENU_DATA_CUBES, 3, |g| {
+            g.game_menu.menu_choices[usize::from(MENU_DATA_CUBES)] = 4;
+            g.config.cube_max = 2;
+        }),
+        menu_case("cubes: none", MENU_DATA_CUBES, 2, |g| {
+            g.game_menu.menu_choices[usize::from(MENU_DATA_CUBES)] = 4;
+            g.config.cube_max = 0;
+        }),
+        menu_case("cube: back", MENU_DATA_CUBE_SUB, 2, |_| {}),
+        menu_case("2p: play", MENU_2_PLAYER_ARCADE, 2, |g| {
+            g.varz.map_p_num = 2
+        }),
+        menu_case("2p: device 1", MENU_2_PLAYER_ARCADE, 3, |g| {
+            g.config.input_device = [1, 2]
+        }),
+        menu_case("2p: device 2", MENU_2_PLAYER_ARCADE, 4, |g| {
+            g.config.input_device = [2, 1]
+        }),
+        menu_case("2p: options", MENU_2_PLAYER_ARCADE, 5, |_| {}),
+        menu_case("2p: quit", MENU_2_PLAYER_ARCADE, 6, |_| {}).script(keys(&[(500, "RETURN")])),
+        menu_case("1p: play (no sections)", MENU_1_PLAYER_ARCADE, 2, |g| {
+            g.varz.map_p_num = 1
+        }),
+        menu_case("1p: options", MENU_1_PLAYER_ARCADE, 3, |_| {}),
+        menu_case("1p: quit", MENU_1_PLAYER_ARCADE, 4, |_| {}).script(keys(&[(500, "ESCAPE")])),
+        menu_case("limited: joystick", MENU_LIMITED_OPTIONS, 2, |_| {}),
+        menu_case("limited: keyboard", MENU_LIMITED_OPTIONS, 3, |_| {}),
+        menu_case("limited: back", MENU_LIMITED_OPTIONS, 6, |_| {}),
+        menu_case("limited: other", MENU_LIMITED_OPTIONS, 4, |_| {}),
+        menu_case("joystick: none", MENU_JOYSTICK_CONFIG, 3, |_| {}),
+        menu_case("joystick: none, done", MENU_JOYSTICK_CONFIG, 17, |_| {}),
+        menu_case("super: play", MENU_SUPER_TYRIAN, 2, |g| {
+            g.varz.map_p_num = 3
+        }),
+        menu_case("super: ship specs", MENU_SUPER_TYRIAN, 3, |_| {})
+            .script(keys(&[(500, "SPACE"), (1500, "SPACE")])),
+        menu_case("super: options", MENU_SUPER_TYRIAN, 4, |_| {}),
+        menu_case("super: quit", MENU_SUPER_TYRIAN, 5, |_| {}).script(keys(&[(500, "RETURN")])),
+        menu_case("super: other", MENU_SUPER_TYRIAN, 6, |_| {}),
+    ];
+    for row in 2..=8u8 {
+        v.push(menu_case("upgrades: item row", MENU_UPGRADES, row, |_| {}));
+    }
+    // a joystick: every option, and assignments detected into an empty,
+    // a matching and a full slot pair
+    for (select, analog) in [
+        (2u8, false),
+        (3, true),
+        (4, true),
+        (4, false),
+        (5, true),
+        (5, false),
+        (16, true),
+        (17, true),
+    ] {
+        v.push(
+            menu_case("joystick: option", MENU_JOYSTICK_CONFIG, select, move |g| {
+                if let Some(j) = g.joystick.joystick.as_mut() {
+                    j[0].analog = analog;
+                    j[0].sensitivity = 10;
+                    j[0].threshold = 3;
+                }
+            })
+            .script(pad(""))
+            .joystick(),
+        );
+    }
+    for (label, preset) in [
+        ("joystick: assign (empty)", 0u8),
+        ("joystick: assign (same)", 1),
+        ("joystick: assign (full)", 2),
+    ] {
+        v.push(
+            menu_case(label, MENU_JOYSTICK_CONFIG, 7, move |g| {
+                use rustyrian_core::joystick::{
+                    JoystickAssignment as A, JoystickAssignmentTypes as T,
+                };
+                let button = |num| A {
+                    r#type: T::Button,
+                    num,
+                    x_axis: false,
+                    negative_axis: false,
+                };
+                if let Some(j) = g.joystick.joystick.as_mut() {
+                    j[0].assignment[1] = match preset {
+                        0 => [A::default(), A::default()],
+                        1 => [button(5), button(2)],
+                        _ => [button(5), button(6)],
+                    };
+                }
+            })
+            .script(pad("@600 joy-button 0 2 1\n@700 joy-button 0 2 0\n"))
+            .joystick(),
+        );
+    }
+    v
+}
+
+/// `JE_menuFunction` for every menu row: state, platform calls and saved
+/// files match after each.
+#[test]
+fn je_menu_function_matches_every_action() {
+    for case in menu_cases() {
+        let mut rig = ScriptRig::from_fixture(&case.script, 500);
+        if case.joystick {
+            // SAFETY: plain C call.
+            unsafe { b::init_joysticks() };
+            rustyrian_core::joystick::init_joysticks(&mut rig.g);
+        }
+        (case.setup)(&mut rig.g);
+        rig.store();
+        rig.clear();
+        let select = case.select;
+        let r = rig.run(
+            // SAFETY: plain C call; exit is caught by the guard.
+            || unsafe { b::JE_menuFunction(select) },
+            |g| gm::je_menu_function(g, select),
+        );
+        assert_eq!(r, Ok(()), "{}", case.label);
+        rig.check();
+    }
+}

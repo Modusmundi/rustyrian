@@ -5,19 +5,28 @@
 //! Port of upstream `game_menu.c` / `game_menu.h`.
 
 use crate::backgrnd::{initialize_starfield, update_and_draw_starfield};
-use crate::config::{SAVE_FILES_NUM, SHOT_LEFT_SIDEKICK, SHOT_RIGHT_SIDEKICK};
+use crate::config::{
+    DEFAULT_KEY_SETTINGS, SAVE_FILES_NUM, SHOT_LEFT_SIDEKICK, SHOT_RIGHT_SIDEKICK,
+};
+use crate::file;
 use crate::fonthand::{self, c_str};
+use crate::game::{EXIT_FAILURE, Halt};
 use crate::game::{Flow, Game};
 use crate::helptext::{self, MENU_HELP, MENU_MAX};
+use crate::joystick::{Joystick, JoystickAssignment, JoystickAssignmentTypes};
 use crate::keyboard::{self, INPUT_NO_MOTION, KeyboardInput, MouseInput, SDL_SCANCODE_RETURN};
+use crate::logging::log_fatal;
+use crate::mainint::{self, je_get_cost};
 use crate::player::{FRONT_WEAPON, LEFT_SIDEKICK, PlayerItems, REAR_WEAPON, RIGHT_SIDEKICK};
 use crate::sdl::upper_blit;
 use crate::shots::{player_shot_create, simulate_player_shots};
+use crate::sndmast::S_ITEM;
 use crate::sndmast::{S_CLICK, S_CURSOR, S_SPRING};
 use crate::sprite::{
     self, FONT_SHAPES, OPTION_SHAPES, PLANET_SHAPES, SMALL_FONT_SHAPES, TINY_FONT, WEAPON_SHAPES,
     blit_sprite, blit_sprite_dark, blit_sprite_hv, blit_sprite2x2,
 };
+use crate::varz::je_tyrian_halt;
 use crate::varz::{P_ANI, PGR, Sprite2Ref, je_s_gr};
 use crate::vga256d::{fill_rectangle_xy, je_bar_shade, je_pix, je_pix3, je_rectangle};
 use crate::video::{self, ScreenId};
@@ -1341,4 +1350,613 @@ pub fn je_weapon_sim_update(g: &mut Game) {
     let p = &g.player.player[0];
     let (ship, x, y) = (p.items.ship, (p.x - 5) as u16, (p.y - 7) as u16);
     je_draw_item(g, 1, u16::from(ship), x, y);
+}
+
+/// The player's cash after buying the upgrade row's selected item and its
+/// power levels (C `JE_longint`, truncated as upstream does).
+#[doc(alias = "JE_cashLeft")]
+pub fn je_cash_left(g: &mut Game) -> i32 {
+    let upgrades = g.game_menu.cur_sel[usize::from(MENU_UPGRADES)];
+    let mut temp_l = g.player.player[0].cash as i32;
+    let item_num = u16::from(*playeritem_map(
+        &mut g.player.player[0].items,
+        u32::from(upgrades).wrapping_sub(2),
+    ));
+
+    temp_l = temp_l.wrapping_sub(je_get_cost(g, upgrades, item_num) as i32);
+
+    g.varz.temp_w = 0;
+
+    if upgrades == 3 || upgrades == 4 {
+        let power = u32::from(g.player.player[0].items.weapon[usize::from(upgrades) - 3].power);
+        let cost = u32::from(g.episodes.weapon_port[usize::from(item_num)].cost);
+        for i in 1..power {
+            g.varz.temp_w = g.varz.temp_w.wrapping_add(cost.wrapping_mul(i) as u16);
+            temp_l = temp_l.wrapping_sub(i32::from(g.varz.temp_w));
+        }
+    }
+
+    temp_l
+}
+
+/// The cash left, in the upgrade submenus.
+#[doc(alias = "JE_drawScore")]
+pub fn je_draw_score(g: &mut Game) {
+    if g.game_menu.cur_menu == i16::from(MENU_UPGRADE_SUB) {
+        let cl = format!("{}", je_cash_left(g));
+        let screen = g.video.vga_screen_id();
+        fonthand::je_text_shade(g, screen, 65, 173, cl.as_bytes(), 1, 6, fonthand::DARKEN);
+    }
+}
+
+/// Loads the data cubes the player has collected (at most the 4 cube slots;
+/// a larger count from a damaged save reads past `cube` upstream,
+/// `D-UB-GAMEMENU-3`).
+pub fn load_cubes(g: &mut Game) -> Flow {
+    for cube_slot in 0..usize::from(g.config.cube_max).min(4) {
+        g.game_menu.cube[cube_slot].text = [[0; 36]; 90];
+
+        let index = i32::from(g.config.cube_list[cube_slot]);
+        load_cube(g, cube_slot as i32, index)?;
+    }
+    Ok(())
+}
+
+/// `strcat(dst, src)` into a cube text line. `load_cubes` empties the lines
+/// first and the wrapping keeps each within its 35 characters, so nothing is
+/// cut here.
+fn strcat(dst: &mut [u8], src: &[u8]) {
+    let start = c_str(dst).len();
+    let n = src.len().min(dst.len() - 1 - start);
+    dst[start..start + n].copy_from_slice(&src[..n]);
+    dst[start + n] = 0;
+}
+
+/// Loads cube `cube_index` (0-based) of the episode's cube text file into
+/// slot `cube_slot`: face, title, header, and the text word-wrapped to the
+/// cube display.
+pub fn load_cube(g: &mut Game, cube_slot: i32, mut cube_index: i32) -> Flow<bool> {
+    let name = c_str(&g.episodes.cube_filename).to_vec();
+    let filename = String::from_utf8_lossy(&name).into_owned();
+
+    let mut file = file::data_file_open(g, &filename, "rb");
+    if file.error {
+        let message = format!(
+            "Failed to open file '{}': {}",
+            filename,
+            file::file_get_error(&file)
+        );
+        log_fatal(g, &message);
+        return Err(Halt { code: EXIT_FAILURE });
+    }
+
+    let mut buf = [0u8; 256];
+
+    // seek to the cube
+    while cube_index > 0 {
+        helptext::read_encrypted_string(&mut file, Some(&mut buf));
+
+        if buf[0] == b'*' || file.error {
+            cube_index -= 1;
+        }
+    }
+
+    let slot = cube_slot as usize;
+    let mut face = g.game_menu.cube[slot].face_sprite;
+    mainint::str_pop_int(&mut buf[4..], &mut face);
+    g.game_menu.cube[slot].face_sprite = face.wrapping_sub(1);
+
+    helptext::read_encrypted_string(&mut file, Some(&mut g.game_menu.cube[slot].title));
+    helptext::read_encrypted_string(&mut file, Some(&mut g.game_menu.cube[slot].header));
+
+    let (mut line, mut line_chars, mut line_width) = (0u32, 0u32, 0u32);
+
+    // word-wrap every line of text onto the cube's lines
+    loop {
+        helptext::read_encrypted_string(&mut file, Some(&mut buf));
+
+        // end of data
+        if buf[0] == b'*' || file.error {
+            break;
+        }
+
+        // new paragraph
+        if c_str(&buf).is_empty() {
+            if line_chars == 0 {
+                line += 4; // consecutive new paragraphs make a 4-line break
+            } else {
+                line += 1;
+            }
+            line_chars = 0;
+            line_width = 0;
+
+            continue;
+        }
+
+        let mut word_start = 0;
+        let mut i = 0;
+        loop {
+            let end_of_line = buf[i] == 0;
+            let end_of_word = end_of_line || buf[i] == b' ';
+
+            if end_of_word {
+                buf[i] = 0;
+
+                let word = buf[word_start..i].to_vec();
+                word_start = i + 1;
+
+                let word_chars = word.len() as u32;
+                let word_width = fonthand::je_text_width(g, &word, TINY_FONT as u32) as u32;
+
+                // a word longer than a line: give up on this line of text
+                if word_chars > CUBE_LINE_CHARS || word_width > CUBE_LINE_WIDTH {
+                    break;
+                }
+
+                let mut prepend_space = true;
+
+                line_chars += word_chars + 1;
+                line_width += word_width + 6;
+
+                // the word goes on the next line
+                if line_chars > CUBE_LINE_CHARS || line_width > CUBE_LINE_WIDTH {
+                    line += 1;
+                    line_chars = word_chars;
+                    line_width = word_width;
+
+                    prepend_space = false;
+                }
+
+                if (line as usize) < 90 {
+                    let cube = &mut g.game_menu.cube[slot];
+                    if prepend_space {
+                        strcat(&mut cube.text[line as usize], b" ");
+                    }
+                    strcat(&mut cube.text[line as usize], &word);
+
+                    // the last line with text
+                    cube.last_line = (line + 1) as i32;
+                }
+            }
+
+            if end_of_line {
+                break;
+            }
+            i += 1;
+        }
+    }
+
+    if file.error {
+        let message = format!(
+            "Failed to read from file '{}': {}",
+            filename,
+            file::file_get_error(&file)
+        );
+        log_fatal(g, &message);
+        return Err(Halt { code: EXIT_FAILURE });
+    }
+
+    file::file_close(&mut file);
+
+    Ok(true)
+}
+
+/// `quit_request` then, when confirmed, back to the title screen.
+fn quit_to_title(g: &mut Game) -> Flow {
+    if je_quit_request(g)? {
+        g.varz.game_loaded = true;
+        g.config.main_level = 0;
+    }
+    Ok(())
+}
+
+/// The first level section of the next map: the arcade menus' "play".
+/// A map without sections (upstream reads before `mapSection`) leaves
+/// level 0 (`D-UB-GAMEMENU-3`).
+fn play_next_section(g: &mut Game) {
+    let i = usize::from(g.varz.map_p_num).wrapping_sub(1);
+    g.config.main_level = g.varz.map_section.get(i).copied().unwrap_or(0);
+    g.mainint.jump_section = true;
+}
+
+/// Cycles 2-player input device `i` (`up`: forward), skipping the other
+/// player's device.
+fn cycle_input_device(g: &mut Game, i: usize, up: bool) {
+    let joysticks = g.joystick.joysticks;
+    let other = if i == 0 { 1 } else { 0 };
+    loop {
+        let d = &mut g.config.input_device;
+        if joysticks == 0 {
+            d[other] = d[i]; // swap controllers
+        }
+        if up {
+            if i32::from(d[i]) >= 2 + joysticks {
+                d[i] = 1;
+            } else {
+                d[i] = d[i].wrapping_add(1);
+            }
+        } else if d[i] <= 1 {
+            d[i] = (2 + joysticks) as u8;
+        } else {
+            d[i] -= 1;
+        }
+        if d[i] != d[other] {
+            break;
+        }
+    }
+}
+
+/// The menu after the options/joystick/keyboard menus.
+fn options_menu(g: &Game) -> i16 {
+    i16::from(if g.network.is_network_game {
+        MENU_LIMITED_OPTIONS
+    } else {
+        MENU_OPTIONS
+    })
+}
+
+/// Runs the action of row `select` of the current menu.
+#[doc(alias = "JE_menuFunction")]
+pub fn je_menu_function(g: &mut Game, select: u8) -> Flow {
+    g.game_menu.col = 0;
+    g.game_menu.col_c = -1;
+    nortsong::je_play_sample_num(g, S_CLICK);
+
+    let cur_menu = g.game_menu.cur_menu;
+    let cur_select = u16::from(g.game_menu.cur_sel[cur_menu as usize]);
+
+    match u8::try_from(cur_menu).unwrap_or(u8::MAX) {
+        MENU_FULL_GAME => match select {
+            2 => {
+                // data cubes
+                g.game_menu.cur_menu = i16::from(MENU_DATA_CUBES);
+                g.game_menu.cur_sel[usize::from(MENU_DATA_CUBES)] = 2;
+            }
+            3 => je_do_ship_specs(g)?,
+            4 => g.game_menu.cur_menu = i16::from(MENU_UPGRADES),
+            5 => g.game_menu.cur_menu = i16::from(MENU_OPTIONS),
+            6 => {
+                // next level
+                g.game_menu.cur_menu = i16::from(MENU_PLAY_NEXT_LEVEL);
+                g.game_menu.new_pal = 18;
+                je_compute_dots(g);
+                let origin = usize::from(g.varz.map_origin) - 1;
+                let gm = &mut g.game_menu;
+                gm.nav_x = f32::from(PLANET_X[origin]);
+                gm.nav_y = f32::from(PLANET_Y[origin]);
+                gm.new_nav_x = gm.nav_x;
+                gm.new_nav_y = gm.nav_y;
+                let next = usize::from(MENU_PLAY_NEXT_LEVEL);
+                gm.menu_choices[next] = g.varz.map_p_num.wrapping_add(2) as u8;
+                gm.cur_sel[next] = 2;
+                menu_int_strcpy(g, 4, 0, b"Next Level");
+                let mut x: u8 = 0;
+                while u16::from(x) < g.varz.map_p_num {
+                    g.varz.temp = g.varz.map_planet[usize::from(x)];
+                    let name = g.helptext.p_name[usize::from(g.varz.temp) - 1];
+                    menu_int_strcpy(g, 4, usize::from(x) + 1, &name);
+                    x = x.wrapping_add(1);
+                }
+                let back = g.helptext.misc_text[5];
+                menu_int_strcpy(g, 4, usize::from(x) + 1, &back);
+            }
+            7 => quit_to_title(g)?,
+            _ => {}
+        },
+
+        MENU_UPGRADES => {
+            if select == 9 {
+                // done
+                g.game_menu.cur_menu = i16::from(MENU_FULL_GAME);
+            } else {
+                // an item to upgrade
+                g.game_menu.old_items[0] = g.player.player[0].items;
+
+                g.game_menu.last_direction = 1;
+                je_gen_item_menu(g, select);
+                je_init_weapon_view(g);
+                g.game_menu.cur_menu = i16::from(MENU_UPGRADE_SUB);
+                g.game_menu.last_cur_sel = g.game_menu.cur_sel[usize::from(MENU_UPGRADE_SUB)];
+                let left = je_cash_left(g);
+                let p = &mut g.player.player[0];
+                p.cash = p.cash.wrapping_mul(2).wrapping_sub(i64::from(left) as u64);
+            }
+        }
+
+        MENU_OPTIONS => match select {
+            2 | 3 => {
+                g.game_menu.cur_menu = i16::from(MENU_LOAD_SAVE);
+                g.mainint.perform_save = select == 3;
+                g.game_menu.quik_save = false;
+            }
+            6 => g.game_menu.cur_menu = i16::from(MENU_JOYSTICK_CONFIG),
+            7 => g.game_menu.cur_menu = i16::from(MENU_KEYBOARD_CONFIG),
+            8 => g.game_menu.cur_menu = i16::from(MENU_FULL_GAME),
+            _ => {}
+        },
+
+        MENU_PLAY_NEXT_LEVEL => {
+            if select == g.game_menu.menu_choices[usize::from(MENU_PLAY_NEXT_LEVEL)] {
+                // exit
+                g.game_menu.cur_menu = i16::from(MENU_FULL_GAME);
+                g.game_menu.new_pal = 1;
+            } else {
+                g.config.main_level = g.varz.map_section[usize::from(cur_select) - 2];
+                g.mainint.jump_section = true;
+            }
+        }
+
+        MENU_UPGRADE_SUB => {
+            let sub = usize::from(MENU_UPGRADE_SUB);
+            if g.game_menu.cur_sel[sub] < g.game_menu.menu_choices[sub] {
+                // select "Done"
+                g.game_menu.cur_sel[sub] = g.game_menu.menu_choices[sub];
+            } else {
+                // "Done" selected
+                nortsong::je_play_sample_num(g, S_ITEM);
+
+                g.player.player[0].cash = i64::from(je_cash_left(g)) as u64;
+                g.game_menu.cur_menu = i16::from(MENU_UPGRADES);
+            }
+        }
+
+        MENU_KEYBOARD_CONFIG => {
+            if cur_select == 10 {
+                // reset to defaults
+                g.config.key_settings = DEFAULT_KEY_SETTINGS;
+            } else if cur_select == 11 {
+                // done
+                g.game_menu.cur_menu = options_menu(g);
+            } else {
+                // change a key
+                change_key(g, cur_select)?;
+            }
+        }
+
+        MENU_LOAD_SAVE => {
+            if cur_select == 13 {
+                if g.game_menu.quik_save {
+                    g.game_menu.cur_menu = i16::from(g.game_menu.old_menu);
+                    g.game_menu.new_pal = g.game_menu.old_pal;
+                } else {
+                    g.game_menu.cur_menu = i16::from(MENU_OPTIONS);
+                }
+            } else {
+                g.varz.temp = if g.config.two_player_mode { 11 } else { 0 };
+                let slot = cur_select
+                    .wrapping_sub(1)
+                    .wrapping_add(u16::from(g.varz.temp)) as u8;
+                mainint::je_operation(g, slot)?;
+                if g.game_menu.quik_save {
+                    g.game_menu.cur_menu = i16::from(g.game_menu.old_menu);
+                    g.game_menu.new_pal = g.game_menu.old_pal;
+                }
+            }
+        }
+
+        MENU_DATA_CUBES => {
+            if cur_select == u16::from(g.game_menu.menu_choices[cur_menu as usize]) {
+                g.game_menu.cur_menu = i16::from(MENU_FULL_GAME);
+                g.game_menu.new_pal = 1;
+            } else if g.config.cube_max > 0 {
+                let gm = &mut g.game_menu;
+                gm.first_menu9 = true;
+                gm.cur_menu = i16::from(MENU_DATA_CUBE_SUB);
+                gm.y_loc = 0;
+                gm.y_chg = 0;
+                gm.current_cube = gm.cur_sel[usize::from(MENU_DATA_CUBES)].wrapping_sub(2);
+            } else {
+                g.game_menu.cur_menu = i16::from(MENU_FULL_GAME);
+                g.game_menu.new_pal = 1;
+            }
+        }
+
+        MENU_DATA_CUBE_SUB => g.game_menu.cur_menu = i16::from(MENU_DATA_CUBES),
+
+        MENU_2_PLAYER_ARCADE => match g.game_menu.cur_sel[cur_menu as usize] {
+            2 => play_next_section(g),
+            sel @ (3 | 4) => {
+                nortsong::je_play_sample_num(g, S_CURSOR);
+                cycle_input_device(g, usize::from(sel - 3), true);
+            }
+            5 => g.game_menu.cur_menu = i16::from(MENU_OPTIONS),
+            6 => quit_to_title(g)?,
+            _ => {}
+        },
+
+        MENU_1_PLAYER_ARCADE => match g.game_menu.cur_sel[cur_menu as usize] {
+            2 => play_next_section(g),
+            3 => g.game_menu.cur_menu = options_menu(g),
+            4 => quit_to_title(g)?,
+            _ => {}
+        },
+
+        MENU_LIMITED_OPTIONS => match select {
+            2 => g.game_menu.cur_menu = i16::from(MENU_JOYSTICK_CONFIG),
+            3 => g.game_menu.cur_menu = i16::from(MENU_KEYBOARD_CONFIG),
+            6 => g.game_menu.cur_menu = i16::from(MENU_1_PLAYER_ARCADE),
+            _ => {}
+        },
+
+        MENU_JOYSTICK_CONFIG => {
+            if g.joystick.joysticks != 0 || select == 17 {
+                joystick_config_select(g, select)?;
+            }
+        }
+
+        MENU_SUPER_TYRIAN => match g.game_menu.cur_sel[cur_menu as usize] {
+            2 => play_next_section(g),
+            3 => je_do_ship_specs(g)?,
+            4 => g.game_menu.cur_menu = i16::from(MENU_OPTIONS),
+            5 => {
+                if je_quit_request(g)? {
+                    if g.network.is_network_game {
+                        je_tyrian_halt(g, 0)?;
+                    }
+                    g.varz.game_loaded = true;
+                    g.config.main_level = 0;
+                }
+            }
+            _ => {}
+        },
+
+        _ => {}
+    }
+
+    g.game_menu.old_items[0] = g.player.player[0].items;
+    Ok(())
+}
+
+/// The keyboard menu's "change key": waits for a key (or a click, which
+/// cancels) and assigns it to row `cur_select`, swapping with a row that
+/// had it.
+fn change_key(g: &mut Game, cur_select: u16) -> Flow {
+    const SDL_SCANCODE_ESCAPE: u16 = 41;
+    const SDL_SCANCODE_F11: u16 = 68;
+    const SDL_SCANCODE_P: u16 = 19;
+
+    let screen = g.video.vga_screen_id();
+    let row = usize::from(cur_select) - 2;
+    g.varz.temp2 = 254;
+    let temp2 = u32::from(g.varz.temp2);
+    let temp_y = 38 + (i32::from(cur_select) - 2) * 12;
+    let name = g
+        .platform
+        .get_scancode_name(g.config.key_settings[row] as i32);
+    let shade = (temp2 % 16) as i32 - 8;
+    fonthand::je_text_shade(
+        g,
+        screen,
+        236,
+        temp_y,
+        name.as_bytes(),
+        temp2 / 16,
+        shade,
+        fonthand::DARKEN,
+    );
+    video::je_show_vga(g);
+
+    g.game_menu.col = 248;
+    g.game_menu.col_c = 1;
+
+    let mut joy_held = g.joystick.joydown;
+    loop {
+        joy_held &= g.joystick.joydown;
+
+        nortsong::set_frame_count(g, 1);
+
+        let gm = &mut g.game_menu;
+        gm.col = gm.col.wrapping_add(gm.col_c);
+        if gm.col < 243 || gm.col > 248 {
+            gm.col_c = gm.col_c.wrapping_mul(-1);
+        }
+        let col = i32::from(g.game_menu.col);
+        je_rectangle(g, screen, 230, temp_y - 2, 300, temp_y + 7, col);
+
+        video::je_show_vga(g);
+
+        network::network_keep_alive(g)?;
+
+        nortsong::delay_until_elapsed(g);
+
+        joystick::poll_joysticks(g); // not push_joysticks_as_keyboard
+        keyboard::handle_sdl_events(g)?;
+
+        if keyboard::has_input(g, INPUT_NO_MOTION) || (g.joystick.joydown && !joy_held) {
+            break;
+        }
+    }
+
+    let mut keyboard_input = KeyboardInput::default();
+
+    if keyboard::mouse_get_input(g, INPUT_NO_MOTION, None) {
+        // cancel
+    } else if keyboard::keyboard_get_input(g, Some(&mut keyboard_input)) {
+        let code = u32::from(keyboard_input.scancode);
+        let keys = &mut g.config.key_settings;
+        // already used? then swap
+        if let Some(i) = keys.iter().position(|&k| k == code) {
+            keys[i] = keys[row];
+        }
+
+        if keyboard_input.scancode != SDL_SCANCODE_ESCAPE // reserved for menu
+            && keyboard_input.scancode != SDL_SCANCODE_F11 // reserved for gamma
+            && keyboard_input.scancode != SDL_SCANCODE_P
+        // reserved for pause
+        {
+            nortsong::je_play_sample_num(g, S_CLICK);
+            g.config.key_settings[row] = code;
+        }
+    }
+    Ok(())
+}
+
+/// Joystick `jc` of the initialised joysticks.
+fn stick(g: &mut Game, jc: i32) -> &mut Joystick {
+    &mut g.joystick.joystick.as_mut().expect("joysticks initialised")[jc as usize]
+}
+
+/// The joystick menu's row `select` (with at least one joystick, or "done").
+fn joystick_config_select(g: &mut Game, select: u8) -> Flow {
+    let jc = g.game_menu.joystick_config;
+    let joysticks = g.joystick.joysticks;
+    match select {
+        2 => {
+            g.game_menu.joystick_config = (jc + 1) % joysticks;
+        }
+        3 => {
+            let j = stick(g, jc);
+            j.analog = !j.analog;
+        }
+        4 => {
+            let j = stick(g, jc);
+            if j.analog {
+                j.sensitivity = (j.sensitivity + 1) % 11;
+            }
+        }
+        5 => {
+            let j = stick(g, jc);
+            if j.analog {
+                j.threshold = (j.threshold + 1) % 11;
+            }
+        }
+        16 => joystick::reset_joystick_assignments(g, jc),
+        17 => g.game_menu.cur_menu = options_menu(g),
+        _ => {
+            if joysticks == 0 {
+                return Ok(());
+            }
+
+            let screen = g.video.vga_screen_id();
+            let s = i32::from(select);
+            je_rectangle(g, screen, 235, 21 + s * 8, 310, 30 + s * 8, 248);
+            video::je_show_vga(g);
+
+            let mut temp = JoystickAssignment::default();
+            if joystick::detect_joystick_assignment(g, jc, &mut temp)? {
+                let a = &mut stick(g, jc).assignment[usize::from(select) - 6];
+                if let Some(i) = a
+                    .iter()
+                    .position(|x| joystick::joystick_assignment_cmp(&temp, x))
+                {
+                    // already assigned: unset it
+                    a[i].r#type = JoystickAssignmentTypes::None;
+                } else if let Some(i) = a
+                    .iter()
+                    .position(|x| x.r#type == JoystickAssignmentTypes::None)
+                {
+                    // an empty assignment: set it
+                    a[i] = temp;
+                } else {
+                    // all set: shift them forward and set the last one
+                    let n = a.len();
+                    a.copy_within(1.., 0);
+                    a[n - 1] = temp;
+                }
+
+                joystick::poll_joysticks(g);
+            }
+        }
+    }
+    Ok(())
 }

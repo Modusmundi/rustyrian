@@ -81,8 +81,12 @@ pub fn run(root: &Path) -> Result<()> {
 
     // Long tests are `#[ignore]`d for the per-push CI run; coverage runs them.
     // Local-only advisory reproductions (git-ignored) need the sanitizer
-    // build and are left out.
+    // build and are left out. nextest rejects a `binary()` filter that
+    // matches nothing, so the filter is only passed where they exist.
     eprintln!("coverage: differential tests (including ignored ones)");
+    let has_advisories = std::fs::read_dir(root.join("crates/oracle/tests"))?
+        .filter_map(|e| e.ok())
+        .any(|e| e.file_name().to_string_lossy().starts_with("advisory_"));
     let mut tests = Command::new("cargo");
     tests.current_dir(root).args([
         "nextest",
@@ -92,9 +96,10 @@ pub fn run(root: &Path) -> Result<()> {
         "--no-fail-fast",
         "--run-ignored",
         "all",
-        "-E",
-        "not binary(/^advisory_/)",
     ]);
+    if has_advisories {
+        tests.args(["-E", "not binary(/^advisory_/)"]);
+    }
     cov_env(&mut tests);
     let tests_ok = tests.status()?.success();
 
