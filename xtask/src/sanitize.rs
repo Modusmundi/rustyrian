@@ -23,7 +23,11 @@ const TARGET_DIR: &str = "target/asan";
 /// binaries carry an rpath to SDL3 (see the oracle's build.rs), so no `DYLD_*`
 /// variable is needed; the preflight run proves it.
 fn sanitizer_env(cmd: &mut Command) {
-    let mut asan = "detect_leaks=0:halt_on_error=1:abort_on_error=0".to_owned();
+    // allocator_may_return_null: huge requests from damaged data files must
+    // return NULL as libc's malloc does (the paths the tests drive), instead
+    // of ASan's allocation-size-too-big abort.
+    let mut asan =
+        "detect_leaks=0:halt_on_error=1:abort_on_error=0:allocator_may_return_null=1".to_owned();
     if cfg!(target_os = "linux") {
         // The shared ASan runtime is linked, not preloaded.
         asan.push_str(":verify_asan_link_order=0");
