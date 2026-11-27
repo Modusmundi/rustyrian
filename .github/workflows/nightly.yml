@@ -160,6 +160,38 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TARGET: ${{ matrix.target }}
 
+  # Criterion benches of the core (plan step 10); report-only, nothing gates on
+  # them. The fixtures for the background and scaler benches come from the C
+  # oracle, hence its build dependencies.
+  bench:
+    runs-on: ubuntu-24.04
+    env:
+      CC: clang-18
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+          persist-credentials: false
+      - run: sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list && sudo apt-get update && sudo apt-get install -y libsdl2-dev libclang-18-dev clang-18
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: data
+          key: tyrian21-7790d09a2a3addcd33c66ef063d5900eb81cc9c342f4807eb8356364dd1d9277
+      - run: cargo xtask fetch-data
+      - run: cargo xtask fixtures
+      - run: cargo bench -p rustyrian-core
+        env:
+          # Benches run in crates/core; keep the report where the upload looks.
+          CRITERION_HOME: ${{ github.workspace }}/target/criterion
+      # `cargo xtask bench-ratio` (the Rust/C throughput gate) joins this job
+      # once the Rust runner `rs-run` exists.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: criterion-report
+          path: target/criterion
+          if-no-files-found: warn
+
   deny:
     runs-on: ubuntu-24.04
     steps:

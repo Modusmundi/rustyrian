@@ -12,5 +12,36 @@ libm.workspace = true
 postcard = { workspace = true }
 serde.workspace = true
 
+# Benches (`cargo bench -p rustyrian-core`, plan step 10). The harness's fake
+# platform supplies the `Game`'s platform; it depends on this crate, which a
+# dev-dependency may. The library has no libtest benches, and would reject
+# Criterion's options (`-- --quick`).
+[lib]
+bench = false
+
+[dev-dependencies]
+criterion.workspace = true
+rustyrian-harness.workspace = true
+
+[[bench]]
+name = "blit"
+harness = false
+
+[[bench]]
+name = "background"
+harness = false
+
+[[bench]]
+name = "scalers"
+harness = false
+
+[[bench]]
+name = "opl"
+harness = false
+
+[[bench]]
+name = "lds"
+harness = false
+
 [lints]
 workspace = true
