@@ -1689,6 +1689,64 @@ fn adjust_difficulty_thresholds_match_c() {
     rig.check();
 }
 
+/// Scores whose adjusted value falls within half a point below a threshold:
+/// upstream's `roundf` lifts them over it, so these cases pin the rounding
+/// mode (a `floor` port passes every other adjust_difficulty test).
+#[test]
+fn adjust_difficulty_rounding_at_thresholds_matches_c() {
+    const MULTIPLIER: [f32; 10] = [0.0, 0.4, 0.8, 1.3, 1.6, 2.0, 2.0, 3.0, 3.0, 3.0];
+    let mut rig = Rig::from_fixture("ots 1\n", 500);
+    let base = rig.g.snapshot();
+    let limits: [u64; 9] = [
+        10_000, 20_000, 50_000, 80_000, 125_000, 200_000, 400_000, 600_000, 3_000_000,
+    ];
+    let mut rounding_edges = 0;
+    for two in [false, true] {
+        for initial in 1i8..10 {
+            let multiplier = MULTIPLIER[initial as usize];
+            for &limit in &limits {
+                let centre = (limit as f64 / f64::from(multiplier)) as u64;
+                for score in centre.saturating_sub(3)..=centre + 3 {
+                    rig.g.restore(base.clone());
+                    rig.g.config.two_player_mode = two;
+                    rig.g.config.initial_difficulty = initial;
+                    rig.g.config.difficulty_level = 0;
+                    rig.g.player.player[1].cash = 0;
+                    rig.g.player.player[0].cash = 0;
+                    // One player: the total score adds the items' value to cash.
+                    let items = if two {
+                        0
+                    } else {
+                        mi::je_total_score(&mut rig.g, 0)
+                    };
+                    let Some(cash) = score.checked_sub(items) else {
+                        continue;
+                    };
+                    rig.g.player.player[0].cash = cash;
+                    let adjusted = score as f32 * multiplier;
+                    if adjusted.round() as u64 == limit && adjusted.floor() as u64 == limit - 1 {
+                        rounding_edges += 1;
+                    }
+                    rig.store();
+                    rig.clear();
+                    // SAFETY: plain C call.
+                    unsafe { b::adjust_difficulty() };
+                    mi::adjust_difficulty(&mut rig.g);
+                    // SAFETY: a read of a C global on the test thread.
+                    let c =
+                        unsafe { *rustyrian_oracle::mirror::global(&raw const b::difficultyLevel) };
+                    assert_eq!(c, rig.g.config.difficulty_level, "{two} {initial} {score}");
+                }
+            }
+        }
+    }
+    assert!(
+        rounding_edges > 0,
+        "no case where roundf and floor disagree at a threshold"
+    );
+    rig.check();
+}
+
 #[test]
 fn next_episode_super_carrot_matches_c() {
     // The last episode jumps back to episode 1: credits (ended by a key),

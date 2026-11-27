@@ -112,7 +112,6 @@ fn main() {
         "-DNDEBUG",
         "-DWITH_NETWORK",
         "-DTYRIAN_DIR=\"/nonexistent\"",
-        "-DOPENTYRIAN_VERSION=\"rustyrian-oracle\"",
         "-fwrapv",
         "-fno-strict-aliasing",
         "-fsigned-char",

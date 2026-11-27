@@ -2751,7 +2751,7 @@ c = "mainint.c::adjust_difficulty"
 c_sha = "817e01d93729"
 rust = "rustyrian_core::mainint::adjust_difficulty"
 status = "verified"
-verify = ["diff:mainint::adjust_difficulty_matches_c", "diff:mainint::adjust_difficulty_thresholds_match_c", "diff:mainint::end_level_ani_matches_c"]
+verify = ["diff:mainint::adjust_difficulty_matches_c", "diff:mainint::adjust_difficulty_thresholds_match_c", "diff:mainint::adjust_difficulty_rounding_at_thresholds_matches_c", "diff:mainint::end_level_ani_matches_c"]
 notes = ""
 
 [[fn]]
