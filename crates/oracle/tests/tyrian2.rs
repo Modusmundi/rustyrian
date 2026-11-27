@@ -15,6 +15,8 @@ use std::os::unix::ffi::OsStrExt;
 
 mod net_support;
 use net_support::{Rig, data_dir, taps};
+mod menus_support;
+use menus_support::{Act, output_rect, script as menu_script};
 
 /// Mid-level fixture frames of `demo-cycle` (run `cargo xtask fixtures`).
 const FRAMES: [u64; 2] = [500, 2000];
@@ -825,6 +827,712 @@ fn je_draw_enemy_matches() {
             },
         )
         .expect("JE_drawEnemy matches");
+}
+
+/// Every branch of `JE_createNewEventEnemy` as fixed cases: each slot range
+/// (and 30, which positions nothing), with and without a position
+/// (`eventdat2` -99), each background3x1/background3x1b combination, the
+/// small-enemy adjustment on a size-0 and a size-1 enemy, and a full range.
+#[test]
+fn je_create_new_event_enemy_every_branch() {
+    // One fixture store, then per case only `varz`/`tyrian2`/`backgrnd`
+    // (41 cases, about 0.05 s each).
+    let mut d = Diff::new();
+    fixture_game(&mut d, 500);
+    d.game.episodes.enemy_dat[1].esize = 0;
+    d.game.episodes.enemy_dat[2].esize = 1;
+    d.store_to_c();
+    let mut case = 0usize;
+    let mut run = |d: &mut Diff, offset: u16, dat2: i16, flags: (bool, bool), free: bool| {
+        case += 1;
+        let g = &mut d.game;
+        let eventdat = 1 + (case % 2) as i16;
+        g.varz.event_loc = 3;
+        g.tyrian2.event_rec[2] = JeEventRecType {
+            eventdat,
+            eventdat2: dat2,
+            eventdat3: 2,
+            eventdat5: -3,
+            eventdat6: 4,
+            eventdat4: 9,
+            ..JeEventRecType::default()
+        };
+        g.varz.enemy_avail = [2; 100];
+        if free {
+            g.varz.enemy_avail[usize::from(offset) + case % 25] = 1;
+        }
+        (g.varz.background3x1, g.varz.background3x1b) = flags;
+        g.varz.small_enemy_adjust = !case.is_multiple_of(3);
+        (g.backgrnd.map_x, g.backgrnd.map_x3) = (3, 2);
+        (
+            g.backgrnd.back_move,
+            g.backgrnd.back_move2,
+            g.backgrnd.back_move3,
+        ) = (1, 2, 3);
+        g.varz.store_to_c();
+        g.tyrian2.store_to_c();
+        g.backgrnd.store_to_c();
+        // SAFETY: plain C call; `eventLoc >= 1` and the enemy index is valid.
+        unsafe { b::JE_createNewEventEnemy(0, offset, 0) };
+        t2::je_create_new_event_enemy(&mut d.game, 0, offset, 0);
+        check_enemies(d).unwrap_or_else(|e| panic!("case {case} offset {offset}: {e}"));
+    };
+    for offset in [0u16, 25, 50, 75, 30] {
+        for dat2 in [-99i16, 40] {
+            for flags in [(false, false), (true, false), (false, true), (true, true)] {
+                run(&mut d, offset, dat2, flags, true);
+            }
+        }
+    }
+    run(&mut d, 50, 40, (true, true), false);
+}
+
+/// A small deterministic generator for event data.
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 ^= self.0 << 13;
+        self.0 ^= self.0 >> 7;
+        self.0 ^= self.0 << 17;
+        self.0
+    }
+
+    /// Uniform in `lo..=hi`.
+    fn range(&mut self, lo: i64, hi: i64) -> i64 {
+        lo + (self.next() % (hi - lo + 1) as u64) as i64
+    }
+
+    /// True one time in `n`.
+    fn one_in(&mut self, n: u64) -> bool {
+        self.next().is_multiple_of(n)
+    }
+
+    fn pick<T: Copy>(&mut self, items: &[T]) -> T {
+        items[self.next() as usize % items.len()]
+    }
+}
+
+/// Event types that create enemies through `JE_createNewEventEnemy`.
+const CREATING_EVENTS: [u8; 14] = [6, 7, 10, 12, 15, 17, 18, 23, 32, 49, 50, 51, 52, 56];
+
+/// Shape-bank ids (`shapeFile` index + 1) whose file ships with the data.
+fn shipped_shape_banks() -> Vec<i16> {
+    let dir = data_dir();
+    (1..=rustyrian_core::lvlmast::SHAPE_FILE.len())
+        .filter(|&id| {
+            let c = rustyrian_core::lvlmast::SHAPE_FILE[id - 1].to_ascii_lowercase();
+            dir.join(format!("newsh{}.shp", c as char)).exists()
+        })
+        .map(|id| id as i16)
+        .collect()
+}
+
+/// Writes `eventLoc` in both engines.
+fn set_event_loc(d: &mut Diff, loc: u16) {
+    d.game.varz.event_loc = loc;
+    // SAFETY: C runs only on this thread; no other reference is live.
+    unsafe { *global_mut(&raw mut b::eventLoc) = loc };
+}
+
+/// Event 75 picks random link numbers until `JE_searchFor` finds one whose
+/// last live enemy is not moving vertically; with no such link number in the
+/// range C loops forever, so give the live enemies in range `eyc == 0`.
+/// Returns whether the Rust state changed.
+fn ensure_event_75_ends(g: &mut Game, ev: &JeEventRecType) -> bool {
+    let (lo, hi) = (ev.eventdat, ev.eventdat2);
+    let in_range = |l: u8| (lo..=hi).contains(&i16::from(l));
+    let v = &g.varz;
+    let clue = (0..100)
+        .any(|i| v.enemy_avail[i] == 0 && v.enemy[i].eyc == 0 && in_range(v.enemy[i].linknum));
+    let ends = (0..100).rev().any(|i| {
+        v.enemy_avail[i] == 0
+            && in_range(v.enemy[i].linknum)
+            && v.enemy[i].eyc == 0
+            && !(i + 1..100)
+                .any(|j| v.enemy_avail[j] == 0 && v.enemy[j].linknum == v.enemy[i].linknum)
+    });
+    if !clue || ends {
+        return false;
+    }
+    for i in 0..100 {
+        if g.varz.enemy_avail[i] == 0 && in_range(g.varz.enemy[i].linknum) {
+            g.varz.enemy[i].eyc = 0;
+        }
+    }
+    true
+}
+
+/// Runs the event at `loc` in both engines; checks the outcome and the
+/// platform calls, and with `deep` the module states events write.
+fn step_event(d: &mut Diff, loc: u16, deep: bool, what: &dyn std::fmt::Display) {
+    set_event_loc(d, loc);
+    // SAFETY: plain C call inside the guard; the event data is valid.
+    let c = unsafe { rustyrian_oracle::guard_call(|| b::JE_eventSystem()) };
+    let r = t2::je_event_system(&mut d.game);
+    assert_eq!(c, r.err().map(|h| h.code), "{what}");
+    assert_eq!(d.c_calls(), d.rust_calls(), "{what}: platform calls");
+    let same = || {
+        diff::load::<varz::State>() == d.game.varz
+            && diff::load::<State>() == d.game.tyrian2
+            && diff::load::<rustyrian_core::config::State>() == d.game.config
+            && diff::load::<rustyrian_core::backgrnd::State>() == d.game.backgrnd
+            && diff::load::<rustyrian_core::mtrand::State>() == d.game.mtrand
+    };
+    if deep && !same() {
+        check_whole(d, what);
+        panic!("{what}: module states differ");
+    }
+}
+
+/// The whole C state equals the Rust state.
+fn check_whole(d: &Diff, what: &dyn std::fmt::Display) {
+    if let Some(diff) = diff::first_difference(&d.c_game_state(), &d.game.snapshot()) {
+        panic!("{what}: states differ at {diff}");
+    }
+}
+
+/// Random game-mode flags and counters the events read, in both engines.
+fn shuffle_modes(d: &mut Diff, rng: &mut Rng) {
+    let g = &mut d.game;
+    let c = &mut g.config;
+    c.galaga_mode = rng.one_in(4);
+    c.two_player_mode = rng.one_in(3);
+    c.one_player_action = rng.one_in(3);
+    c.super_tyrian = rng.one_in(4);
+    c.super_arcade_mode = if rng.one_in(3) {
+        rng.range(1, 7) as u8
+    } else {
+        0
+    };
+    c.difficulty_level = rng.range(0, 10) as i8;
+    c.initial_difficulty = rng.range(0, 10) as i8;
+    let v = &mut g.varz;
+    v.all_players_gone = rng.one_in(4);
+    v.end_level = rng.one_in(3);
+    v.first_game_over = !rng.one_in(4);
+    v.galaga_shot_freq = rng.range(8, 10) as u16;
+    for f in v.global_flags.iter_mut() {
+        *f = rng.one_in(2);
+    }
+    let lives = rng.pick(&[0u8, 3, 11]);
+    g.player.player[0].set_lives(lives);
+    g.config.store_to_c();
+    g.varz.store_to_c();
+    g.player.store_to_c();
+}
+
+/// Frees a few enemy slots in both engines, so creating events find room.
+fn free_some_slots(d: &mut Diff, rng: &mut Rng) {
+    for _ in 0..3 {
+        let i = rng.range(0, 99) as usize;
+        set_avail(d, i, 1);
+    }
+}
+
+/// Synthetic data for an event of type `ty` that keeps C defined: indices
+/// into fixed tables stay in range, as `JE_loadMap`'s validation of level
+/// data guarantees.
+fn synthetic_event(ty: u8, rng: &mut Rng, g: &Game, banks: &[i16]) -> JeEventRecType {
+    let any16 = |rng: &mut Rng| match rng.range(0, 3) {
+        0 => -99,
+        1 => 0,
+        _ => rng.range(-300, 900) as i16,
+    };
+    let link = |rng: &mut Rng| -> u8 {
+        if rng.one_in(2) {
+            g.varz.enemy[rng.range(0, 99) as usize].linknum
+        } else {
+            rng.range(0, 3) as u8
+        }
+    };
+    let mut ev = JeEventRecType {
+        eventtime: rng.range(0, 3000) as u16,
+        eventtype: ty,
+        eventdat: any16(rng),
+        eventdat2: any16(rng),
+        eventdat3: rng.pick(&[0i8, 1, 2, 3, 16, 17, 99, -99, 80, 85, 89, -5]),
+        eventdat5: rng.pick(&[0i8, 3, -2, -99, 40]),
+        eventdat6: rng.pick(&[0i8, 1, 2, 3, 4, 5, -99, 7]),
+        eventdat4: link(rng),
+    };
+    match ty {
+        5 => {
+            let bank = |rng: &mut Rng| {
+                if rng.one_in(3) {
+                    rng.range(-2, 0) as i16
+                } else {
+                    rng.pick(banks)
+                }
+            };
+            ev.eventdat = bank(rng);
+            ev.eventdat2 = bank(rng);
+            ev.eventdat3 = bank(rng) as i8;
+            ev.eventdat4 = bank(rng).max(0) as u8;
+        }
+        _ if CREATING_EVENTS.contains(&ty) => {
+            ev.eventdat = rng.range(0, ENEMY_NUM as i64 - 3) as i16;
+            if (49..=52).contains(&ty) {
+                ev.eventdat3 = rng.pick(&[0i8, 21, 26, 99, -5]);
+            }
+        }
+        4 => ev.eventdat = rng.range(0, 4) as i16,
+        11 => ev.eventdat = rng.range(0, 2) as i16,
+        16 => ev.eventdat = rng.range(-1, 11) as i16,
+        25 => ev.eventdat = rng.range(0, 51) as i16,
+        35 => ev.eventdat = rng.range(1, rustyrian_core::musmast::MUSIC_NUM as i64) as i16,
+        46 => ev.eventdat = rng.range(-12, 12) as i16,
+        53 => ev.eventdat = rng.pick(&[99i16, 0, 1]),
+        61 => {
+            ev.eventdat = rng.range(1, 10) as i16;
+            ev.eventdat2 = rng.range(0, 1) as i16;
+            ev.eventdat3 = rng.range(0, 4) as i8;
+        }
+        64 => {
+            ev.eventdat = rng.range(1, 9) as i16;
+            ev.eventdat2 = rng.range(0, 1) as i16;
+        }
+        66 | 63 | 80 => ev.eventdat2 = rng.range(0, 4) as i16,
+        70 => {
+            let (l2, l3, l4) = (link(rng), link(rng), link(rng));
+            ev.eventdat2 = rng.pick(&[0i16, i16::from(l2), 5]);
+            ev.eventdat3 = rng.pick(&[0i8, l3 as i8]);
+            ev.eventdat4 = rng.pick(&[0u8, l4]);
+        }
+        71 => ev.eventdat2 = rng.pick(&[0i16, 300, 2000, -1]),
+        75 => {
+            ev.eventdat = i16::from(link(rng)).min(250);
+            ev.eventdat2 = ev.eventdat + rng.range(0, 5) as i16;
+            ev.eventdat3 = rng.range(80, 89) as i8;
+            ev.eventdat4 = rng.range(0, 4) as u8;
+        }
+        // Positions inside `mainmap` (a pointer outside it is undefined).
+        77 | 81 => {
+            ev.eventdat = rng.range(0, 8000) as i16;
+            let far = rng.range(0, 8000) as i16;
+            // 77 ignores a non-positive `eventdat2`; 81 uses it as a position.
+            ev.eventdat2 = rng.pick(&[0i16, if ty == 77 { -3 } else { 2 }, far]);
+        }
+        _ => {}
+    }
+    if matches!(ty, 1 | 19 | 20 | 24 | 27 | 55) && rng.one_in(2) {
+        ev.eventdat = rng.range(1, 12) as i16;
+    }
+    ev
+}
+
+/// `JE_eventSystem` on synthetic events of every type (and invalid types)
+/// with data that reaches every branch, under random game modes; runs both
+/// engines in lock step from each mid-level fixture.
+#[test]
+fn je_event_system_matches_on_synthetic_events() {
+    // Lock step from one fixture store per frame; about 2 ms per event.
+    let banks = shipped_shape_banks();
+    for (round, frame) in FRAMES.into_iter().enumerate() {
+        let mut d = Diff::new();
+        fixture_game(&mut d, frame);
+        // Synthetic jumps (and returns to locations set by event 75) may
+        // target any time: the last slot ends every search, as the level's
+        // final event at time 65535 does for its own script.
+        d.game.tyrian2.event_rec[EVENT_MAXIMUM - 1].eventtime = 65535;
+        d.store_to_c();
+        let max_event = usize::from(d.game.varz.max_event);
+        assert!(max_event > 10);
+        let mut rng = Rng(0x9E37_79B9_7F4A_7C15 ^ frame);
+        for pass in 0..16 {
+            for ty in 0..=90u8 {
+                let what = format!("frame {frame} pass {pass} type {ty}");
+                if rng.one_in(4) {
+                    shuffle_modes(&mut d, &mut rng);
+                }
+                if CREATING_EVENTS.contains(&ty) {
+                    free_some_slots(&mut d, &mut rng);
+                }
+                // Keep the level's final event (time 65535) as the end of
+                // every jump's search.
+                let loc = rng.range(1, max_event as i64 - 6) as u16;
+                let ev = synthetic_event(ty, &mut rng, &d.game, &banks);
+                d.game.tyrian2.event_rec[usize::from(loc) - 1] = ev;
+                if ty == 70 && rng.one_in(2) {
+                    // No live enemy: event 70's search finds nothing.
+                    d.game.varz.enemy_avail = [1; 100];
+                }
+                if ty == 75 && rng.one_in(2) {
+                    // A live, still enemy in the link range.
+                    let i = rng.range(0, 99) as usize;
+                    set_avail(&mut d, i, 0);
+                    d.game.varz.enemy[i].linknum = ev.eventdat2 as u8;
+                    d.game.varz.enemy[i].eyc = 0;
+                }
+                if ty == 75 {
+                    ensure_event_75_ends(&mut d.game, &ev);
+                }
+                d.game.varz.store_to_c();
+                d.game.tyrian2.store_to_c();
+                step_event(&mut d, loc, true, &what);
+            }
+            check_whole(&d, &format!("frame {frame} pass {pass} (round {round})"));
+        }
+    }
+}
+
+/// The event lists of every level of episode `ep`, read as `JE_loadMap`
+/// reads them.
+fn shipped_level_events(ep: u8) -> Vec<Vec<JeEventRecType>> {
+    let bytes = std::fs::read(data_dir().join(format!("tyrian{ep}.lvl"))).expect("level file");
+    let u16_at = |p: usize| u16::from_le_bytes([bytes[p], bytes[p + 1]]);
+    let lvl_num = usize::from(u16_at(0));
+    let pos = |i: usize| {
+        u32::from_le_bytes(bytes[2 + 4 * i..6 + 4 * i].try_into().expect("4 bytes")) as usize
+    };
+    (0..lvl_num / 2)
+        .map(|k| {
+            // char_mapFile, char_shapeFile, mapX, mapX2, mapX3
+            let mut p = pos(k * 2) + 2 + 6;
+            let enemies = usize::from(u16_at(p));
+            p += 2 + 2 * enemies;
+            let max_event = usize::from(u16_at(p));
+            p += 2;
+            assert!(max_event < EVENT_MAXIMUM, "episode {ep} level {k}");
+            (0..max_event)
+                .map(|i| {
+                    let e = &bytes[p + 11 * i..p + 11 * (i + 1)];
+                    JeEventRecType {
+                        eventtime: u16::from_le_bytes([e[0], e[1]]),
+                        eventtype: e[2],
+                        eventdat: i16::from_le_bytes([e[3], e[4]]),
+                        eventdat2: i16::from_le_bytes([e[5], e[6]]),
+                        eventdat3: e[7] as i8,
+                        eventdat5: e[8] as i8,
+                        eventdat6: e[9] as i8,
+                        eventdat4: e[10],
+                    }
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// Every event of every level of the four episodes, in file order, under
+/// game modes that vary per level, in both engines in lock step.
+#[test]
+fn je_event_system_runs_every_shipped_event() {
+    // Lock step from one fixture store per episode; whole-state comparison
+    // per level (about 0.3 s), module comparison every 16 events.
+    for ep in 1..=4u8 {
+        let mut d = Diff::new();
+        fixture_game(&mut d, FRAMES[usize::from(ep) % 2]);
+        d.store_to_c();
+        // SAFETY: JE_initEpisode may exit, which the guard catches.
+        let c = unsafe { rustyrian_oracle::guard_call(|| b::JE_initEpisode(ep)) };
+        assert_eq!(c, None);
+        episodes::je_init_episode(&mut d.game, ep).expect("episode loads");
+        assert_eq!(d.c_calls(), d.rust_calls());
+        let mut rng = Rng(0xD1B5_4A32_D192_ED03 ^ u64::from(ep));
+        let levels = shipped_level_events(ep);
+        assert!(levels.len() > 5, "episode {ep}");
+        for (k, events) in levels.iter().enumerate() {
+            shuffle_modes(&mut d, &mut rng);
+            let g = &mut d.game;
+            g.tyrian2.event_rec[..events.len()].copy_from_slice(events);
+            g.tyrian2.event_rec[events.len()].eventtime = 65500;
+            g.varz.max_event = events.len() as u16;
+            g.tyrian2.store_to_c();
+            g.varz.store_to_c();
+            for loc in 1..=events.len() as u16 {
+                let what = format!("episode {ep} level {k} event {loc}");
+                let ev = d.game.tyrian2.event_rec[usize::from(loc) - 1];
+                if CREATING_EVENTS.contains(&ev.eventtype) {
+                    free_some_slots(&mut d, &mut rng);
+                }
+                if ev.eventtype == 75 && ensure_event_75_ends(&mut d.game, &ev) {
+                    d.game.varz.store_to_c();
+                }
+                step_event(&mut d, loc, loc % 16 == 0, &what);
+            }
+            check_whole(&d, &format!("episode {ep} level {k}"));
+        }
+    }
+}
+
+/// The level warning text: red or normal placement, ended by input, by the
+/// slow countdown or by ESC already held, with the warning animation on or
+/// off, and a network halt while it is drawn.
+#[test]
+fn je_display_text_matches() {
+    for case in 0..10u32 {
+        // Only input ends the wait (in the slow case through the glow
+        // animation, which zeroes `frameCountMax`); early or late taps.
+        let script = if case % 3 == 2 {
+            taps(200, 20_000)
+        } else {
+            taps(1_500, 20_000)
+        };
+        let mut rig = rig_on(&script);
+        let f = &mut rig.g.fonthand;
+        f.level_warning_lines = (case % 4 + 1) as u8;
+        for (i, line) in f.level_warning_text.iter_mut().enumerate() {
+            let text = format!("WARNING LINE {i}");
+            line[..text.len()].copy_from_slice(text.as_bytes());
+        }
+        f.warning_red = case % 2 == 1;
+        f.level_warning_display = case % 4 < 2;
+        rig.g.nortsong.frame_count_max = if case % 3 == 2 { 3 } else { 0 };
+        rig.g.keyboard.esc_pressed = case == 5;
+        rig.g.network.halt_game = case == 9;
+        rig.store();
+        rig.clear();
+        // SAFETY: plain C call inside the guard.
+        let r = rig.run(|| unsafe { b::JE_displayText() }, t2::je_display_text);
+        if case == 9 {
+            assert_eq!(r, Err(0));
+            rig.check_halted();
+        } else {
+            assert_eq!(r, Ok(()));
+            rig.check();
+        }
+    }
+}
+
+/// Key taps one per `gap` ms from 1 s (then ESC taps, so every loop ends).
+fn key_script(keys: &[&'static str], gap: u32) -> String {
+    let acts: Vec<(Act, u32)> = keys.iter().map(|&k| (Act::Key(k), gap)).collect();
+    menu_script(output_rect(), 1_000, &acts)
+}
+
+/// `newGame`: every game mode, every episode's starting cash, the rich
+/// mode, and cancelling in each of the three menus.
+#[test]
+fn new_game_matches() {
+    let runs: [(&[&'static str], bool); 10] = [
+        (&["RETURN", "RETURN", "RETURN"], false),
+        (&["RETURN", "DOWN", "RETURN", "RETURN"], false),
+        (&["RETURN", "DOWN", "DOWN", "RETURN", "RETURN"], false),
+        (&["RETURN", "UP", "RETURN", "RETURN"], false),
+        (&["DOWN", "RETURN", "RETURN", "RETURN"], false),
+        (&["DOWN", "DOWN", "RETURN", "RETURN", "RETURN"], false),
+        (&["RETURN", "RETURN", "RETURN"], true),
+        (&["RETURN", "ESCAPE"], false),
+        (&["RETURN", "RETURN", "ESCAPE"], false),
+        (&["ESCAPE"], false),
+    ];
+    for (keys, rich) in runs {
+        let mut rig = rig_on(&key_script(keys, 1_500));
+        rig.g.episodes.episode_avail = [true; 5];
+        rig.g.params.rich_mode = rich;
+        rig.store();
+        rig.clear();
+        // SAFETY: plain C call inside the guard.
+        let r = rig.run(|| unsafe { b::newGame() }, t2::new_game);
+        assert!(r.is_ok(), "{keys:?}");
+        rig.check();
+    }
+}
+
+/// `newSuperArcadeGame` for every super-arcade ship, started or cancelled.
+#[test]
+fn new_super_arcade_game_matches() {
+    for i in 0..7u32 {
+        let keys: &[&'static str] = if i == 4 {
+            &["ESCAPE"]
+        } else {
+            &["RETURN", "RETURN", "RETURN"]
+        };
+        let mut rig = rig_on(&key_script(keys, 1_500));
+        rig.g.episodes.episode_avail = [true; 5];
+        rig.store();
+        rig.clear();
+        // SAFETY: plain C call inside the guard.
+        let r = rig.run(
+            || unsafe { b::newSuperArcadeGame(i) },
+            |g| t2::new_super_arcade_game(g, i),
+        );
+        assert_eq!(r, Ok(i != 4), "ship {i}");
+        rig.check();
+    }
+}
+
+/// A packet: header (`type`, `sync`) then `body`.
+fn net_pkt(type_: u16, sync: u16, body: &[u8]) -> Vec<u8> {
+    let mut v = type_.to_be_bytes().to_vec();
+    v.extend_from_slice(&sync.to_be_bytes());
+    v.extend_from_slice(body);
+    v
+}
+
+/// `networkStartScreen` as the host (choosing an episode and difficulty, or
+/// cancelling) and as the guest (waiting for the details packet).
+#[test]
+fn network_start_screen_matches() {
+    use rustyrian_core::network as net;
+    // (player, cancel, late): the guest's details either arrive with the
+    // handshake or later, while it waits (receives fail for a while).
+    for (player, cancel, late) in [
+        (1u32, false, false),
+        (1, true, false),
+        (2, false, false),
+        (2, false, true),
+    ] {
+        let keys: &[&'static str] = if cancel {
+            &["ESCAPE"]
+        } else {
+            &["RETURN", "RETURN"]
+        };
+        let acts: Vec<(Act, u32)> = keys.iter().map(|&k| (Act::Key(k), 1_500)).collect();
+        let mut rig = rig_on(&menu_script(output_rect(), 3_000, &acts));
+        rig.net();
+        rig.g.episodes.episode_avail = [true; 5];
+        let mut s = rig.g.network.clone();
+        s.is_network_game = true;
+        s.network_delay = 1;
+        s.this_player_num = player;
+        s.network_opponent_host = Some(b"127.0.0.1".to_vec());
+        s.network_player_name = Some(b"HOST".to_vec());
+        net_support::store_net(&mut rig, s);
+        rig.store();
+        rig.clear();
+        let mut connect = Vec::new();
+        // Every episode available on the opponent's side too.
+        for v in [net::NET_VERSION, 1, 0x1F, (3 - player) as u16] {
+            connect.extend_from_slice(&v.to_be_bytes());
+        }
+        connect.extend_from_slice(b"PEER\0");
+        rig.push(&net_pkt(net::PACKET_CONNECT, 7, &connect));
+        for sync in 0..4 {
+            rig.push(&net_pkt(net::PACKET_ACKNOWLEDGE, sync, &[]));
+        }
+        if player == 2 {
+            let mut details = 2u16.to_be_bytes().to_vec();
+            details.extend_from_slice(&3u16.to_be_bytes());
+            rig.push(&net_pkt(net::PACKET_DETAILS, 8, &details));
+        }
+        if late {
+            // Each `fail_after(k)` fails receive call k+1 (failed calls
+            // count too): the details wait behind the CONNECT and four
+            // acknowledgments.
+            for k in 5..600 {
+                rig.c_fake.fail_after("SDLNet_UDP_Recv", k);
+                rig.r_fake.fail_after("SDLNet_UDP_Recv", k);
+            }
+        }
+        // SAFETY: plain C call inside the guard.
+        let r = rig.run(
+            || unsafe { b::networkStartScreen() },
+            t2::network_start_screen,
+        );
+        // Only a cancel exits (through network_tyrian_halt).
+        assert_eq!(r.is_err(), cancel, "player {player}: {r:?}");
+        match r {
+            Ok(()) => rig.check(),
+            Err(_) => rig.check_halted(),
+        }
+    }
+}
+
+/// The special names typed on the title screen, from the help text.
+fn special_names() -> Vec<String> {
+    let rig = rig_on("ots 1\n");
+    rig.g
+        .helptext
+        .special_name
+        .iter()
+        .map(|n| {
+            let len = n.iter().position(|&c| c == 0).unwrap_or(n.len());
+            String::from_utf8_lossy(&n[..len]).into_owned()
+        })
+        .collect()
+}
+
+/// One title-screen run on both engines; returns its result.
+fn run_title(acts: &[(Act, u32)], logo_up: bool) -> bool {
+    // Without interactions: no input at all (the idle demo).
+    let script = if acts.is_empty() {
+        "ots 1\n".to_owned()
+    } else {
+        menu_script(output_rect(), 500, acts)
+    };
+    let mut rig = rig_on(&script);
+    rig.g.episodes.episode_avail = [true; 5];
+    rig.g.varz.move_tyrian_logo_up = logo_up;
+    rig.store();
+    rig.clear();
+    // SAFETY: plain C call inside the guard.
+    let r = rig.run(|| unsafe { b::titleScreen() }, t2::title_screen);
+    let r = r.unwrap_or_else(|code| panic!("{acts:?}: exit {code}"));
+    rig.check();
+    r
+}
+
+/// The script key name of an uppercase letter.
+fn letter(c: char) -> &'static str {
+    const LETTERS: [&str; 26] = [
+        "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R",
+        "S", "T", "U", "V", "W", "X", "Y", "Z",
+    ];
+    LETTERS[(c.to_ascii_uppercase() as u8 - b'A') as usize]
+}
+
+/// `titleScreen`: every menu item by keyboard (with wrap-around) and by
+/// mouse, ESC and right-click, the idle demo, the logo animation, and every
+/// special name (super-arcade ships, Destruct, SuperTyrian), including a
+/// broken-off name and a cancelled super-arcade start.
+#[test]
+fn title_screen_matches() {
+    use Act::{Click, Key, Move};
+    let k = |name: &'static str| (Key(name), 1_200);
+    let item = |i: i32| (160, 104 + 13 * i + 5);
+    // Idle until the demo starts.
+    assert!(run_title(&[], true));
+    assert!(!run_title(&[k("UP"), k("RETURN")], false));
+    assert!(run_title(&[k("UP"), k("UP"), k("SPACE")], false));
+    assert!(!run_title(&[k("ESCAPE")], false));
+    // New game started, then cancelled (back to the menu, then quit).
+    assert!(run_title(
+        &[k("RETURN"), k("RETURN"), k("RETURN"), k("RETURN")],
+        false
+    ));
+    assert!(!run_title(&[k("RETURN"), k("ESCAPE")], false));
+    // Load (left again), high scores, instructions, setup; then ESC taps.
+    for down in 1..=4 {
+        let mut acts = vec![k("DOWN"); down];
+        acts.push(k("RETURN"));
+        assert!(!run_title(&acts, false), "item {down}");
+    }
+    // Mouse: hover an item, click one, right-click.
+    let (x, y) = item(6);
+    assert!(!run_title(&[(Move(x, y), 1_200), (Click(1), 300)], false));
+    let (x, y) = item(5);
+    assert!(run_title(
+        &[
+            (Move(x, y), 1_200),
+            (Move(x, y - 13), 300),
+            (Move(x, y), 300),
+            (Click(1), 300)
+        ],
+        false
+    ));
+    assert!(!run_title(&[(Move(5, 5), 1_200), (Click(3), 300)], false));
+    // Special names: typed letters; F1 is not ASCII.
+    let names = special_names();
+    for (i, name) in names.iter().enumerate() {
+        let mut acts: Vec<(Act, u32)> = vec![(Key("F1"), 1_200)];
+        if i == 0 {
+            // A broken-off name first.
+            acts.extend(name.chars().take(2).map(|c| (Key(letter(c)), 200)));
+            acts.push((Key("Z"), 200));
+        }
+        acts.extend(name.chars().map(|c| (Key(letter(c)), 200)));
+        if i < 7 {
+            let confirm = if i == 1 { "ESCAPE" } else { "RETURN" };
+            acts.extend([
+                (Key(confirm), 1_500),
+                (Key("RETURN"), 1_500),
+                (Key("RETURN"), 1_500),
+            ]);
+        }
+        let started = run_title(&acts, false);
+        assert_eq!(started, i != 1, "name {i} {name}");
+    }
 }
 
 #[test]
