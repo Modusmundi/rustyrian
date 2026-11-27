@@ -4,7 +4,11 @@
 //! `--sim-digest`.
 //!
 //! Pass: both exit 0, neither log contains `unsynchronized`, and the `sim`
-//! values are equal for every frame both traces contain. The engines present
+//! values are equal for every frame both traces contain. Upstream only draws
+//! "Player N is unsynchronized!" on screen (`tyrian2.c:2155`), so the log
+//! check is a backstop; the per-frame `sim` equality, which covers both
+//! players' positions that upstream's desync test compares, is the operative
+//! check. The engines present
 //! menu frames at their own pace (player 1 waits in "Waiting for other
 //! player" without presenting), so the traces are aligned first: at the frame
 //! offset whose run of equal `sim` values reaches the end of the overlap
