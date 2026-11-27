@@ -334,24 +334,37 @@ pub fn audio_callback(a: &mut AudioState, crand: &Mutex<crand::State>, samples: 
             sample_volume_factor.wrapping_mul(i as i32 + 1) / CHANNEL_VOLUME_LEVELS as i32
         });
 
-        // Mix music and channels
-        for s in samples.iter_mut() {
-            let mut sample = i32::from(*s).wrapping_mul(music_volume_factor);
-
-            for i in 0..CHANNEL_COUNT {
-                if a.channel_sample_count[i] > 0 {
-                    let factor = sample_volume_factors[usize::from(a.channel_volume[i])];
-                    let ch = a.channel_samples[i]
-                        .as_mut()
-                        .expect("a playing channel has samples");
-                    sample = sample.wrapping_add(i32::from(ch.buf.0[ch.pos]).wrapping_mul(factor));
-
-                    ch.pos += 1;
-                    a.channel_sample_count[i] -= 1;
-                }
+        // Mix music and channels. C walks the samples and, for each, adds
+        // the playing channels in order; the same sums, channel by channel
+        // over a block of samples.
+        const MIX_BLOCK: usize = 1024;
+        for block in samples.chunks_mut(MIX_BLOCK) {
+            let mut mix = [0i32; MIX_BLOCK];
+            let mix = &mut mix[..block.len()];
+            for (m, &s) in mix.iter_mut().zip(block.iter()) {
+                *m = i32::from(s).wrapping_mul(music_volume_factor);
             }
 
-            *s = clamp16(fixed_to_int(sample));
+            for i in 0..CHANNEL_COUNT {
+                let n = a.channel_sample_count[i].min(block.len());
+                if n == 0 {
+                    continue;
+                }
+                let factor = sample_volume_factors[usize::from(a.channel_volume[i])];
+                let ch = a.channel_samples[i]
+                    .as_mut()
+                    .expect("a playing channel has samples");
+                for (m, &v) in mix[..n].iter_mut().zip(&ch.buf.0[ch.pos..ch.pos + n]) {
+                    *m = m.wrapping_add(i32::from(v).wrapping_mul(factor));
+                }
+
+                ch.pos += n;
+                a.channel_sample_count[i] -= n;
+            }
+
+            for (s, &m) in block.iter_mut().zip(mix.iter()) {
+                *s = clamp16(fixed_to_int(m));
+            }
         }
     }
 }
