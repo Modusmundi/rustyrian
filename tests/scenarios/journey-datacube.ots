@@ -1,0 +1,39 @@
+ots 1
+# journey-datacube: new game; read two datacubes from the Game Menu's Data screen.
+# Authored against ot-ref-run (virtual clock); the title menu is ready at ~8.1 s.
+# title: Start New Game
+@8500 key-down RETURN
+@8560 key-up RETURN
+# Players: 1 Player Full Game
+@10300 key-down RETURN
+@10360 key-up RETURN
+# Episode 1: Escape
+@12100 key-down RETURN
+@12160 key-up RETURN
+# Difficulty: Normal
+@13900 key-down RETURN
+@13960 key-up RETURN
+# Game Menu: Data
+@15000 key-down RETURN
+@15060 key-up RETURN
+# Data: read cube 1 (Tyrian Dataflux), scroll down
+@16100 key-down RETURN
+@16160 key-up RETURN
+@17900 key-down DOWN
+@17960 key-up DOWN
+@18200 key-down DOWN
+@18260 key-up DOWN
+@18500 key-down DOWN
+@18560 key-up DOWN
+# back to the cube list; read cube 2 (Holovid Release Alpha)
+@20300 key-down ESCAPE
+@20360 key-up ESCAPE
+@21400 key-down DOWN
+@21460 key-up DOWN
+@21700 key-down RETURN
+@21760 key-up RETURN
+# back to the cube list, then the Game Menu
+@24000 key-down ESCAPE
+@24060 key-up ESCAPE
+@25100 key-down ESCAPE
+@25160 key-up ESCAPE

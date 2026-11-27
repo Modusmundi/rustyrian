@@ -1,0 +1,31 @@
+ots 1
+# journey-arcade-1p: 1 Player Arcade, episode 1, Normal; play level 1.
+# Authored against ot-ref-run (virtual clock); the title menu is ready at ~8.1 s.
+# title: Start New Game
+@8500 key-down RETURN
+@8560 key-up RETURN
+# Players: 1 Player Arcade
+@10300 key-down DOWN
+@10360 key-up DOWN
+@10600 key-down RETURN
+@10660 key-up RETURN
+# Episode 1: Escape
+@12400 key-down RETURN
+@12460 key-up RETURN
+# Difficulty: Normal
+@14200 key-down RETURN
+@14260 key-up RETURN
+# arcade Game Menu: Play Next Level
+@19500 key-down RETURN
+@19560 key-up RETURN
+# arcade level 1: fire and strafe (picks up the Sonic Wave and the Vulcan Cannon)
+@22500 key-down SPACE
+@22500 key-down LEFT
+@23500 key-up LEFT
+@24800 key-down RIGHT
+@26800 key-up RIGHT
+@28100 key-down UP
+@28600 key-up UP
+@32900 key-down LEFT
+@34400 key-up LEFT
+@34700 key-up SPACE

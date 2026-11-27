@@ -1,0 +1,23 @@
+ots 1
+# netplay-crossplay, player 1 (the C engine in `cargo xtask crossplay`). Real clock: the
+# times are milliseconds since this peer started; both peers start together.
+# "Waiting for other player", then episode select: Episode 1
+@3000 key-down RETURN
+@3060 key-up RETURN
+# difficulty select: Normal
+@4800 key-down RETURN
+@4860 key-up RETURN
+# network Game Menu: Play Next Level ("Waiting for other player" until player 2 does too)
+@9000 key-down RETURN
+@9060 key-up RETURN
+# level 1 (starts at ~10 s): fire and strafe
+@14000 key-down SPACE
+@14000 key-down LEFT
+@15000 key-up LEFT
+@16300 key-down RIGHT
+@18300 key-up RIGHT
+@19600 key-down UP
+@20100 key-up UP
+@24400 key-down LEFT
+@25900 key-up LEFT
+@26200 key-up SPACE

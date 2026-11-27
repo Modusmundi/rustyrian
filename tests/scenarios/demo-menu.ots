@@ -1,0 +1,16 @@
+ots 1
+# demo-menu: select Demo on the title menu and watch 60 s of it.
+# Authored against ot-ref-run (virtual clock); the title menu is ready at ~8.1 s.
+# title: Down x5 to Demo, Return (the demo starts at ~11.7 s)
+@8500 key-down DOWN
+@8560 key-up DOWN
+@8800 key-down DOWN
+@8860 key-up DOWN
+@9100 key-down DOWN
+@9160 key-up DOWN
+@9400 key-down DOWN
+@9460 key-up DOWN
+@9700 key-down DOWN
+@9760 key-up DOWN
+@10000 key-down RETURN
+@10060 key-up RETURN

@@ -167,3 +167,40 @@ game_states!(
     video_scale_hqnx,
     xmas,
 );
+
+/// The `--sim-digest` value of a frame: FNV-1a 64 over the postcard
+/// serialisation of the simulation state that two netplay peers must agree on
+/// (and that both runners, `ot-ref-run` and `rs-run`, digest identically).
+///
+/// In order:
+/// - `mtrand.mt_global`: the shared Mersenne Twister; every gameplay draw
+///   comes from it, so any divergence in simulation call order shows here.
+/// - `player.player`: both ships (position, items, cash, armor, shields,
+///   sidekicks).
+/// - `shots.player_shot_data`, `shots.shot_avail`: player shots in flight.
+/// - `varz.enemy`, `varz.enemy_avail`, `varz.enemy_shot`,
+///   `varz.enemy_shot_avail`: enemies and their shots.
+/// - `varz.cur_loc`, `varz.event_loc`, `varz.level_end`, `varz.end_level`,
+///   `varz.total_enemy`, `varz.enemy_killed`: level progress.
+///
+/// Peer-local and UI state (menus, palette, screens, audio, network
+/// bookkeeping, the libc `rand()` stream) is deliberately left out.
+pub fn sim_digest(g: &Game) -> u64 {
+    let v = &g.varz;
+    let state = (
+        &g.mtrand.mt_global,
+        &g.player.player,
+        &g.shots.player_shot_data[..],
+        &g.shots.shot_avail[..],
+        &v.enemy[..],
+        &v.enemy_avail[..],
+        &v.enemy_shot[..],
+        &v.enemy_shot_avail[..],
+        (v.cur_loc, v.event_loc, v.level_end, v.end_level),
+        (v.total_enemy, v.enemy_killed),
+    );
+    let bytes = postcard::to_stdvec(&state).expect("simulation state always serialises");
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325_u64, |h, &b| {
+        (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3)
+    })
+}

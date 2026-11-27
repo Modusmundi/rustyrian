@@ -1,0 +1,42 @@
+ots 1
+# journey-arcade-2p: 2 Player Arcade, episode 1, Normal; player 1 on the keyboard,
+# player 2 (the game's default for 2-player arcade) on the mouse; play level 1.
+# Authored against ot-ref-run (virtual clock); the title menu is ready at ~8.1 s.
+# title: Start New Game
+@8500 key-down RETURN
+@8560 key-up RETURN
+# Players: 2 Player Arcade
+@10300 key-down DOWN
+@10360 key-up DOWN
+@10600 key-down DOWN
+@10660 key-up DOWN
+@10900 key-down RETURN
+@10960 key-up RETURN
+# Episode 1: Escape
+@12700 key-down RETURN
+@12760 key-up RETURN
+# Difficulty: Normal
+@14500 key-down RETURN
+@14560 key-up RETURN
+# arcade Game Menu: Play Next Level
+@19500 key-down RETURN
+@19560 key-up RETURN
+# player 1 (keyboard) fires and strafes while player 2 (mouse) fires and moves
+@22500 mouse-down 1
+@22500 key-down SPACE
+@22500 key-down LEFT
+@23500 key-up LEFT
+@24800 mouse-move 120 100
+@25100 mouse-move 80 90
+@25400 mouse-move 40 90
+@25400 key-down RIGHT
+@27400 key-up RIGHT
+@28700 key-down UP
+@29200 key-up UP
+@29500 mouse-move 120 100
+@29800 mouse-move 200 110
+@30100 mouse-move 240 110
+@34100 key-down LEFT
+@35600 key-up LEFT
+@35900 key-up SPACE
+@35900 mouse-up 1

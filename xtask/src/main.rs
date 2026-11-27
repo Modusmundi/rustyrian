@@ -1,13 +1,16 @@
 //! Repository automation for rustyrian. See `porting/RULES.md` and the README.
 
 mod ast;
+mod bench;
 mod check_trace;
 mod coverage;
+mod crossplay;
 mod fetch_data;
 mod fuzz_seed;
 mod gen_oracle;
 mod inventory;
 mod manifest;
+mod parity;
 mod sanitize;
 mod scenario;
 mod tools;
@@ -54,6 +57,37 @@ enum Cmd {
         #[arg(long)]
         release: bool,
     },
+    /// Compare the C oracle and the Rust runner on a scenario (traces and user
+    /// directories); diagnose the first differing frame.
+    Parity {
+        scenario: String,
+        /// Copy the C traces to `tests/golden/`.
+        #[arg(long)]
+        bless: bool,
+        /// Rust runner binary (default: `rs-run` of the oracle crate).
+        #[arg(long)]
+        rust_runner: Option<std::path::PathBuf>,
+        /// Test only: the Rust side runs this script instead of the
+        /// scenario's first one.
+        #[arg(long, hide = true)]
+        rust_script: Option<std::path::PathBuf>,
+        #[arg(long)]
+        release: bool,
+    },
+    /// Rust/C headless throughput on `demo-cycle`; fails below 0.90.
+    BenchRatio {
+        /// Rust runner binary (default: `rs-run` of the oracle crate).
+        #[arg(long)]
+        rust_runner: Option<std::path::PathBuf>,
+    },
+    /// C (player 1) and Rust (player 2) netplay over UDP on 127.0.0.1.
+    Crossplay {
+        /// Rust runner binary (default: `rs-run` of the oracle crate).
+        #[arg(long)]
+        rust_runner: Option<std::path::PathBuf>,
+        #[arg(long)]
+        release: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -74,5 +108,37 @@ fn main() -> Result<()> {
             out,
             release,
         } => scenario::ref_trace(&root, &scenario, out.as_deref(), release),
+        Cmd::Parity {
+            scenario,
+            bless,
+            rust_runner,
+            rust_script,
+            release,
+        } => {
+            let opts = parity::Options {
+                scenario,
+                bless,
+                rust_runner: runner_path(rust_runner)?,
+                rust_script: rust_script.map(std::path::absolute).transpose()?,
+                release,
+            };
+            if !parity::run(&root, &opts)? {
+                std::process::exit(1);
+            }
+            Ok(())
+        }
+        Cmd::BenchRatio { rust_runner } => bench::run(&root, runner_path(rust_runner)?.as_deref()),
+        Cmd::Crossplay {
+            rust_runner,
+            release,
+        } => crossplay::run(&root, runner_path(rust_runner)?.as_deref(), release),
     }
+}
+
+/// `--rust-runner`, made absolute: runners start in the repository root.
+fn runner_path(p: Option<std::path::PathBuf>) -> Result<Option<std::path::PathBuf>> {
+    p.map(|p| {
+        std::fs::canonicalize(&p).map_err(|e| anyhow::anyhow!("--rust-runner {}: {e}", p.display()))
+    })
+    .transpose()
 }

@@ -1,0 +1,220 @@
+ots 1
+# journey-new-game-shop: new game (episode 1, Normal); buy and sell in every shop category;
+# keep a Multi-Cannon and a Satellite Marlo; enter level 1 and play ~600 frames.
+# In the shop, highlighting an item previews it; Return moves to DONE and Return again
+# buys it, trading in (selling) the owned item of that category.
+# Authored against ot-ref-run (virtual clock); the title menu is ready at ~8.1 s.
+# title: Start New Game
+@8500 key-down RETURN
+@8560 key-up RETURN
+# Players: 1 Player Full Game
+@10300 key-down RETURN
+@10360 key-up RETURN
+# Episode 1: Escape
+@12100 key-down RETURN
+@12160 key-up RETURN
+# Difficulty: Normal (the Game Menu is up at ~14.3 s, cash 10000)
+@13900 key-down RETURN
+@13960 key-up RETURN
+# Game Menu: Upgrade Ship
+@15000 key-down DOWN
+@15060 key-up DOWN
+@15300 key-down DOWN
+@15360 key-up DOWN
+@15600 key-down RETURN
+@15660 key-up RETURN
+# Ship Type: only the USP Talon is offered; view it and leave
+@16500 key-down RETURN
+@16560 key-up RETURN
+@17200 key-down RETURN
+@17260 key-up RETURN
+@17500 key-down RETURN
+@17560 key-up RETURN
+@18100 key-down DOWN
+@18160 key-up DOWN
+# Front Gun (Pulse-Cannon owned): buy the Multi-Cannon (750): cash 10000 -> 9750
+@18400 key-down RETURN
+@18460 key-up RETURN
+@19000 key-down DOWN
+@19060 key-up DOWN
+@19300 key-down RETURN
+@19360 key-up RETURN
+@19600 key-down RETURN
+@19660 key-up RETURN
+# Front Gun: sell it back for the Pulse-Cannon: cash 9750 -> 10000
+@20200 key-down RETURN
+@20260 key-up RETURN
+@20800 key-down UP
+@20860 key-up UP
+@21100 key-down RETURN
+@21160 key-up RETURN
+@21400 key-down RETURN
+@21460 key-up RETURN
+# next category
+@22000 key-down DOWN
+@22060 key-up DOWN
+# Rear Gun (None owned): buy Heavy Guided Bombs (1000): cash 10000 -> 9000
+@22300 key-down RETURN
+@22360 key-up RETURN
+@22900 key-down UP
+@22960 key-up UP
+@23200 key-down RETURN
+@23260 key-up RETURN
+@23500 key-down RETURN
+@23560 key-up RETURN
+# Rear Gun: sell them (None): cash 9000 -> 10000
+@24100 key-down RETURN
+@24160 key-up RETURN
+@24700 key-down DOWN
+@24760 key-up DOWN
+@25000 key-down RETURN
+@25060 key-up RETURN
+@25300 key-down RETURN
+@25360 key-up RETURN
+# next category
+@25900 key-down DOWN
+@25960 key-up DOWN
+# Shield (Gencore High Energy owned, 1000): buy the Low Energy (500): cash 10000 -> 10500
+@26200 key-down RETURN
+@26260 key-up RETURN
+@26800 key-down UP
+@26860 key-up UP
+@27100 key-down RETURN
+@27160 key-up RETURN
+@27400 key-down RETURN
+@27460 key-up RETURN
+# Shield: trade back to the High Energy: cash 10500 -> 10000
+@28000 key-down RETURN
+@28060 key-up RETURN
+@28600 key-down DOWN
+@28660 key-up DOWN
+@28900 key-down RETURN
+@28960 key-up RETURN
+@29200 key-down RETURN
+@29260 key-up RETURN
+# next category
+@29800 key-down DOWN
+@29860 key-up DOWN
+# Generator (Advanced MR-12 owned, 2000): buy the Standard MR-9 (500): cash 10000 -> 11500
+@30100 key-down RETURN
+@30160 key-up RETURN
+@30700 key-down UP
+@30760 key-up UP
+@31000 key-down RETURN
+@31060 key-up RETURN
+@31300 key-down RETURN
+@31360 key-up RETURN
+# Generator: trade back to the MR-12: cash 11500 -> 10000
+@31900 key-down RETURN
+@31960 key-up RETURN
+@32500 key-down DOWN
+@32560 key-up DOWN
+@32800 key-down RETURN
+@32860 key-up RETURN
+@33100 key-down RETURN
+@33160 key-up RETURN
+# next category
+@33700 key-down DOWN
+@33760 key-up DOWN
+# Left Sidekick (None owned): buy a Satellite Marlo (2000): cash 10000 -> 8000
+@34000 key-down RETURN
+@34060 key-up RETURN
+@34600 key-down UP
+@34660 key-up UP
+@34900 key-down RETURN
+@34960 key-up RETURN
+@35200 key-down RETURN
+@35260 key-up RETURN
+# Left Sidekick: sell it (None): cash 8000 -> 10000
+@35800 key-down RETURN
+@35860 key-up RETURN
+@36400 key-down DOWN
+@36460 key-up DOWN
+@36700 key-down RETURN
+@36760 key-up RETURN
+@37000 key-down RETURN
+@37060 key-up RETURN
+# next category
+@37600 key-down DOWN
+@37660 key-up DOWN
+# Right Sidekick (None owned): buy a Satellite Marlo (2000): cash 10000 -> 8000
+@37900 key-down RETURN
+@37960 key-up RETURN
+@38500 key-down UP
+@38560 key-up UP
+@38800 key-down RETURN
+@38860 key-up RETURN
+@39100 key-down RETURN
+@39160 key-up RETURN
+# Right Sidekick: sell it (None): cash 8000 -> 10000
+@39700 key-down RETURN
+@39760 key-up RETURN
+@40300 key-down DOWN
+@40360 key-up DOWN
+@40600 key-down RETURN
+@40660 key-up RETURN
+@40900 key-down RETURN
+@40960 key-up RETURN
+# keep: Front Gun Multi-Cannon (cash 10000 -> 9750)
+@41500 key-down UP
+@41560 key-up UP
+@41800 key-down UP
+@41860 key-up UP
+@42100 key-down UP
+@42160 key-up UP
+@42400 key-down UP
+@42460 key-up UP
+@42700 key-down UP
+@42760 key-up UP
+@43000 key-down RETURN
+@43060 key-up RETURN
+@43600 key-down DOWN
+@43660 key-up DOWN
+@43900 key-down RETURN
+@43960 key-up RETURN
+@44200 key-down RETURN
+@44260 key-up RETURN
+# keep: Left Sidekick Satellite Marlo (cash 9750 -> 7750)
+@44800 key-down DOWN
+@44860 key-up DOWN
+@45100 key-down DOWN
+@45160 key-up DOWN
+@45400 key-down DOWN
+@45460 key-up DOWN
+@45700 key-down DOWN
+@45760 key-up DOWN
+@46000 key-down RETURN
+@46060 key-up RETURN
+@46600 key-down UP
+@46660 key-up UP
+@46900 key-down RETURN
+@46960 key-up RETURN
+@47200 key-down RETURN
+@47260 key-up RETURN
+# Upgrade Ship: Done
+@47800 key-down DOWN
+@47860 key-up DOWN
+@48100 key-down DOWN
+@48160 key-up DOWN
+@48400 key-down RETURN
+@48460 key-up RETURN
+# Game Menu: Play Next Level, Tyrian (level 1 starts at ~52.2 s)
+@49200 key-down DOWN
+@49260 key-up DOWN
+@49500 key-down DOWN
+@49560 key-up DOWN
+@49800 key-down RETURN
+@49860 key-up RETURN
+@50900 key-down RETURN
+@50960 key-up RETURN
+# level 1: fire and strafe
+@55000 key-down SPACE
+@55000 key-down LEFT
+@56000 key-up LEFT
+@57300 key-down RIGHT
+@59300 key-up RIGHT
+@60600 key-down UP
+@61100 key-up UP
+@65400 key-down LEFT
+@66900 key-up LEFT
+@67200 key-up SPACE

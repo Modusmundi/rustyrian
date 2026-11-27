@@ -1,0 +1,85 @@
+ots 1
+# journey-setup: change every setup option, then quit (opentyrian.cfg is written at exit).
+# The second run (runs/journey-setup.2.ots, `then` in scenarios.toml) reuses the user directory.
+# Authored against ot-ref-run (virtual clock); the title menu is ready at ~8.1 s.
+# title: Setup
+@8500 key-down DOWN
+@8560 key-up DOWN
+@8800 key-down DOWN
+@8860 key-up DOWN
+@9100 key-down DOWN
+@9160 key-up DOWN
+@9400 key-down DOWN
+@9460 key-up DOWN
+@9700 key-down RETURN
+@9760 key-up RETURN
+# Setup: Graphics...
+@11200 key-down RETURN
+@11260 key-up RETURN
+# Graphics: Display picker, next item (Window -> Display 1)
+@12300 key-down RETURN
+@12360 key-up RETURN
+@13000 key-down DOWN
+@13060 key-up DOWN
+@13300 key-down RETURN
+@13360 key-up RETURN
+# Graphics: Scaler picker, next item (Scale2x -> hq2x)
+@14400 key-down DOWN
+@14460 key-up DOWN
+@14700 key-down RETURN
+@14760 key-up RETURN
+@15400 key-down DOWN
+@15460 key-up DOWN
+@15700 key-down RETURN
+@15760 key-up RETURN
+# Graphics: Scaling Mode picker, next item (Integer -> Fit 8:5)
+@16800 key-down DOWN
+@16860 key-up DOWN
+@17100 key-down RETURN
+@17160 key-up RETURN
+@17800 key-down DOWN
+@17860 key-up DOWN
+@18100 key-down RETURN
+@18160 key-up RETURN
+# Graphics: Done
+@19200 key-down DOWN
+@19260 key-up DOWN
+@19500 key-down RETURN
+@19560 key-up RETURN
+# Setup: Sound...
+@20600 key-down DOWN
+@20660 key-up DOWN
+@20900 key-down RETURN
+@20960 key-up RETURN
+# Sound: Music Volume down x3, Sound Volume down x2
+@22000 key-down LEFT
+@22060 key-up LEFT
+@22300 key-down LEFT
+@22360 key-up LEFT
+@22600 key-down LEFT
+@22660 key-up LEFT
+@22900 key-down DOWN
+@22960 key-up DOWN
+@23200 key-down LEFT
+@23260 key-up LEFT
+@23500 key-down LEFT
+@23560 key-up LEFT
+# Sound: Done
+@24600 key-down DOWN
+@24660 key-up DOWN
+@24900 key-down RETURN
+@24960 key-up RETURN
+# Setup: Done
+@26000 key-down DOWN
+@26060 key-up DOWN
+@26300 key-down DOWN
+@26360 key-up DOWN
+@26600 key-down RETURN
+@26660 key-up RETURN
+# title: Quit (writes opentyrian.cfg on exit)
+@28400 key-down DOWN
+@28460 key-up DOWN
+@28700 key-down DOWN
+@28760 key-up DOWN
+@29000 key-down RETURN
+@29060 key-up RETURN

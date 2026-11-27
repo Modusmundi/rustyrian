@@ -1,0 +1,17 @@
+ots 1
+# netplay-crossplay, player 2 (the Rust engine in `cargo xtask crossplay`). Real clock:
+# the times are milliseconds since this peer started; both peers start together.
+# network Game Menu (shown once player 1 has picked the episode): Play Next Level
+@9000 key-down RETURN
+@9060 key-up RETURN
+# level 1 (starts at ~10 s): fire and strafe, mirrored
+@14000 key-down SPACE
+@14000 key-down RIGHT
+@15000 key-up RIGHT
+@16300 key-down LEFT
+@18300 key-up LEFT
+@19600 key-down UP
+@20100 key-up UP
+@24400 key-down RIGHT
+@25900 key-up RIGHT
+@26200 key-up SPACE

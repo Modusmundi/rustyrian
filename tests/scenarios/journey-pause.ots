@@ -1,0 +1,55 @@
+ots 1
+# journey-pause: new game, enter level 1; pause and resume with P; open the in-game menu
+# with Escape, raise Detail Level, return to the game.
+# Authored against ot-ref-run (virtual clock); the title menu is ready at ~8.1 s.
+# title: Start New Game
+@8500 key-down RETURN
+@8560 key-up RETURN
+# Players: 1 Player Full Game
+@10300 key-down RETURN
+@10360 key-up RETURN
+# Episode 1: Escape
+@12100 key-down RETURN
+@12160 key-up RETURN
+# Difficulty: Normal
+@13900 key-down RETURN
+@13960 key-up RETURN
+# Game Menu: Play Next Level, Tyrian
+@15000 key-down DOWN
+@15060 key-up DOWN
+@15300 key-down DOWN
+@15360 key-up DOWN
+@15600 key-down DOWN
+@15660 key-up DOWN
+@15900 key-down DOWN
+@15960 key-up DOWN
+@16200 key-down RETURN
+@16260 key-up RETURN
+@17300 key-down RETURN
+@17360 key-up RETURN
+# level 1: fly a little
+@22000 key-down LEFT
+@22800 key-up LEFT
+# P pauses; nothing is presented while paused
+@24100 key-down P
+@24160 key-up P
+# P again resumes
+@27400 key-down P
+@27460 key-up P
+# Escape opens the in-game menu
+@29700 key-down ESCAPE
+@29760 key-up ESCAPE
+# in-game menu: Detail Level, Right raises it (High -> Pentium)
+@31200 key-down DOWN
+@31260 key-up DOWN
+@31500 key-down DOWN
+@31560 key-up DOWN
+@32100 key-down RIGHT
+@32160 key-up RIGHT
+# in-game menu: Return to Game
+@33200 key-down DOWN
+@33260 key-up DOWN
+@33500 key-down DOWN
+@33560 key-up DOWN
+@33800 key-down RETURN
+@33860 key-up RETURN

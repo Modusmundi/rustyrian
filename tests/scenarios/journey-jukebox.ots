@@ -1,0 +1,57 @@
+ots 1
+# journey-jukebox: Setup, Jukebox: change songs, stop/restart, toggle the text, play a
+# sound effect; leave. Keys without a script name use SDL scancodes: 56 is /, 55 is .,
+# 51 is ;.
+# Authored against ot-ref-run (virtual clock); the title menu is ready at ~8.1 s.
+# title: Setup
+@8500 key-down DOWN
+@8560 key-up DOWN
+@8800 key-down DOWN
+@8860 key-up DOWN
+@9100 key-down DOWN
+@9160 key-up DOWN
+@9400 key-down DOWN
+@9460 key-up DOWN
+@9700 key-down RETURN
+@9760 key-up RETURN
+# Setup: Jukebox
+@11200 key-down DOWN
+@11260 key-up DOWN
+@11500 key-down DOWN
+@11560 key-up DOWN
+@11800 key-down RETURN
+@11860 key-up RETURN
+# next song (Right), twice
+@16100 key-down RIGHT
+@16160 key-up RIGHT
+@20400 key-down RIGHT
+@20460 key-up RIGHT
+# previous song (Left)
+@24700 key-down LEFT
+@24760 key-up LEFT
+# stop (S), restart (R)
+@28000 key-down S
+@28060 key-up S
+@29800 key-down R
+@29860 key-up R
+# toggle the text (Space)
+@33100 key-down SPACE
+@33160 key-up SPACE
+@34900 key-down SPACE
+@34960 key-up SPACE
+# sound effects: toggle (/), next effect (.) twice, play it (;)
+@36200 key-down 56
+@36260 key-up 56
+@37000 key-down 55
+@37060 key-up 55
+@37300 key-down 55
+@37360 key-up 55
+@37900 key-down 51
+@37960 key-up 51
+# quit the jukebox (Escape), Setup: Done
+@40200 key-down ESCAPE
+@40260 key-up ESCAPE
+@43000 key-down DOWN
+@43060 key-up DOWN
+@43300 key-down RETURN
+@43360 key-up RETURN

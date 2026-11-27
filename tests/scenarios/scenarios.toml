@@ -1,10 +1,84 @@
 # Run parameters for each scenario script in this directory (`<name>.ots`).
-# Used by `cargo xtask ref-trace` and `cargo xtask parity`.
+# Used by `cargo xtask ref-trace`, `cargo xtask parity` and `cargo xtask crossplay`.
 #
 #   until_ms / frames  run limit (at least one)
 #   args               extra game arguments after `--`
 #   clock, net         runner options (defaults: virtual, loopback)
+#   sim_digest         pass `--sim-digest` (default false)
+#   then               further runs, in order, on the same user directory:
+#                      [{ input = "runs/<file>.ots", until_ms = T, args = [...] }]
+#   peers              netplay only: the two peers, player 1 first:
+#                      [{ input = "runs/<file>.ots", args = [...] }]; such a
+#                      scenario has no `<name>.ots` and runs with `xtask crossplay`
+#
+# Scripts in `runs/` belong to the scenario that names them.
 
 [demo-cycle]
 # Logos, title, 30 s idle, then each of the five demos in turn.
 until_ms = 900000
+
+[demo-menu]
+# Select Demo on the title menu (at ~10 s) and watch 60 s of it.
+until_ms = 72000
+
+[journey-new-game-shop]
+# New game, episode 1, Normal; buy and sell in each shop category; enter level 1
+# (at ~52 s) and play ~620 frames.
+until_ms = 70000
+
+[journey-save-load]
+# New game, buy, save to slot 1, quit to the title, load slot 1 (Game Menu at ~34 s).
+until_ms = 39000
+
+[journey-setup]
+# Change each setup option and quit (the game exits at ~29.5 s); the second run on
+# the same user directory shows that the settings persisted, then quits (~21 s).
+until_ms = 40000
+then = [{ input = "runs/journey-setup.2.ots", until_ms = 40000 }]
+
+[journey-arcade-1p]
+# 1 Player Arcade, episode 1, Normal; level 1 from ~22 s.
+until_ms = 47000
+
+[journey-arcade-2p]
+# 2 Player Arcade, episode 1, Normal; level 1 from ~22 s; player 2 on the mouse.
+until_ms = 48000
+
+[journey-destruct]
+# DESTRUCT typed at the title; one CPU-vs-CPU round (~110 s); back to the title.
+until_ms = 119000
+
+[journey-jukebox]
+# Setup, Jukebox: songs, stop/restart, text, sound effects; back to the title.
+until_ms = 46000
+
+[journey-datacube]
+# New game; read two datacubes; back to the Game Menu.
+until_ms = 28000
+
+[journey-pause]
+# New game, level 1 (from ~19 s); pause/resume; in-game menu.
+until_ms = 38000
+
+[netplay-crossplay]
+# `cargo xtask crossplay`: the C engine (player 1) and the Rust engine (player 2)
+# play episode 1 level 1 over UDP on 127.0.0.1 in real time. Player 1 picks the
+# episode and difficulty; both choose Play Next Level; the level starts at ~10 s.
+until_ms = 45000
+clock = "real"
+net = "udp"
+sim_digest = true
+peers = [
+    { input = "runs/netplay-crossplay.p1.ots", args = [
+        "--net=127.0.0.1:41334",
+        "--net-player-number=1",
+        "--net-port=41333",
+        "--net-player-name=C",
+    ] },
+    { input = "runs/netplay-crossplay.p2.ots", args = [
+        "--net=127.0.0.1:41333",
+        "--net-player-number=2",
+        "--net-port=41334",
+        "--net-player-name=Rust",
+    ] },
+]

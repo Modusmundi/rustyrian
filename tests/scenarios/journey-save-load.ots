@@ -1,0 +1,78 @@
+ots 1
+# journey-save-load: new game, buy a Multi-Cannon, save to slot 1, quit to the title, load slot 1.
+# Authored against ot-ref-run (virtual clock); the title menu is ready at ~8.1 s.
+# title: Start New Game
+@8500 key-down RETURN
+@8560 key-up RETURN
+# Players: 1 Player Full Game
+@10300 key-down RETURN
+@10360 key-up RETURN
+# Episode 1: Escape
+@12100 key-down RETURN
+@12160 key-up RETURN
+# Difficulty: Normal
+@13900 key-down RETURN
+@13960 key-up RETURN
+# Game Menu: Upgrade Ship, Front Gun: buy Multi-Cannon (cash 10000 -> 9750)
+@15000 key-down DOWN
+@15060 key-up DOWN
+@15300 key-down DOWN
+@15360 key-up DOWN
+@15600 key-down RETURN
+@15660 key-up RETURN
+@16500 key-down DOWN
+@16560 key-up DOWN
+@16800 key-down RETURN
+@16860 key-up RETURN
+@17400 key-down DOWN
+@17460 key-up DOWN
+@17700 key-down RETURN
+@17760 key-up RETURN
+@18000 key-down RETURN
+@18060 key-up RETURN
+# Upgrade Ship: Done
+@18600 key-down UP
+@18660 key-up UP
+@18900 key-down UP
+@18960 key-up UP
+@19200 key-down RETURN
+@19260 key-up RETURN
+# Game Menu: Options
+@20100 key-down DOWN
+@20160 key-up DOWN
+@20400 key-down RETURN
+@20460 key-up RETURN
+# Options: Save Game
+@21300 key-down DOWN
+@21360 key-up DOWN
+@21600 key-down RETURN
+@21660 key-up RETURN
+# Save: slot 1
+@22500 key-down RETURN
+@22560 key-up RETURN
+# Save name: PARITY, then RETURN saves
+@23400 text "PARITY"
+@23800 key-down RETURN
+@23860 key-up RETURN
+# Save: Escape back to Options, Escape to Game Menu
+@24900 key-down ESCAPE
+@24960 key-up ESCAPE
+@25800 key-down ESCAPE
+@25860 key-up ESCAPE
+# Game Menu: Quit Game, confirm
+@26700 key-down DOWN
+@26760 key-up DOWN
+@27000 key-down DOWN
+@27060 key-up DOWN
+@27300 key-down RETURN
+@27360 key-up RETURN
+@28400 key-down RETURN
+@28460 key-up RETURN
+# title: Load Game
+@31200 key-down DOWN
+@31260 key-up DOWN
+@31500 key-down RETURN
+@31560 key-up RETURN
+# Load: slot 1
+@33300 key-down RETURN
+@33360 key-up RETURN

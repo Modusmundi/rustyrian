@@ -1,0 +1,36 @@
+ots 1
+# journey-destruct: type DESTRUCT at the title; one CPU-vs-CPU round of 5 Card War;
+# leave to the title.
+# Authored against ot-ref-run (virtual clock); the title menu is ready at ~8.1 s.
+# title: type DESTRUCT
+@8500 key-down D
+@8560 key-up D
+@8700 key-down E
+@8760 key-up E
+@8900 key-down S
+@8960 key-up S
+@9100 key-down T
+@9160 key-up T
+@9300 key-down R
+@9360 key-up R
+@9500 key-down U
+@9560 key-up U
+@9700 key-down C
+@9760 key-up C
+@9900 key-down T
+@9960 key-up T
+# intro: any key
+@12100 key-down SPACE
+@12160 key-up SPACE
+# mode select: 5 Card War
+@14300 key-down RETURN
+@14360 key-up RETURN
+# F11: the right player becomes a CPU too (the left one is a CPU by default)
+@16500 key-down F11
+@16560 key-up F11
+# CPU vs CPU: the first round ends near 110 s (a new map is drawn at ~111.8 s)
+# Escape: back to mode select; Escape: leave Destruct (title at ~116.4 s)
+@113000 key-down ESCAPE
+@113060 key-up ESCAPE
+@115700 key-down ESCAPE
+@115760 key-up ESCAPE

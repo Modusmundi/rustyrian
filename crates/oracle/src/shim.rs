@@ -25,6 +25,9 @@ thread_local! {
     /// heap buffer does not move when the map rebalances.
     static INTERNED: RefCell<BTreeMap<Vec<u8>, CString>> = const { RefCell::new(BTreeMap::new()) };
     static TM: RefCell<b::tm> = RefCell::new(b::tm::default());
+    /// Scratch game for `--sim-digest`: only the states `sim_digest` reads are
+    /// reloaded from C at each present.
+    static SIM_SCRATCH: RefCell<Option<Box<rustyrian_core::Game>>> = const { RefCell::new(None) };
 }
 
 fn intern(s: &str) -> *const c_char {
@@ -372,6 +375,24 @@ fn snapshot_c_game() -> Vec<u8> {
     postcard::to_stdvec(&g.snapshot()).expect("a snapshot always serialises")
 }
 
+/// `game::sim_digest` of the C state, for `--sim-digest`. Mirrors only the
+/// states the digest covers into a reused scratch game.
+fn sim_c_game() -> Vec<u8> {
+    use crate::mirror::Mirror;
+    SIM_SCRATCH.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let g = slot.get_or_insert_with(|| {
+            let (p, _) = rustyrian_harness::test_session();
+            rustyrian_core::Game::new(Box::new(p))
+        });
+        g.mtrand.load_from_c();
+        g.player.load_from_c();
+        g.shots.load_from_c();
+        g.varz.load_from_c();
+        rustyrian_core::game::sim_digest(g).to_le_bytes().to_vec()
+    })
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn ot_shim_SDL_RenderPresent(renderer: *mut b::SDL_Renderer) {
     // SAFETY: reading upstream globals on the only thread running C; the
@@ -388,7 +409,7 @@ pub extern "C" fn ot_shim_SDL_RenderPresent(renderer: *mut b::SDL_Renderer) {
     let view = FrameView {
         screen,
         palette,
-        sim: None,
+        sim: Some(&sim_c_game),
         snapshot: Some(&snapshot_c_game),
     };
     with(|s| s.render_present(RendererId(id_of(renderer)), &view));

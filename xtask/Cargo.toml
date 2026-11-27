@@ -18,6 +18,10 @@ toml = "1"
 toml_edit = "0.25"
 syn = { version = "2", features = ["full", "visit"] }
 regex = "1"
+# `cargo xtask parity`: decode `--snapshot-out` files, write frame diffs.
+rustyrian-core.workspace = true
+postcard.workspace = true
+png.workspace = true
 
 [lints.rust]
 unsafe_code = "forbid"
