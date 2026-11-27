@@ -4040,9 +4040,9 @@ notes = ""
 c = "shots.c::player_shot_move_and_draw"
 c_sha = "de1d09ee601d"
 rust = "rustyrian_core::shots::player_shot_move_and_draw"
-status = "todo"
-verify = []
-notes = "blocked on sprite.c::blit_sprite2, sprite.c::blit_sprite2_darken, sprite.c::blit_sprite_blend, sprite.h::sprite, varz.c::JE_doSP, varz.c::JE_setupExplosion (not verified on main)"
+status = "verified"
+verify = ["diff:shots::player_shot_move_and_draw_matches", "diff:shots::player_shot_move_and_draw_special_past_table_has_no_radius"]
+notes = "R10 guard (D-UB-SHOTS-2): a special frame past the 151-entry OPTION_SHAPES table gets radius 0 instead of reading outside the table"
 
 [[fn]]
 c = "shots.c::player_shot_create"
@@ -4369,9 +4369,9 @@ notes = ""
 c = "tyrian2.c::JE_drawEnemy"
 c_sha = "4991ecfcf656"
 rust = "rustyrian_core::tyrian2::je_draw_enemy"
-status = "todo"
-verify = []
-notes = "blocked on varz.c::JE_setupExplosion (not verified on main)"
+status = "verified"
+verify = ["diff:tyrian2::je_draw_enemy_matches"]
+notes = ""
 
 [[fn]]
 c = "tyrian2.c::JE_main"
