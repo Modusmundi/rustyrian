@@ -108,4 +108,12 @@ fn xmas_prompt_answers_match() {
         false
     ));
     assert!(!run_prompt(&[(Act::Click(3), 100)], false));
+    assert!(run_prompt(
+        &[
+            (Act::Key("RIGHT"), 100),
+            (Act::Key("LEFT"), 100),
+            (Act::Key("RETURN"), 100)
+        ],
+        false
+    ));
 }

@@ -113,6 +113,33 @@ proptest! {
     }
 }
 
+/// The two "or elapsed" loops when input is already waiting: both return true
+/// before the frame period ends.
+#[test]
+fn wait_loops_return_on_pending_input() {
+    for which in 0..2 {
+        let mut rig = Rig::new("ots 1\n@0 key-down SPACE\n@40 key-up SPACE\n");
+        rig.video();
+        set_frame_count(&mut rig, 5);
+        rig.clear();
+        let r = if which == 0 {
+            // SAFETY: plain C call inside the guard.
+            rig.run(
+                || unsafe { b::waitUntilHasInputOrElapsed() },
+                kb::wait_until_has_input_or_elapsed,
+            )
+        } else {
+            // SAFETY: plain C call inside the guard.
+            rig.run(
+                || unsafe { b::waitUntilGetInputOrElapsed() },
+                kb::wait_until_get_input_or_elapsed,
+            )
+        };
+        assert_eq!(r, Ok(true));
+        rig.check();
+    }
+}
+
 fn any_color() -> impl Strategy<Value = Color> {
     any::<[u8; 3]>().prop_map(|[r, g, b_]| Color { r, g, b: b_, a: 0 })
 }

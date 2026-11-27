@@ -2400,7 +2400,7 @@ c = "keyboard.c::waitUntilHasInputOrElapsed"
 c_sha = "b75f2957c21b"
 rust = "rustyrian_core::keyboard::wait_until_has_input_or_elapsed"
 status = "verified"
-verify = ["diff:waits::wait_loops_match"]
+verify = ["diff:waits::wait_loops_match", "diff:waits::wait_loops_return_on_pending_input"]
 notes = ""
 
 [[fn]]
@@ -2408,7 +2408,7 @@ c = "keyboard.c::waitUntilGetInputOrElapsed"
 c_sha = "ed2bf1df4819"
 rust = "rustyrian_core::keyboard::wait_until_get_input_or_elapsed"
 status = "verified"
-verify = ["diff:waits::wait_loops_match", "diff:waits::je_out_text_glow_matches"]
+verify = ["diff:waits::wait_loops_match", "diff:waits::je_out_text_glow_matches", "diff:waits::wait_loops_return_on_pending_input"]
 notes = ""
 
 [[fn]]
@@ -3225,7 +3225,7 @@ c = "menus.c::gameplaySelect"
 c_sha = "45b993391926"
 rust = "rustyrian_core::menus::gameplay_select"
 status = "verified"
-verify = ["diff:menus::gameplay_select_matches"]
+verify = ["diff:menus::gameplay_select_matches", "diff:menus::menus_clicks_and_keys_match"]
 waived_lines = [{ line = 216, reason = "unreachable: selectedIndex is always one of the four menu items handled above" }]
 notes = ""
 
@@ -3234,7 +3234,7 @@ c = "menus.c::episodeSelect"
 c_sha = "978979144429"
 rust = "rustyrian_core::menus::episode_select"
 status = "verified"
-verify = ["diff:menus::episode_select_matches"]
+verify = ["diff:menus::episode_select_matches", "diff:menus::menus_clicks_and_keys_match"]
 notes = ""
 
 [[fn]]
@@ -3242,7 +3242,7 @@ c = "menus.c::difficultySelect"
 c_sha = "f10f41683f3c"
 rust = "rustyrian_core::menus::difficulty_select"
 status = "verified"
-verify = ["diff:menus::difficulty_select_matches", "diff:menus::difficulty_select_every_level_matches", "diff:menus::difficulty_select_held_lord_keys_match"]
+verify = ["diff:menus::difficulty_select_matches", "diff:menus::difficulty_select_every_level_matches", "diff:menus::difficulty_select_held_lord_keys_match", "diff:menus::menus_clicks_and_keys_match"]
 notes = ""
 
 [[fn]]
@@ -3458,7 +3458,7 @@ c = "network.c::network_state_update"
 c_sha = "7e30aed7855d"
 rust = "rustyrian_core::network::network_state_update"
 status = "verified"
-verify = ["diff:network::network_state_update_matches", "diff:network::net_session"]
+verify = ["diff:network::network_state_update_matches", "diff:network::net_session", "diff:network::network_state_update_waits_then_times_out"]
 notes = ""
 
 [[fn]]

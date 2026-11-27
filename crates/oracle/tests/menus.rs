@@ -185,3 +185,51 @@ fn difficulty_select_held_lord_keys_match() {
     ];
     run_menu(2, &acts, &State::default(), [true; 5]);
 }
+
+/// Names "Item" everywhere, so every menu item has a width to click on.
+fn item_names() -> State {
+    let mut s = State::default();
+    for row in &mut s.episode_name {
+        row[..4].copy_from_slice(b"Item");
+    }
+    for row in &mut s.difficulty_name {
+        row[..4].copy_from_slice(b"Item");
+    }
+    for row in &mut s.gameplay_name {
+        row[..4].copy_from_slice(b"Item");
+    }
+    s
+}
+
+/// Left clicks on items (choosing them), the disabled network item chosen by
+/// keyboard, and wrapping cursor moves, in every menu.
+#[test]
+fn menus_clicks_and_keys_match() {
+    let names = item_names();
+    let click = |x: i32, y: i32| vec![(Act::Move(x, y), 20), (Act::Click(1), 20)];
+    // Each item of each menu, chosen by a left click.
+    for i in 0..4 {
+        run_menu(0, &click(160, 60 + 24 * i), &names, [true; 5]);
+        run_menu(1, &click(30, 56 + 30 * i), &names, [true; 5]);
+    }
+    for i in 0..3 {
+        run_menu(2, &click(160, 60 + 24 * i), &names, [true; 5]);
+    }
+    // The network item does nothing; cancel afterwards.
+    let keys = |k: &[&'static str]| k.iter().map(|&k| (Act::Key(k), 20)).collect::<Vec<_>>();
+    run_menu(
+        0,
+        &keys(&["DOWN", "DOWN", "DOWN", "RETURN", "UP", "ESCAPE"]),
+        &names,
+        [true; 5],
+    );
+    // Wrapping both ways.
+    run_menu(0, &keys(&["UP", "DOWN", "RETURN"]), &names, [true; 5]);
+    run_menu(1, &keys(&["UP", "DOWN", "SPACE"]), &names, [true; 5]);
+    run_menu(
+        2,
+        &keys(&["UP", "UP", "DOWN", "DOWN", "SPACE"]),
+        &names,
+        [true; 5],
+    );
+}
