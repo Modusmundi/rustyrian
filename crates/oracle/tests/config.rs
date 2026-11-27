@@ -309,6 +309,15 @@ fn save_files_write_errors_match() {
     }
     cfg::save_saves(&mut d.game);
     cfg::save_configuration(&mut d.game);
+    // SAFETY: as above; lifts the limit so the process can still write its
+    // coverage data at exit.
+    unsafe {
+        let limit = libc::rlimit {
+            rlim_cur: libc::RLIM_INFINITY,
+            rlim_max: libc::RLIM_INFINITY,
+        };
+        assert_eq!(libc::setrlimit(libc::RLIMIT_FSIZE, &limit), 0);
+    }
     let calls = d.c_calls();
     assert_eq!(calls, d.rust_calls());
     let text = format!("{calls:?}");

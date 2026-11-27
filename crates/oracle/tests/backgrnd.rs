@@ -265,23 +265,40 @@ proptest! {
     }
 }
 
-/// Every brightness and hue value through the two static filters.
+/// Every brightness and hue value through the two static filters, each on a
+/// freshly scrambled screen (a filtered screen would be flat for the next).
 #[test]
 fn filter_screen_hue_and_value_match_for_every_argument() {
-    let mut d = setup(500, 7, |_| {});
+    let mut d = setup(500, 0, |_| {});
     let s = vga(&d);
+    let mut x = 0x9E37_79B9_7F4A_7C15u64;
     for v in i8::MIN..=i8::MAX {
-        // SAFETY: as above.
-        unsafe {
-            b::ot_s_backgrnd_filterScreenValue(b::VGAScreen, v);
-            b::ot_s_backgrnd_filterScreenHue(b::VGAScreen, v as u8);
+        for hue in [false, true] {
+            for p in d.game.video.screen_mut(s).pixels.iter_mut() {
+                x ^= x << 13;
+                x ^= x >> 7;
+                x ^= x << 17;
+                *p = x as u8;
+            }
+            d.game.video.store_to_c();
+            // SAFETY: as above.
+            unsafe {
+                if hue {
+                    b::ot_s_backgrnd_filterScreenHue(b::VGAScreen, v as u8);
+                } else {
+                    b::ot_s_backgrnd_filterScreenValue(b::VGAScreen, v);
+                }
+            }
+            if hue {
+                bg::filter_screen_hue(d.game.video.screen_mut(s), v as u8);
+            } else {
+                bg::filter_screen_value(d.game.video.screen_mut(s), v);
+            }
+            assert!(
+                diff::load::<rustyrian_core::video::State>() == d.game.video,
+                "{v} hue={hue}"
+            );
         }
-        bg::filter_screen_value(d.game.video.screen_mut(s), v);
-        bg::filter_screen_hue(d.game.video.screen_mut(s), v as u8);
-        assert!(
-            diff::load::<rustyrian_core::video::State>() == d.game.video,
-            "{v}"
-        );
     }
 }
 
