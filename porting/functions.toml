@@ -3969,7 +3969,7 @@ c = "pcxload.c::JE_loadPCX"
 c_sha = "9f14b8171d48"
 rust = "rustyrian_core::pcxload::je_load_pcx"
 status = "verified"
-verify = ["diff:pcxload::je_load_pcx_matches_on_every_pcx", "diff:pcxload::je_load_pcx_other_files_match"]
+verify = ["diff:pcxload::je_load_pcx_matches_on_every_pcx", "diff:pcxload::je_load_pcx_other_files_match", "diff:pcxload::je_load_pcx_allocation_failure_is_a_read_error"]
 notes = ""
 
 [[fn]]

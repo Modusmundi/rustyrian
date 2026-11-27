@@ -131,9 +131,68 @@ fn je_load_pcx_other_files_match() {
         );
     }
 
-    // A directory named like the file opens but cannot be read.
+    // A directory named like the file opens but cannot be read. Its length
+    // (SEEK_END) is small on macOS but huge on ext4, where C's `malloc` fails
+    // and C then crashes; there only Rust runs (`D-UB-PCX-1`).
     let dir = tmp("dir");
     std::fs::create_dir(dir.join("tshp2.pcx")).expect("mkdir");
-    let (c, r) = check(&dir, "tshp2.pcx", ScreenId::VgaScreenSeg);
-    assert_eq!(c.map(|code| Halt { code }), r.err());
+    if seek_end(&dir.join("tshp2.pcx")) < 1 << 30 {
+        let (c, r) = check(&dir, "tshp2.pcx", ScreenId::VgaScreenSeg);
+        assert_eq!(c.map(|code| Halt { code }), r.err());
+    } else {
+        rust_only_allocation_failure(&dir);
+    }
+}
+
+/// `lseek(fd, 0, SEEK_END)` of `p`, as `fileGetLength` measures it.
+fn seek_end(p: &Path) -> u64 {
+    use std::io::{Seek, SeekFrom};
+    let mut f = std::fs::File::open(p).expect("open");
+    f.seek(SeekFrom::End(0)).unwrap_or(0)
+}
+
+/// Rust only: `tshp2.pcx` in `dir` has a length no allocation can hold. The
+/// load logs a read error (ENOMEM), leaves the screen blank and returns
+/// (`D-UB-PCX-1`); upstream's `malloc` returns NULL there and C crashes.
+fn rust_only_allocation_failure(dir: &Path) {
+    use std::os::unix::ffi::OsStrExt;
+    let mut d = Diff::new();
+    let vs = &mut d.game.video;
+    for slot in vs.screens.iter_mut() {
+        let mut s = Surface::new_8bit(320, 200);
+        s.pixels.fill(7);
+        *slot = Some(s);
+    }
+    vs.vga_screen = Some(ScreenId::VgaScreen2);
+    d.game.file.custom_data_dir_path = Some(dir.as_os_str().as_bytes().to_vec());
+    let r = pcx::je_load_pcx(&mut d.game, "tshp2.pcx");
+    assert_eq!(r, Ok(()));
+    let calls = format!("{:?}", d.rust_calls());
+    assert!(
+        calls.contains("Failed to read from file 'tshp2.pcx': Cannot allocate memory"),
+        "{calls}"
+    );
+    assert!(
+        d.game
+            .video
+            .screen(ScreenId::VgaScreen2)
+            .pixels
+            .iter()
+            .all(|&p| p == 0)
+    );
+}
+
+/// A sparse `tshp2.pcx` larger than any address space (2^60 bytes, or 2^52
+/// where the file system caps file sizes lower, as APFS does) exercises the
+/// allocation guard on every platform.
+#[test]
+fn je_load_pcx_allocation_failure_is_a_read_error() {
+    let dir = tmp("sparse");
+    let f = std::fs::File::create(dir.join("tshp2.pcx")).expect("create");
+    let sized = [1u64 << 60, 1 << 52]
+        .into_iter()
+        .any(|n| f.set_len(n).is_ok());
+    assert!(sized, "the file system refuses a 2^52-byte sparse file");
+    drop(f);
+    rust_only_allocation_failure(&dir);
 }

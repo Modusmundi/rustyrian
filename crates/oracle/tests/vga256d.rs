@@ -66,12 +66,14 @@ fn check(
 
 proptest! {
     /// Coordinates whose pixel lies inside the buffer, or that upstream's
-    /// right/bottom clip rejects (C writes outside the buffer otherwise).
+    /// right/bottom clip rejects (C writes outside the buffer otherwise):
+    /// a negative `x` only below the first row (generated directly, no
+    /// rejects).
     #[test]
-    fn je_pix_and_je_pix3_match(x in -2i32..330, y in 0i32..210, c in any::<u8>(), salt in any::<u32>()) {
+    fn je_pix_and_je_pix3_match((x, y) in (0i32..210).prop_flat_map(|y| (if y == 0 { 0i32..330 } else { -2i32..330 }, Just(y))),
+                                c in any::<u8>(), salt in any::<u32>()) {
         let mut d = setup(salt);
         let inside = |x: i32, y: i32| x >= 320 || y >= 200 || (0..64000).contains(&(y * 320 + x));
-        prop_assume!(inside(x, y));
         // SAFETY: (each) C call on a valid surface with an in-bounds index.
         check(&mut d, |s| unsafe { b::JE_pix(s, x, y, c) }, |g, s| v::je_pix(g, s, x, y, c));
         let all = [(x, y), (x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)];
@@ -83,11 +85,10 @@ proptest! {
 
     /// Corners inside the surface (or rejected by the clip); a top-left
     /// corner past the right one by more than a pixel makes C's `memset`
-    /// length negative, so `a <= c + 1`.
+    /// length negative, so `c >= a - 1` (generated directly, no rejects).
     #[test]
-    fn je_rectangle_matches(a in 0i32..330, b_ in 0i32..210, c in 0i32..330, d_ in 0i32..210,
-                            e in any::<i32>(), salt in any::<u32>()) {
-        prop_assume!(a <= c + 1);
+    fn je_rectangle_matches((a, c) in (0i32..330).prop_flat_map(|a| (Just(a), (a - 1).max(0)..330)),
+                            b_ in 0i32..210, d_ in 0i32..210, e in any::<i32>(), salt in any::<u32>()) {
         let mut d = setup(salt);
         // SAFETY: C call on a valid surface with in-bounds writes.
         check(&mut d, |s| unsafe { b::JE_rectangle(s, a, b_, c, d_, e) }, |g, s| v::je_rectangle(g, s, a, b_, c, d_, e));
