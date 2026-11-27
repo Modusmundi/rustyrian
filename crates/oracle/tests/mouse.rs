@@ -105,3 +105,85 @@ proptest! {
         d.assert_same();
     }
 }
+
+/// Two engines with video up and the shop sprite sheet (`newsh1.shp`)
+/// loaded by C and mirrored into Rust.
+fn with_shop_sheet() -> Both {
+    let mut d = Both::new(&[]);
+    assert_eq!(d.init_video(), None);
+    {
+        use std::os::unix::ffi::OsStrExt;
+        let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../data")
+            .canonicalize()
+            .expect("data/ (run `cargo xtask fetch-data`)");
+        d.game.file.custom_data_dir_path = Some(data.as_os_str().as_bytes().to_vec());
+    }
+    d.store();
+    // SAFETY: a valid sheet global; exit is caught by the guard.
+    let exit = unsafe {
+        rustyrian_oracle::guard_call(|| {
+            b::JE_loadCompShapes(&raw mut b::shopSpriteSheet, b'1' as _)
+        })
+    };
+    assert_eq!(exit, None);
+    let c = d.c_state();
+    d.game.restore(c);
+    d.clear_calls();
+    d
+}
+
+proptest! {
+    #[test]
+    fn mouse_start_matches_c(
+        has_mouse: bool,
+        inactive: bool,
+        cursor in 0u8..5,
+        mouse_x in prop_oneof![-40i32..360, any::<i32>()],
+        mouse_y in prop_oneof![-40i32..240, any::<i32>()],
+        filter: Option<u8>,
+        seed: u8,
+    ) {
+        let mut d = with_shop_sheet();
+        fill(&mut d, seed);
+        d.game.mouse.has_mouse = has_mouse;
+        d.game.mouse.mouse_inactive = inactive;
+        d.game.mouse.mouse_cursor = cursor;
+        d.game.keyboard.mouse_x = mouse_x;
+        d.game.keyboard.mouse_y = mouse_y;
+        d.store();
+        // SAFETY: plain C calls.
+        unsafe {
+            match filter {
+                None => b::JE_mouseStart(),
+                Some(f) => b::JE_mouseStartFilter(f),
+            }
+        }
+        match filter {
+            None => ms::je_mouse_start(&mut d.game),
+            Some(f) => ms::je_mouse_start_filter(&mut d.game, f),
+        }
+        d.assert_same();
+    }
+}
+
+#[test]
+fn mouse_pointer_sprites_match_c() {
+    // `mousePointerSprites` is a C file-scope constant without a getter; its
+    // values show through JE_mouseStart: the grab position clamps to the
+    // pointer's width/height and focus point.
+    for cursor in 0u8..5 {
+        for (mx, my) in [(-100, -100), (1000, 1000)] {
+            let mut d = with_shop_sheet();
+            d.game.mouse.mouse_cursor = cursor;
+            d.game.mouse.mouse_inactive = false;
+            d.game.keyboard.mouse_x = mx;
+            d.game.keyboard.mouse_y = my;
+            d.store();
+            // SAFETY: plain C call.
+            unsafe { b::JE_mouseStart() };
+            ms::je_mouse_start(&mut d.game);
+            d.assert_same();
+        }
+    }
+}

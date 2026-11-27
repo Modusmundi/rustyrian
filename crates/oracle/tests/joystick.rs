@@ -190,10 +190,17 @@ proptest! {
     }
 
     #[test]
-    fn joystick_assignment_cmp_matches_c(a in any_assignment(), bb in any_assignment(), same_type: bool) {
+    fn joystick_assignment_cmp_matches_c(a in any_assignment(), bb in any_assignment(), same in 0u8..4) {
+        // Copy a prefix of `a`'s fields so every `&&` operand is reached.
         let mut bb = bb;
-        if same_type {
+        if same >= 1 {
             bb.r#type = a.r#type;
+        }
+        if same >= 2 {
+            bb.num = a.num;
+        }
+        if same >= 3 {
+            bb.x_axis = a.x_axis;
         }
         let (ca, cb) = (a_to_c(&a), a_to_c(&bb));
         // SAFETY: plain C call.

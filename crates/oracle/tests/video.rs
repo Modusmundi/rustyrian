@@ -429,3 +429,48 @@ fn reinit_fullscreen_falls_back_to_windowed() {
         assert_eq!(d.game.video.fullscreen_display, -1);
     }
 }
+
+/// `scale_and_render_screen` and `JE_showVGA` with every scaler and scaling
+/// mode on every fixture frame; the scaled textures match too.
+#[test]
+fn scale_and_render_screen_matches_c_on_fixture_frames() {
+    for frame in [60, 500, 2000] {
+        let fx = diff::fixture("demo-cycle", frame);
+        for scaler in 0..SCALERS_COUNT {
+            let mut d = Both::new(&[]);
+            d.game.video_scale.scaler = scaler;
+            d.store();
+            assert_eq!(d.init_video(), None);
+            d.game.palette.rgb_palette = fx.palette.rgb_palette;
+            for id in ScreenId::ALL {
+                if let Some(s) = &fx.video.screens[id as usize] {
+                    d.game
+                        .video
+                        .screen_mut(id)
+                        .pixels
+                        .copy_from_slice(&s.pixels);
+                }
+            }
+            let src = fx.video.vga_screen.expect("VGAScreen");
+            d.game.video.vga_screen = Some(src);
+            d.game.video.scaling_mode = ScalingMode::from_c(scaler % 4).unwrap();
+            d.store();
+            set_window_size(&mut d, 1000 + 7 * scaler as i32, 700 + 3 * scaler as i32);
+            let tex = d.game.video.main_window_texture.expect("texture");
+
+            // SAFETY: plain C call on a live surface.
+            unsafe { b::scale_and_render_screen(screen_to_c(Some(src))) };
+            video::scale_and_render_screen(&mut d.game, src);
+            d.assert_same();
+            let pixels = d.both(|p| p.lock_texture(tex, None).map(|(px, _)| px.to_vec()));
+            assert!(pixels.is_some(), "frame {frame}, scaler {scaler}");
+            d.both(|p| p.unlock_texture(tex));
+            d.clear_calls();
+
+            // SAFETY: plain C call.
+            unsafe { b::JE_showVGA() };
+            video::je_show_vga(&mut d.game);
+            d.assert_same();
+        }
+    }
+}
