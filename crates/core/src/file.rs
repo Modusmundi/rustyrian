@@ -286,7 +286,16 @@ impl Stream {
                 Err(e) => break Err(errno_of(&e)),
             }
         };
-        self.pending.drain(..n);
+        const KEEPS_UNWRITTEN: bool = cfg!(any(
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "freebsd"
+        ));
+        if result.is_err() && !KEEPS_UNWRITTEN {
+            self.pending.clear();
+        } else {
+            self.pending.drain(..n);
+        }
         result
     }
 
