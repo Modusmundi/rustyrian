@@ -7,8 +7,10 @@
 
 use crate::Game;
 use crate::file::{self, File};
+use crate::fonthand::{self, c_str};
 use crate::game::{EXIT_FAILURE, Flow, Halt};
 use crate::logging::log_fatal;
+use crate::video::ScreenId;
 use serde::{Deserialize, Serialize};
 
 /// `MENU_MAX`.
@@ -361,4 +363,149 @@ pub fn je_load_help_text(g: &mut Game) -> Flow {
 
     file::file_close(&mut file);
     Ok(())
+}
+
+/// `SDL_strlcpy(dst, src, maxlen)`: copies `src` up to its NUL (or its end),
+/// at most `maxlen - 1` bytes, and terminates; `maxlen` 0 leaves `dst` as is.
+fn strlcpy(dst: &mut [u8], src: &[u8], maxlen: usize) {
+    if maxlen == 0 {
+        return;
+    }
+    let n = c_str(src).len().min(maxlen - 1);
+    dst[..n].copy_from_slice(&src[..n]);
+    dst[n] = 0;
+}
+
+/// Draws `message` word-wrapped to `box_width` characters per line, lines
+/// `vertical_height` pixels apart. `message` is the C buffer holding the
+/// string: like upstream, a one-character message reads past its NUL.
+///
+/// Reads outside `message` (only reachable from a buffer too small for the
+/// upstream scan, where C reads outside the string's array) yield NUL, and a
+/// string of 256 or more bytes (on which upstream never terminates) draws
+/// nothing (divergence `D-UB-HELP-1`); every caller's buffer is shorter.
+#[doc(alias = "JE_helpBox")]
+#[allow(clippy::too_many_arguments)]
+pub fn je_help_box(
+    g: &mut Game,
+    screen: ScreenId,
+    x: i32,
+    mut y: i32,
+    message: &[u8],
+    box_width: u8,
+    vertical_height: u8,
+    color: u8,
+    brightness: u8,
+    shade_type: u8,
+) {
+    let len = c_str(message).len();
+    if len == 0 || len > usize::from(u8::MAX) {
+        return;
+    }
+    let at = |i: i32| -> u8 {
+        usize::try_from(i)
+            .ok()
+            .and_then(|i| message.get(i))
+            .copied()
+            .unwrap_or(0)
+    };
+    let from = |i: i32| -> &[u8] {
+        usize::try_from(i)
+            .ok()
+            .and_then(|i| message.get(i..))
+            .unwrap_or(&[])
+    };
+    let (color, brightness, shade_type) = (
+        u32::from(color),
+        i32::from(brightness),
+        u32::from(shade_type),
+    );
+    // `(unsigned)(pos - startpos)` with both promoted to int
+    let span = |pos: u8, startpos: u8| (i32::from(pos) - i32::from(startpos)) as u32;
+
+    let mut substring = [0u8; 256];
+
+    let mut pos: u8 = 1;
+    let mut endpos: u8 = 0;
+    let mut endstring = false;
+
+    loop {
+        let startpos = endpos.wrapping_add(1);
+
+        loop {
+            endpos = pos;
+            loop {
+                pos = pos.wrapping_add(1);
+                if usize::from(pos) == len {
+                    endstring = true;
+                    if span(pos, startpos) < u32::from(box_width) {
+                        endpos = pos.wrapping_add(1);
+                    }
+                }
+
+                if at(i32::from(pos) - 1) == b' ' || endstring {
+                    break;
+                }
+            }
+
+            if span(pos, startpos) > u32::from(box_width) || endstring {
+                break;
+            }
+        }
+
+        let maxlen = (i32::from(endpos) - i32::from(startpos) + 1) as i64 as u64;
+        let maxlen = usize::try_from(maxlen)
+            .unwrap_or(usize::MAX)
+            .min(substring.len());
+        strlcpy(&mut substring, from(i32::from(startpos) - 1), maxlen);
+        fonthand::je_text_shade(g, screen, x, y, &substring, color, brightness, shade_type);
+
+        y = y.wrapping_add(i32::from(vertical_height));
+
+        if endstring {
+            break;
+        }
+    }
+
+    if i32::from(endpos) != i32::from(pos) + 1 {
+        let tail = from(i32::from(endpos));
+        fonthand::je_text_shade(g, screen, x, y, tail, color, brightness, shade_type);
+    }
+}
+
+/// Help text `message_num` (1-based) in a full-shade help box. A number
+/// outside the table (C reads outside `helpTxt`) draws nothing
+/// (`D-UB-HELP-1`).
+#[doc(alias = "JE_HBox")]
+#[allow(clippy::too_many_arguments)]
+pub fn je_h_box(
+    g: &mut Game,
+    screen: ScreenId,
+    x: i32,
+    y: i32,
+    message_num: u8,
+    box_width: u8,
+    vertical_height: u8,
+    color: u8,
+    brightness: u8,
+) {
+    let i = i32::from(message_num) - 1;
+    let Some(&message) = usize::try_from(i)
+        .ok()
+        .and_then(|i| g.helptext.help_txt.get(i))
+    else {
+        return;
+    };
+    je_help_box(
+        g,
+        screen,
+        x,
+        y,
+        &message,
+        box_width,
+        vertical_height,
+        color,
+        brightness,
+        fonthand::FULL_SHADE as u8,
+    );
 }

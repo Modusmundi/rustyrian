@@ -214,3 +214,79 @@ proptest! {
         check_all(&mut d, &text, x, y, font, bank, brightness, shadow);
     }
 }
+
+/// `JE_updateWarning` with video and audio initialised and the sounds
+/// loaded: every color-bar boundary and direction, the sound countdown, and
+/// both an expired and a pending `frameCount2`.
+#[test]
+fn je_update_warning_matches() {
+    use rustyrian_core::loudness::{self as ld, AudioState};
+    use rustyrian_core::nortsong;
+    use rustyrian_oracle::mirror::video::sv;
+    use std::os::unix::ffi::OsStrExt;
+
+    let mut d = Diff::new();
+    d.game.file.custom_data_dir_path = Some(data_dir().as_os_str().as_bytes().to_vec());
+    d.store_to_c();
+    // SAFETY: plain C calls on the test thread; exit is caught by the guard.
+    let c = unsafe { rustyrian_oracle::guard_call(|| b::init_video()) };
+    assert_eq!(c, None);
+    rustyrian_core::video::init_video(&mut d.game).expect("init_video");
+    // SAFETY: as above.
+    let c = unsafe { b::init_audio() };
+    assert_eq!(c, ld::init_audio(&mut d.game));
+    // SAFETY: as above.
+    let c = unsafe { rustyrian_oracle::guard_call(|| b::loadSndFile(false)) };
+    assert_eq!(
+        (c, nortsong::load_snd_file(&mut d.game, false)),
+        (None, Ok(()))
+    );
+    // The C session now holds what the Rust game holds; start both from the
+    // Rust state.
+    let screen = d.game.video.vga_screen_id();
+    assert_eq!(d.c_calls(), d.rust_calls());
+
+    let mut k = 0u32;
+    for col in [0u8, 100, 227, 228, 229, 233, 234, 235, 255] {
+        for change in [-128i8, -3, -1, 0, 1, 3, 127] {
+            for delay in [0u8, 1, 14, 255] {
+                for pending in [false, true] {
+                    k += 1;
+                    let now = d.game.platform.get_ticks() << 10;
+                    let _ = d.rust_calls();
+                    d.game.fonthand.warning_col = col;
+                    d.game.fonthand.warning_col_change = change;
+                    d.game.fonthand.warning_sound_delay = delay;
+                    d.game.nortsong.frame_count2_end = if pending {
+                        now.wrapping_add((k % 7 + 1) << 10)
+                    } else {
+                        now.wrapping_sub(k << 10)
+                    };
+                    d.game.fonthand.store_to_c();
+                    // Only the timer: storing the whole nortsong state would
+                    // reallocate the sample buffers playing channels point to.
+                    // SAFETY: C runs only on this thread; the static is a u32.
+                    unsafe {
+                        *sv::<u32>(b::ot_sv_nortsong_frameCount2End) =
+                            d.game.nortsong.frame_count2_end
+                    };
+                    let label =
+                        format!("col {col} change {change} delay {delay} pending {pending}");
+
+                    // SAFETY: plain C call on a live surface.
+                    unsafe { b::JE_updateWarning(screen_to_c(Some(screen))) };
+                    fh::je_update_warning(&mut d.game, screen);
+
+                    assert_eq!(diff::load::<State>(), d.game.fonthand, "{label}");
+                    assert_eq!(diff::load::<nortsong::State>(), d.game.nortsong, "{label}");
+                    assert_eq!(diff::load::<AudioState>(), *ld::audio(&d.game), "{label}");
+                    assert!(
+                        diff::load::<video::State>().screens == d.game.video.screens,
+                        "{label}: surfaces differ"
+                    );
+                    assert_eq!(d.c_calls(), d.rust_calls(), "{label}");
+                }
+            }
+        }
+    }
+}

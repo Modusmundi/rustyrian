@@ -16,6 +16,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct State {}
 
+/// `ENOMEM` (12 on every platform the port supports).
+const ENOMEM: i32 = 12;
+
 /// Width × height of the full-screen pictures.
 pub const IMAGE_SIZE: usize = 320 * 200;
 
@@ -86,9 +89,18 @@ pub fn je_load_pcx(g: &mut Game, filename: &str) -> Flow {
 
     file::file_set_position(&mut file, 128);
 
+    // Upstream does not check `malloc` for NULL (a directory's length can be
+    // huge); an allocation failure becomes a read error with ENOMEM and the
+    // picture decodes from no data (divergence `D-UB-PCX-1`).
     let size = (file_length - 128 - 3 * 256) as usize;
-    let mut data = vec![0u8; size];
-    file::file_read_exactly(&mut file, &mut data);
+    let mut data = Vec::new();
+    if data.try_reserve_exact(size).is_ok() {
+        data.resize(size, 0);
+        file::file_read_exactly(&mut file, &mut data);
+    } else {
+        file.error = true;
+        file.errnum = ENOMEM;
+    }
 
     if file.error {
         let message = format!(

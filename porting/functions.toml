@@ -1841,9 +1841,9 @@ notes = ""
 c = "fonthand.c::JE_updateWarning"
 c_sha = "9ec43433fec1"
 rust = "rustyrian_core::fonthand::je_update_warning"
-status = "todo"
-verify = []
-notes = "blocked: calls nortsong.c::getFrameCount2Ticks/setFrameCount2/JE_playSampleNum and video.c::JE_showVGA (not verified on main)"
+status = "verified"
+verify = ["diff:fonthand::je_update_warning_matches"]
+notes = ""
 
 [[fn]]
 c = "fonthand.c::JE_outTextGlow"
@@ -2097,17 +2097,17 @@ notes = ""
 c = "helptext.c::JE_helpBox"
 c_sha = "8eeb302f5e14"
 rust = "rustyrian_core::helptext::je_help_box"
-status = "todo"
-verify = []
-notes = "blocked on callee fonthand.c::JE_textShade (not ported)"
+status = "verified"
+verify = ["diff:helptext::je_help_box_matches_random", "diff:helptext::je_help_box_matches_on_misc_text", "diff:helptext::je_h_box_matches_on_every_help_text"]
+notes = ""
 
 [[fn]]
 c = "helptext.c::JE_HBox"
 c_sha = "996b37b4691e"
 rust = "rustyrian_core::helptext::je_h_box"
-status = "todo"
-verify = []
-notes = "blocked on callee helptext.c::JE_helpBox (needs fonthand.c::JE_textShade)"
+status = "verified"
+verify = ["diff:helptext::je_h_box_matches_on_every_help_text"]
+notes = ""
 
 [[fn]]
 c = "helptext.c::JE_loadHelpText"
@@ -3969,7 +3969,7 @@ c = "pcxload.c::JE_loadPCX"
 c_sha = "9f14b8171d48"
 rust = "rustyrian_core::pcxload::je_load_pcx"
 status = "verified"
-verify = ["diff:pcxload::je_load_pcx_matches_on_every_pcx", "diff:pcxload::je_load_pcx_other_files_match"]
+verify = ["diff:pcxload::je_load_pcx_matches_on_every_pcx", "diff:pcxload::je_load_pcx_other_files_match", "diff:pcxload::je_load_pcx_allocation_failure_is_a_read_error"]
 notes = ""
 
 [[fn]]
