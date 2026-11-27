@@ -884,6 +884,33 @@ proptest! {
     }
 }
 
+/// `network_state_update` with no state packet coming: it requests a resend,
+/// keeps polling, and the connection times out.
+#[test]
+fn network_state_update_waits_then_times_out() {
+    let mut rig = connected_rig(&halt_script());
+    rig.both(|p| p.delay(30_000));
+    let now = 30_000u32;
+    let mut s = rig.g.network.clone();
+    s.network_delay = 2;
+    s.last_state_out_sync = 5;
+    s.last_state_in_sync = 3;
+    s.last_in_tick = now - 15_000;
+    s.last_state_in_tick = now - 1000;
+    s.network_check_keep_alive_tick = now;
+    s.last_out_tick = now;
+    s.network_state_update_resend_tick = now - 1000;
+    store_net(&mut rig, s);
+    rig.clear();
+    // SAFETY: plain C call (inside the guard).
+    let r = rig.run(
+        || unsafe { b::network_state_update() },
+        net::network_state_update,
+    );
+    assert_eq!(r, Err(0));
+    rig.check_halted();
+}
+
 /// What the opponent sends during `network_connect`.
 #[derive(Clone, Debug)]
 enum Peer {
