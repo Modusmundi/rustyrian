@@ -796,3 +796,83 @@ fn file_state_serde_round_trip() {
     assert_eq!(f::file_read_u8(&mut cloned), b'c');
     assert_eq!(r_view(&r).3, 2, "a clone is independent");
 }
+
+/// Restores `RLIMIT_FSIZE` and the `SIGXFSZ` disposition on drop.
+struct FileSizeLimit(libc::rlimit, libc::sighandler_t);
+
+impl FileSizeLimit {
+    fn set(bytes: u64) -> FileSizeLimit {
+        let mut old = libc::rlimit {
+            rlim_cur: 0,
+            rlim_max: 0,
+        };
+        // SAFETY: plain libc calls on valid pointers; the test process is
+        // single-threaded under nextest.
+        unsafe {
+            assert_eq!(libc::getrlimit(libc::RLIMIT_FSIZE, &raw mut old), 0);
+            let new = libc::rlimit {
+                rlim_cur: bytes as libc::rlim_t,
+                rlim_max: old.rlim_max,
+            };
+            assert_eq!(libc::setrlimit(libc::RLIMIT_FSIZE, &raw const new), 0);
+            FileSizeLimit(old, libc::signal(libc::SIGXFSZ, libc::SIG_IGN))
+        }
+    }
+}
+
+impl Drop for FileSizeLimit {
+    fn drop(&mut self) {
+        // SAFETY: as in `set`.
+        unsafe {
+            libc::setrlimit(libc::RLIMIT_FSIZE, &raw const self.0);
+            libc::signal(libc::SIGXFSZ, self.1);
+        }
+    }
+}
+
+/// Writes are buffered like stdio: a write past the file-size limit succeeds
+/// and the error surfaces at `fileFlush` or `fileClose`, as in C.
+#[test]
+fn write_errors_surface_when_buffers_are_written() {
+    let dir = tmp("efbig");
+    let data = [0x5au8; 64];
+    for flush_first in [true, false] {
+        let (pc, pr) = (dir.join("c.bin"), dir.join("r.bin"));
+        let (cp, cm) = (cs(bytes(&pc)), cs("wb"));
+        let _limit = FileSizeLimit::set(10);
+        // SAFETY: valid C strings and buffer.
+        let mut c = unsafe { b::ot_s_file_fileOpen(cp.as_ptr(), cm.as_ptr()) };
+        let mut r = f::file_open(&bytes(&pr), "wb");
+        // SAFETY: an open File and a valid buffer.
+        unsafe { b::fileWrite(&raw mut c, data.as_ptr().cast::<c_void>(), data.len()) };
+        f::file_write(&mut r, &data);
+        assert_eq!(c_view(&c), r_view(&r));
+        assert_eq!(
+            c_view(&c),
+            (true, 0, false, 64),
+            "the write is only buffered"
+        );
+        if flush_first {
+            // SAFETY: an open File.
+            unsafe { b::fileFlush(&raw mut c) };
+            f::file_flush(&mut r);
+            assert_eq!(c_view(&c), r_view(&r));
+            assert!(r.error);
+        }
+        // SAFETY: from fileOpen.
+        unsafe { b::fileClose(&raw mut c) };
+        f::file_close(&mut r);
+        assert_eq!(c_view(&c), r_view(&r));
+        assert_eq!((c.error, c.errnum), (true, libc::EFBIG));
+        // SAFETY: fileGetError only reads the struct.
+        let ce = unsafe { CStr::from_ptr(b::fileGetError(&raw mut c)) }
+            .to_string_lossy()
+            .into_owned();
+        assert_eq!(ce, f::file_get_error(&r));
+        drop(_limit);
+        assert_eq!(
+            std::fs::read(&pc).expect("c file"),
+            std::fs::read(&pr).expect("r file")
+        );
+    }
+}

@@ -25,6 +25,9 @@ pub const ERRNUM_EOF: i32 = -1;
 /// `EINVAL` (identical on every supported OS).
 const EINVAL: i32 = 22;
 
+/// `EBADF` (identical on every supported OS).
+const EBADF: i32 = 9;
+
 /// The installation data directory configured at build time (`TYRIAN_DIR`
 /// in upstream's Makefile); unset unless the build sets it.
 pub const TYRIAN_DIR: Option<&str> = option_env!("TYRIAN_DIR");
@@ -123,6 +126,10 @@ const STREAM_BUFFER_SIZE: usize = 4096;
 
 /// C's `FILE`: an open stdio stream.
 ///
+/// Fully buffered like stdio: reads go through a read-ahead buffer and
+/// writes are held until the buffer fills, `fflush`, a seek, a read or
+/// `fclose`, so write errors surface where C's do.
+///
 /// Holds the path and mode it was opened with (C does not expose these), so a
 /// clone or a deserialised snapshot can reopen the same file at the same
 /// position as an independent stream. Clone, equality and serialisation cover
@@ -133,10 +140,19 @@ pub struct Stream {
     /// returned (stdio's buffer).
     buf: Vec<u8>,
     pos: usize,
+    /// Written bytes not yet passed to the OS. Empty whenever `buf[pos..]`
+    /// is not.
+    pending: Vec<u8>,
     error: bool,
     eof: bool,
     path: PathBuf,
     mode: OpenMode,
+}
+
+impl Drop for Stream {
+    fn drop(&mut self) {
+        let _ = self.write_out();
+    }
 }
 
 impl Stream {
@@ -158,6 +174,7 @@ impl Stream {
             file,
             buf: Vec::new(),
             pos: 0,
+            pending: Vec::new(),
             error: false,
             eof: false,
             path,
@@ -195,6 +212,10 @@ impl Stream {
     /// `fread(data, 1, data.len(), f)`: the count read and `errno` afterwards
     /// (0 unless an error occurred).
     pub fn read(&mut self, data: &mut [u8]) -> (usize, i32) {
+        if let Err(e) = self.write_out() {
+            self.error = true;
+            return (0, e);
+        }
         let mut n = 0;
         while n < data.len() {
             if self.pos < self.buf.len() {
@@ -248,29 +269,70 @@ impl Stream {
         Ok(())
     }
 
+    /// Passes the pending writes to the OS. On failure the unwritten rest
+    /// stays pending and `Err(errno)` is returned.
+    fn write_out(&mut self) -> Result<(), i32> {
+        let mut n = 0;
+        let result = loop {
+            if n == self.pending.len() {
+                break Ok(());
+            }
+            match self.file.write(&self.pending[n..]) {
+                Ok(0) => break Err(0),
+                Ok(k) => n += k,
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+                Err(e) => break Err(errno_of(&e)),
+            }
+        };
+        self.pending.drain(..n);
+        result
+    }
+
     /// `fwrite(data, 1, data.len(), f)`: the count written and `errno`
-    /// afterwards (0 unless an error occurred).
+    /// afterwards (0 unless an error occurred). Data that fits stays in the
+    /// buffer; a full buffer is passed on, then whole buffer-sized blocks go
+    /// straight to the OS and the rest is buffered.
     pub fn write(&mut self, data: &[u8]) -> (usize, i32) {
+        if data.is_empty() {
+            return (0, 0);
+        }
+        if !self.mode.write {
+            self.error = true;
+            return (0, EBADF);
+        }
         if let Err(e) = self.drop_read_ahead() {
             self.error = true;
             return (0, e);
         }
+        let space = STREAM_BUFFER_SIZE - self.pending.len();
+        if data.len() <= space {
+            self.pending.extend_from_slice(data);
+            return (data.len(), 0);
+        }
+        self.pending.extend_from_slice(&data[..space]);
+        if let Err(e) = self.write_out() {
+            self.error = true;
+            return (space, e);
+        }
+        let rest = &data[space..];
+        let direct = rest.len() / STREAM_BUFFER_SIZE * STREAM_BUFFER_SIZE;
         let mut n = 0;
-        while n < data.len() {
-            match self.file.write(&data[n..]) {
+        while n < direct {
+            match self.file.write(&rest[n..direct]) {
                 Ok(0) => {
                     self.error = true;
-                    return (n, 0);
+                    return (space + n, 0);
                 }
                 Ok(k) => n += k,
                 Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
                 Err(e) => {
                     self.error = true;
-                    return (n, errno_of(&e));
+                    return (space + n, errno_of(&e));
                 }
             }
         }
-        (n, 0)
+        self.pending.extend_from_slice(&rest[direct..]);
+        (data.len(), 0)
     }
 
     /// `fputc(c, f)`.
@@ -284,6 +346,10 @@ impl Stream {
     }
 
     fn seek(&mut self, to: SeekFrom) -> Result<(), i32> {
+        if let Err(e) = self.write_out() {
+            self.error = true;
+            return Err(e);
+        }
         self.buf.clear();
         self.pos = 0;
         self.file.seek(to).map_err(|e| errno_of(&e))?;
@@ -308,15 +374,28 @@ impl Stream {
     pub fn tell(&self) -> Result<i64, i32> {
         let mut f = &self.file;
         let p = f.stream_position().map_err(|e| errno_of(&e))?;
-        Ok(p as i64 - (self.buf.len() - self.pos) as i64)
+        Ok(p as i64 - (self.buf.len() - self.pos) as i64 + self.pending.len() as i64)
     }
 
-    /// `fflush(f)`: writes are unbuffered, so it always succeeds.
+    /// `fflush(f)`; `Err(errno)` where it returns `EOF`.
     pub fn flush(&mut self) -> Result<(), i32> {
-        Ok(())
+        self.write_out().inspect_err(|_| self.error = true)
     }
 
-    /// An independent stream on the same file at the same position.
+    /// `fclose(f)`: flushes, then closes even if flushing failed.
+    pub fn close(mut self) -> Result<(), i32> {
+        let result = self.write_out();
+        self.pending.clear();
+        result
+    }
+
+    /// Written bytes not yet passed to the OS.
+    pub fn pending(&self) -> &[u8] {
+        &self.pending
+    }
+
+    /// An independent stream on the same file at the same position, holding
+    /// the same pending writes.
     fn reopen(&self, position: i64) -> std::io::Result<Stream> {
         let m = OpenMode {
             create: false,
@@ -324,12 +403,13 @@ impl Stream {
             ..self.mode
         };
         let mut file = m.options().open(&self.path)?;
-        file.seek(SeekFrom::Start(position.max(0) as u64))?;
-        Ok(Stream {
-            error: self.error,
-            eof: self.eof,
-            ..Stream::from_std(file, self.path.clone(), self.mode)
-        })
+        let os_position = position - self.pending.len() as i64;
+        file.seek(SeekFrom::Start(os_position.max(0) as u64))?;
+        let mut s = Stream::from_std(file, self.path.clone(), self.mode);
+        s.pending = self.pending.clone();
+        s.error = self.error;
+        s.eof = self.eof;
+        Ok(s)
     }
 }
 
@@ -350,6 +430,7 @@ impl Clone for Stream {
             file,
             buf: self.buf.clone(),
             pos: self.pos,
+            pending: self.pending.clone(),
             error: self.error,
             eof: self.eof,
             path: self.path.clone(),
@@ -369,6 +450,7 @@ impl std::fmt::Debug for Stream {
         f.debug_struct("Stream")
             .field("path", &self.path)
             .field("position", &self.tell())
+            .field("pending", &self.pending.len())
             .field("error", &self.error)
             .field("eof", &self.eof)
             .finish()
@@ -380,6 +462,7 @@ struct StreamRepr {
     path: PathBuf,
     mode: OpenMode,
     position: i64,
+    pending: Vec<u8>,
     error: bool,
     eof: bool,
 }
@@ -390,6 +473,7 @@ impl Serialize for Stream {
             path: self.path.clone(),
             mode: self.mode,
             position: self.tell().unwrap_or(-1),
+            pending: self.pending.clone(),
             error: self.error,
             eof: self.eof,
         }
@@ -399,18 +483,19 @@ impl Serialize for Stream {
 
 impl<'de> Deserialize<'de> for Stream {
     /// Reopens the file (without creating or truncating it) at the recorded
-    /// position.
+    /// position, with the recorded writes pending.
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Stream, D::Error> {
         let r = StreamRepr::deserialize(d)?;
         let file = r.mode.options().create(false).truncate(false).open(&r.path);
         let mut file = file.map_err(|e| D::Error::custom(format!("{}: {e}", r.path.display())))?;
-        file.seek(SeekFrom::Start(r.position.max(0) as u64))
+        let os_position = r.position - r.pending.len() as i64;
+        file.seek(SeekFrom::Start(os_position.max(0) as u64))
             .map_err(D::Error::custom)?;
-        Ok(Stream {
-            error: r.error,
-            eof: r.eof,
-            ..Stream::from_std(file, r.path, r.mode)
-        })
+        let mut s = Stream::from_std(file, r.path, r.mode);
+        s.pending = r.pending;
+        s.error = r.error;
+        s.eof = r.eof;
+        Ok(s)
     }
 }
 
@@ -925,14 +1010,16 @@ pub fn file_flush(file: &mut File) {
     }
 }
 
-/// `fileClose`. Writes are unbuffered, so closing cannot fail.
 #[doc(alias = "fileClose")]
 pub fn file_close(file: &mut File) {
-    if file.f.is_none() {
+    let Some(f) = file.f.take() else {
         return;
-    }
+    };
 
-    file.f = None;
+    if let Err(errnum) = f.close() {
+        file.errnum = errnum;
+        file.error = true;
+    }
 }
 
 /// `strerror(errnum)`: the OS message without std's ` (os error N)` suffix.
