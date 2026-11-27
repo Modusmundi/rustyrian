@@ -867,6 +867,7 @@ name = "rustyrian-core"
 version = "0.0.0"
 dependencies = [
  "libm",
+ "postcard",
  "serde",
 ]
 
