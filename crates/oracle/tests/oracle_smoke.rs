@@ -9,7 +9,8 @@ use std::process::Command;
 
 #[test]
 fn guard_call_captures_c_exit_and_platform_calls() {
-    session::install(rustyrian_harness::test_session());
+    let (s, log) = rustyrian_harness::test_session();
+    session::install(s);
     let argv: Vec<CString> = ["opentyrian", "--bogus"]
         .into_iter()
         .map(|s| CString::new(s).expect("no NUL"))
@@ -28,7 +29,7 @@ fn guard_call_captures_c_exit_and_platform_calls() {
     );
     assert_eq!(session::last_exit(), Some(1));
 
-    let calls = session::with(|s| std::mem::take(&mut s.recorder.recent_calls));
+    let calls = log.take();
     let errors: Vec<&Arg> = calls
         .iter()
         .filter(|c| c.name == "SDL_LogError")

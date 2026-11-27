@@ -3266,64 +3266,64 @@ notes = ""
 c = "mtrand.c::mt_srand_r"
 c_sha = "d6c01054e4c6"
 rust = "rustyrian_core::mtrand::mt_srand_r"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mtrand::mt_srand_r_from_any_state", "diff:mtrand::mt_srand_then_10000_mt_rand_match"]
 notes = ""
 
 [[fn]]
 c = "mtrand.c::mt_rand_r"
 c_sha = "25556071125b"
 rust = "rustyrian_core::mtrand::mt_rand_r"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mtrand::mt_rand_r_variants_from_any_state", "diff:mtrand::mt_srand_then_10000_mt_rand_match"]
 notes = ""
 
 [[fn]]
 c = "mtrand.c::mt_rand_1_r"
 c_sha = "04556b3a6968"
 rust = "rustyrian_core::mtrand::mt_rand_1_r"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mtrand::mt_rand_r_variants_from_any_state", "diff:mtrand::mt_rand_1_and_lt1_match_bitwise"]
 notes = ""
 
 [[fn]]
 c = "mtrand.c::mt_rand_lt1_r"
 c_sha = "9b7240b91217"
 rust = "rustyrian_core::mtrand::mt_rand_lt1_r"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mtrand::mt_rand_r_variants_from_any_state", "diff:mtrand::mt_rand_1_and_lt1_match_bitwise"]
 notes = ""
 
 [[fn]]
 c = "mtrand.h::mt_srand"
 c_sha = "4b6b0bfbbe2c"
 rust = "rustyrian_core::mtrand::mt_srand"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mtrand::mt_srand_then_10000_mt_rand_match"]
 notes = ""
 
 [[fn]]
 c = "mtrand.h::mt_rand"
 c_sha = "989c7cfd72cd"
 rust = "rustyrian_core::mtrand::mt_rand"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mtrand::mt_srand_then_10000_mt_rand_match"]
 notes = ""
 
 [[fn]]
 c = "mtrand.h::mt_rand_1"
 c_sha = "9fa897ec3588"
 rust = "rustyrian_core::mtrand::mt_rand_1"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mtrand::mt_rand_1_and_lt1_match_bitwise"]
 notes = ""
 
 [[fn]]
 c = "mtrand.h::mt_rand_lt1"
 c_sha = "3cefb476f4fe"
 rust = "rustyrian_core::mtrand::mt_rand_lt1"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mtrand::mt_rand_1_and_lt1_match_bitwise"]
 notes = ""
 
 [[fn]]

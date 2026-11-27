@@ -16,6 +16,7 @@ use rustyrian_core::platform::{
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use xxhash_rust::xxh3::Xxh3;
 
@@ -46,15 +47,29 @@ pub enum End {
     Exit(i32),
 }
 
+/// A shared, clonable list of recorded calls; differential tests keep a clone
+/// and compare the C and Rust sessions' calls.
+#[derive(Clone, Debug, Default)]
+pub struct CallLog(Arc<Mutex<Vec<PlatformCall>>>);
+
+impl CallLog {
+    /// Removes and returns every call recorded so far.
+    pub fn take(&self) -> Vec<PlatformCall> {
+        std::mem::take(&mut *self.0.lock().unwrap_or_else(|e| e.into_inner()))
+    }
+
+    fn push(&self, call: PlatformCall) {
+        self.0.lock().unwrap_or_else(|e| e.into_inner()).push(call);
+    }
+}
+
 /// Call recording state, separate from `inner` so a call can be recorded
 /// while a borrow of the inner platform (a locked texture) is live.
 pub struct Recorder {
     calls: Xxh3,
     log_out: Option<BufWriter<File>>,
-    /// Every call since the last present, when `keep_calls` is set.
-    pub recent_calls: Vec<PlatformCall>,
-    /// Keep `recent_calls` across presents (for in-process differential tests).
-    pub keep_calls: bool,
+    /// Receives every call when set.
+    pub log: Option<CallLog>,
     redact: Vec<(String, String)>,
 }
 
@@ -85,8 +100,8 @@ impl Recorder {
         if let Some(w) = self.log_out.as_mut() {
             let _ = w.write_all(&line);
         }
-        if self.keep_calls {
-            self.recent_calls.push(call);
+        if let Some(log) = &self.log {
+            log.push(call);
         }
     }
 }
@@ -210,8 +225,7 @@ impl<P: Platform + PlatformProbe> Instrumented<P> {
             recorder: Recorder {
                 calls: Xxh3::new(),
                 log_out,
-                recent_calls: Vec::new(),
-                keep_calls: false,
+                log: None,
                 redact,
             },
             trace,
@@ -723,9 +737,6 @@ impl<P: Platform + PlatformProbe> Platform for Instrumented<P> {
         self.frame_start = now;
         self.render_start = None;
         self.frame += 1;
-        if !self.recorder.keep_calls {
-            self.recorder.recent_calls.clear();
-        }
         if self.config.frames.is_some_and(|n| self.frame >= n) {
             self.limit_reached();
         }

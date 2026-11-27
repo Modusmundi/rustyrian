@@ -47,10 +47,14 @@ fn doc_aliases_in(path: &Path, out: &mut BTreeSet<String>) -> Result<()> {
     }
     impl<'ast> syn::visit::Visit<'ast> for V<'_> {
         fn visit_item_fn(&mut self, i: &'ast syn::ItemFn) {
+            // A function named exactly like the C function needs no alias
+            // (rustc rejects an alias equal to the item name).
+            self.0.insert(i.sig.ident.to_string());
             self.attrs(&i.attrs);
             syn::visit::visit_item_fn(self, i);
         }
         fn visit_impl_item_fn(&mut self, i: &'ast syn::ImplItemFn) {
+            self.0.insert(i.sig.ident.to_string());
             self.attrs(&i.attrs);
             syn::visit::visit_impl_item_fn(self, i);
         }
@@ -120,8 +124,13 @@ fn nextest_names(root: &Path) -> Result<BTreeSet<String>> {
     let mut names = BTreeSet::new();
     if let Some(suites) = v.get("rust-suites").and_then(|s| s.as_object()) {
         for suite in suites.values() {
+            let binary = suite
+                .get("binary-name")
+                .and_then(|b| b.as_str())
+                .unwrap_or_default();
             if let Some(cases) = suite.get("testcases").and_then(|c| c.as_object()) {
-                names.extend(cases.keys().cloned());
+                // `diff:<test binary>::<test name>`, e.g. `diff:mtrand::mt_rand_r_variants_from_any_state`.
+                names.extend(cases.keys().map(|k| format!("{binary}::{k}")));
             }
         }
     }

@@ -2,6 +2,8 @@
 //! rustyrian fake platform. See `porting/RULES.md` and plan step 2.
 
 pub mod bindings;
+pub mod diff;
+pub mod mirror;
 pub mod runner;
 pub mod session;
 pub mod shim;

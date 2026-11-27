@@ -17,7 +17,7 @@ pub mod script;
 pub mod trace;
 
 pub use fake::{Clock, FakeConfig, FakePlatform, NetBackend};
-pub use instrumented::{End, InstrumentConfig, Instrumented, Recorder};
+pub use instrumented::{CallLog, End, InstrumentConfig, Instrumented, Recorder};
 
 /// A scripted, recorded fake platform.
 pub type Session = Instrumented<FakePlatform>;
@@ -25,13 +25,15 @@ pub type Session = Instrumented<FakePlatform>;
 /// The Rust port's headless platform.
 pub type HeadlessPlatform = Session;
 
-/// A session with no script, outputs or limits, keeping every call record.
-pub fn test_session() -> Session {
+/// A session with no script, outputs or limits, and the log of every call it
+/// records.
+pub fn test_session() -> (Session, CallLog) {
     let mut s = Instrumented::new(
         FakePlatform::new(FakeConfig::default()),
         InstrumentConfig::default(),
     )
     .expect("a session without outputs cannot fail to open");
-    s.recorder.keep_calls = true;
-    s
+    let log = CallLog::default();
+    s.recorder.log = Some(log.clone());
+    (s, log)
 }

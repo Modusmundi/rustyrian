@@ -140,8 +140,17 @@ fn main() {
     // rustc links with `-nodefaultlibs`, so the clang driver does not add the
     // sanitizer or profile runtimes; link them explicitly.
     if sanitize {
-        common
-            .extend(["-fsanitize=address,undefined", "-fno-omit-frame-pointer"].map(String::from));
+        // Fortified libc calls (`__strcpy_chk`, on by default in the macOS SDK
+        // when optimising) bypass ASan's interceptors; use the plain ones.
+        common.extend(
+            [
+                "-fsanitize=address,undefined",
+                "-fno-omit-frame-pointer",
+                "-U_FORTIFY_SOURCE",
+                "-D_FORTIFY_SOURCE=0",
+            ]
+            .map(String::from),
+        );
         link_runtime(
             &cc,
             &[

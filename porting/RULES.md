@@ -12,7 +12,9 @@ functions go in the module of their header (`file.h` → `file.rs`).
 ## R2. Names
 Functions and variables use `heck::ToSnakeCase` of the C name; types use
 `ToUpperCamelCase`. Every ported function carries
-`#[doc(alias = "<exact C name>")]`; `cargo xtask check-trace` finds ports by it.
+`#[doc(alias = "<exact C name>")]`, unless its Rust name already equals the C
+name (rustc rejects such an alias); `cargo xtask check-trace` finds ports by
+the alias or the name.
 
 ## R3. State
 Every C global, file `static`, and function-local `static` becomes a field of
