@@ -573,6 +573,29 @@ fn blit_sprite2_with(
             // end of row
             pixels += i64::from(vga_pitch.wrapping_sub(12));
         } else {
+            // A run that lies wholly inside the surface and the data takes
+            // the per-pixel loop's path at every pixel; do it as one slice.
+            let run = usize::from(count);
+            let end = pixels + i64::from(count);
+            if pixels >= 0
+                && end <= pixels_ul
+                && end as usize <= s.pixels.len()
+                && (!reads_data || i + run < data.len())
+            {
+                let dst = &mut s.pixels[pixels as usize..end as usize];
+                if reads_data {
+                    for (p, &v) in dst.iter_mut().zip(&data[i + 1..=i + run]) {
+                        *p = op(v, *p);
+                    }
+                } else {
+                    for p in dst {
+                        *p = op(0, *p);
+                    }
+                }
+                i += run;
+                pixels = end;
+                count = 0;
+            }
             while count > 0 {
                 count -= 1;
                 i += 1;
