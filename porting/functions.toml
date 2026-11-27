@@ -870,472 +870,474 @@ notes = ""
 c = "destruct.c::get_unit_by_name"
 c_sha = "f98d2d04bcb6"
 rust = "rustyrian_core::destruct::get_unit_by_name"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::get_unit_by_name_matches_c", "diff:destruct::load_destruct_config_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::load_destruct_config"
 c_sha = "c9ce306957b9"
 rust = "rustyrian_core::destruct::load_destruct_config"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::load_destruct_config_matches_c", "diff:destruct::destruct_game_matches_c"]
+waived_lines = [{ line = 543, reason = "out of memory adding a config section (allocation failure aborts in Rust)" }, { line = 566, reason = "out of memory adding a config section (allocation failure aborts in Rust)" }, { line = 573, reason = "out of memory adding a config option (allocation failure aborts in Rust)" }, { line = 610, reason = "out of memory adding a config section (allocation failure aborts in Rust)" }, { line = 625, reason = "out of memory adding a config option (allocation failure aborts in Rust)" }]
 notes = ""
 
 [[fn]]
 c = "destruct.c::JE_destructGame"
 c_sha = "091aaaaf6400"
 rust = "rustyrian_core::destruct::je_destruct_game"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::destruct_game_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::JE_destructMain"
 c_sha = "5371263e6cd2"
 rust = "rustyrian_core::destruct::je_destruct_main"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::destruct_game_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::JE_introScreen"
 c_sha = "cc0a55aabacc"
 rust = "rustyrian_core::destruct::je_intro_screen"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::screens_match_c", "diff:destruct::destruct_game_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DrawModeSelectMenu"
 c_sha = "62f647ea434b"
 rust = "rustyrian_core::destruct::draw_mode_select_menu"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::screens_match_c", "diff:destruct::destruct_game_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::JE_modeSelect"
 c_sha = "8561fee5a717"
 rust = "rustyrian_core::destruct::je_mode_select"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::screens_match_c", "diff:destruct::mode_select_wraps_match_c", "diff:destruct::destruct_game_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::JE_generateTerrain"
 c_sha = "eff6915cbba0"
 rust = "rustyrian_core::destruct::je_generate_terrain"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::terrain_matches_c", "diff:destruct::destruct_game_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_generateBaseTerrain"
 c_sha = "62ed711c2f0b"
 rust = "rustyrian_core::destruct::de_generate_base_terrain"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::terrain_matches_c", "diff:destruct::destruct_game_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_drawBaseTerrain"
 c_sha = "ed5f8a9e26bd"
 rust = "rustyrian_core::destruct::de_draw_base_terrain"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::terrain_matches_c", "diff:destruct::destruct_game_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_generateUnits"
 c_sha = "a80ad804fff4"
 rust = "rustyrian_core::destruct::de_generate_units"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::terrain_matches_c", "diff:destruct::destruct_game_matches_c"]
+waived_lines = [{ line = 1012, reason = "unreachable: numSatellites counts earlier units only, so it is always below the fleet size" }, { line = 1013, reason = "unreachable: numSatellites counts earlier units only, so it is always below the fleet size" }, { line = 1014, reason = "unreachable: numSatellites counts earlier units only, so it is always below the fleet size" }]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_generateWalls"
 c_sha = "f3385bcd2005"
 rust = "rustyrian_core::destruct::de_generate_walls"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::terrain_matches_c", "diff:destruct::destruct_game_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_generateRings"
 c_sha = "90dff5a16338"
 rust = "rustyrian_core::destruct::de_generate_rings"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::terrain_matches_c", "diff:destruct::destruct_game_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::aliasDirtPixel"
 c_sha = "07fc89c7b1a5"
 rust = "rustyrian_core::destruct::alias_dirt_pixel"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::terrain_matches_c", "diff:destruct::tick_parts_match_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::JE_aliasDirt"
 c_sha = "96b1d0d38717"
 rust = "rustyrian_core::destruct::je_alias_dirt"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::terrain_matches_c", "diff:destruct::destruct_game_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::JE_placementPosition"
 c_sha = "765ab3cff02c"
 rust = "rustyrian_core::destruct::je_placement_position"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::terrain_matches_c", "diff:destruct::destruct_game_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::JE_stabilityCheck"
 c_sha = "7472342add9f"
 rust = "rustyrian_core::destruct::je_stability_check"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::gravity_matches_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::JE_tempScreenChecking"
 c_sha = "0e65f2b58e58"
 rust = "rustyrian_core::destruct::je_temp_screen_checking"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::JE_makeExplosion"
 c_sha = "2d155797dbdf"
 rust = "rustyrian_core::destruct::je_make_explosion"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::explosions_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::JE_eSound"
 c_sha = "1219b406e97e"
 rust = "rustyrian_core::destruct::je_e_sound"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::explosions_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::JE_superPixel"
 c_sha = "c63676415eb7"
 rust = "rustyrian_core::destruct::je_super_pixel"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::explosions_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::JE_helpScreen"
 c_sha = "962d5323111f"
 rust = "rustyrian_core::destruct::je_help_screen"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::screens_match_c", "diff:destruct::destruct_game_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::JE_pauseScreen"
 c_sha = "ad066cbb9f8c"
 rust = "rustyrian_core::destruct::je_pause_screen"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::screens_match_c", "diff:destruct::destruct_game_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_ResetUnits"
 c_sha = "38fc0befa573"
 rust = "rustyrian_core::destruct::de_reset_units"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::destruct_game_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_ResetPlayers"
 c_sha = "aa4e74ee7eac"
 rust = "rustyrian_core::destruct::de_reset_players"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::destruct_game_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_ResetWeapons"
 c_sha = "1283528e83bb"
 rust = "rustyrian_core::destruct::de_reset_weapons"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::destruct_game_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_ResetLevel"
 c_sha = "7a4ab8e1e91c"
 rust = "rustyrian_core::destruct::de_reset_level"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::terrain_matches_c", "diff:destruct::destruct_game_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_ResetAI"
 c_sha = "4361e919b01f"
 rust = "rustyrian_core::destruct::de_reset_ai"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::destruct_game_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_ResetActions"
 c_sha = "a70d021097b4"
 rust = "rustyrian_core::destruct::de_reset_actions"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_RunTick"
 c_sha = "8fb5b22d6c3b"
 rust = "rustyrian_core::destruct::de_run_tick"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::run_tick_matches_c", "diff:destruct::destruct_game_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_RunTickCycleDeadUnits"
 c_sha = "6d6ad36bae93"
 rust = "rustyrian_core::destruct::de_run_tick_cycle_dead_units"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_RunTickGravity"
 c_sha = "525c110d148d"
 rust = "rustyrian_core::destruct::de_run_tick_gravity"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::gravity_matches_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_GravityDrawUnit"
 c_sha = "b10ccc69e2d7"
 rust = "rustyrian_core::destruct::de_gravity_draw_unit"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::gravity_matches_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_GravityLowerUnit"
 c_sha = "0c189b213989"
 rust = "rustyrian_core::destruct::de_gravity_lower_unit"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::gravity_matches_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_GravityFlyUnit"
 c_sha = "21cbf1850ec4"
 rust = "rustyrian_core::destruct::de_gravity_fly_unit"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::gravity_matches_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_RunTickAnimate"
 c_sha = "f77723d1900e"
 rust = "rustyrian_core::destruct::de_run_tick_animate"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_RunTickDrawWalls"
 c_sha = "cf9f43d87b6d"
 rust = "rustyrian_core::destruct::de_run_tick_draw_walls"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_RunTickExplosions"
 c_sha = "87124370e47a"
 rust = "rustyrian_core::destruct::de_run_tick_explosions"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::explosions_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_TestExplosionCollision"
 c_sha = "3eb236131284"
 rust = "rustyrian_core::destruct::de_test_explosion_collision"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::explosions_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_DestroyUnit"
 c_sha = "f1da9fdd82a8"
 rust = "rustyrian_core::destruct::de_destroy_unit"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::explosions_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_RunTickShots"
 c_sha = "59ce92e0cb41"
 rust = "rustyrian_core::destruct::de_run_tick_shots"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::shots_match_c", "diff:destruct::edge_cases_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_DrawTrails"
 c_sha = "fd0b627e9dc3"
 rust = "rustyrian_core::destruct::de_draw_trails"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::shots_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_RunTickAI"
 c_sha = "95472241b220"
 rust = "rustyrian_core::destruct::de_run_tick_ai"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::edge_cases_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_RunTickDrawCrosshairs"
 c_sha = "c3dd004c07f1"
 rust = "rustyrian_core::destruct::de_run_tick_draw_crosshairs"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_RunTickDrawHUD"
 c_sha = "f36baf0c6731"
 rust = "rustyrian_core::destruct::de_run_tick_draw_hud"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_RunTickGetInput"
 c_sha = "af27413979c2"
 rust = "rustyrian_core::destruct::de_run_tick_get_input"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_ProcessInput"
 c_sha = "84c1eca55547"
 rust = "rustyrian_core::destruct::de_process_input"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_CycleWeaponUp"
 c_sha = "1432c0812188"
 rust = "rustyrian_core::destruct::de_cycle_weapon_up"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::unit_functions_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_CycleWeaponDown"
 c_sha = "bdb935d4076c"
 rust = "rustyrian_core::destruct::de_cycle_weapon_down"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::unit_functions_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_MakeShot"
 c_sha = "9a4ccbebd6ae"
 rust = "rustyrian_core::destruct::de_make_shot"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::shots_match_c", "diff:destruct::edge_cases_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_RunMagnet"
 c_sha = "a067459084cf"
 rust = "rustyrian_core::destruct::de_run_magnet"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::shots_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_RaiseAngle"
 c_sha = "c14b2f3d8dfd"
 rust = "rustyrian_core::destruct::de_raise_angle"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::unit_functions_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_LowerAngle"
 c_sha = "02c7761da154"
 rust = "rustyrian_core::destruct::de_lower_angle"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::unit_functions_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_RaisePower"
 c_sha = "800510ee8850"
 rust = "rustyrian_core::destruct::de_raise_power"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::unit_functions_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_LowerPower"
 c_sha = "efbe5f1d238c"
 rust = "rustyrian_core::destruct::de_lower_power"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::unit_functions_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_isValidUnit"
 c_sha = "36eb36739055"
 rust = "rustyrian_core::destruct::de_is_valid_unit"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::unit_functions_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_RunTickCheckEndgame"
 c_sha = "e4469ec5a3c6"
 rust = "rustyrian_core::destruct::de_run_tick_check_endgame"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::DE_RunTickPlaySounds"
 c_sha = "412ba148558a"
 rust = "rustyrian_core::destruct::de_run_tick_play_sounds"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
 c = "destruct.c::JE_pixCool"
 c_sha = "396edcaef17a"
 rust = "rustyrian_core::destruct::je_pix_cool"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:destruct::shots_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
