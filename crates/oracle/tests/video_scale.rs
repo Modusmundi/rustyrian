@@ -68,12 +68,14 @@ fn set_scaler_by_name_matches_c() {
 type RustScaler = fn(&mut Game, ScreenId, TextureId);
 
 /// The non-hq scalers: Rust function, scale factor and destination format.
-const CASES: [(ScalerFunction, RustScaler, i32, u32); 10] = [
+const CASES: [(ScalerFunction, RustScaler, i32, u32); 12] = [
     (ScalerFunction::Nn32, vs::nn_32, 1, PIXELFORMAT_RGB888),
     (ScalerFunction::Nn32, vs::nn_32, 2, PIXELFORMAT_RGB888),
     (ScalerFunction::Nn32, vs::nn_32, 3, PIXELFORMAT_RGB888),
     (ScalerFunction::Nn32, vs::nn_32, 4, PIXELFORMAT_RGB888),
     (ScalerFunction::Nn16, vs::nn_16, 1, PIXELFORMAT_RGB565),
+    (ScalerFunction::Nn16, vs::nn_16, 2, PIXELFORMAT_RGB565),
+    (ScalerFunction::Nn16, vs::nn_16, 3, PIXELFORMAT_RGB565),
     (ScalerFunction::Nn16, vs::nn_16, 4, PIXELFORMAT_RGB565),
     (
         ScalerFunction::Scale2x32,
