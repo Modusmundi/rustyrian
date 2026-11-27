@@ -396,8 +396,11 @@ pub fn write_zip(stage: &Path, archive: &Path) -> Result<()> {
     }
     let mut zip = zip::ZipWriter::new(File::create(archive)?);
     for (rel, path, is_dir) in entries(stage)? {
+        // Unix entries on every host: the zip crate's default on Windows is
+        // DOS, which drops the modes (and makes archives host-dependent).
         let opts = SimpleFileOptions::default()
             .compression_method(zip::CompressionMethod::Deflated)
+            .system(zip::System::Unix)
             .unix_permissions(mode(&rel, is_dir));
         if is_dir {
             zip.add_directory(format!("{rel}/"), opts)?;
