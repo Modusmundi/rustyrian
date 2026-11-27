@@ -24,6 +24,8 @@ fn mirror_round_trip() {
     let s = State {
         opentyrian_str: b"Other".to_vec(),
         opentyrian_version: b"v9.9".to_vec(),
+        // C has registered nothing in this process.
+        atexit: Vec::new(),
     };
     s.store_to_c();
     assert_eq!(diff::load::<State>(), s);
@@ -232,4 +234,197 @@ fn setup_menu_matches() {
         run_setup(&acts);
         Ok(())
     });
+}
+
+/// How a run of `main` ended on both engines.
+#[derive(Debug, PartialEq)]
+enum MainEnd {
+    Returned(i32),
+    Exited(i32),
+}
+
+/// Runs upstream `main` (C) and `opentyr::main` (Rust) on `argv` with the
+/// input `script`; compares the outcome, then runs the `atexit` handlers on
+/// both sides and compares every platform call and the state (the files
+/// written too, when the run quit through `JE_tyrianHalt`).
+fn run_main(argv: &[&str], script: &str) -> MainEnd {
+    run_main_with(argv, script, |_| {})
+}
+
+/// [`run_main`] after `setup` prepared both engines (injected failures).
+fn run_main_with(argv: &[&str], script: &str, setup: impl FnOnce(&mut Rig)) -> MainEnd {
+    use std::ffi::CString;
+    let mut rig = Rig::new(script);
+    setup(&mut rig);
+    rig.clear();
+    let c_args: Vec<CString> = argv
+        .iter()
+        .map(|a| CString::new(*a).expect("no NUL"))
+        .collect();
+    let mut ptrs: Vec<*mut c_char> = c_args.iter().map(|c| c.as_ptr().cast_mut()).collect();
+    ptrs.push(std::ptr::null_mut());
+    let argc = c_args.len() as i32;
+    let r_args: Vec<String> = argv.iter().map(|a| (*a).to_owned()).collect();
+    let r = rig.run(
+        // SAFETY: argv is a NULL-terminated array of NUL-terminated strings
+        // that outlive the call (inside the guard).
+        || unsafe { rustyrian_oracle::ot_c_main(argc, ptrs.as_mut_ptr()) },
+        |g| opentyr::main(g, &r_args),
+    );
+    let end = match r {
+        Ok(code) => MainEnd::Returned(code),
+        Err(code) => MainEnd::Exited(code),
+    };
+    let code = match end {
+        MainEnd::Returned(c) | MainEnd::Exited(c) => c,
+    };
+    // The atexit handlers (SDL_Quit) run on both sides, as at process exit.
+    rustyrian_oracle::session::run_exit(code);
+    opentyr::run_atexit(&mut rig.g);
+    let halted =
+        rig.g.video.screens.iter().all(Option::is_none) && matches!(end, MainEnd::Exited(0));
+    if halted {
+        rig.check_halted();
+    } else {
+        rig.check();
+    }
+    end
+}
+
+/// `--help` prints upstream's help and exits 0.
+#[test]
+fn main_help_matches() {
+    assert_eq!(
+        run_main(&["opentyrian", "--help"], "ots 1\n"),
+        MainEnd::Exited(0)
+    );
+}
+
+/// An unknown option exits with EXIT_FAILURE.
+#[test]
+fn main_bad_argument_matches() {
+    assert_eq!(
+        run_main(&["opentyrian", "--no-such-option"], "ots 1\n"),
+        MainEnd::Exited(1)
+    );
+}
+
+/// No data files: `main` returns EXIT_FAILURE.
+#[test]
+fn main_missing_data_matches() {
+    let dir = std::env::temp_dir().join(format!("rustyrian-nodata-{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&dir);
+    let arg = format!("--data={}", dir.display());
+    assert_eq!(
+        run_main(&["opentyrian", &arg], "ots 1\n"),
+        MainEnd::Returned(1)
+    );
+}
+
+/// The logos, the title screen and quitting from it: `main` ends through
+/// `JE_tyrianHalt(0)`.
+#[test]
+fn main_logos_title_quit_matches() {
+    let data = net_support::data_dir();
+    let arg = format!("--data={}", data.display());
+    let mut s = String::from("ots 1\n");
+    let mut t = 500;
+    while t < 120_000 {
+        s.push_str(&format!(
+            "@{t} key-down ESCAPE\n@{} key-up ESCAPE\n",
+            t + 40
+        ));
+        t += 700;
+    }
+    assert_eq!(run_main(&["opentyrian", &arg], &s), MainEnd::Exited(0));
+}
+
+/// ESC taps every 0.7 s for two minutes: enough to leave the logos and quit
+/// from the title screen.
+fn quit_script() -> String {
+    let mut s = String::from("ots 1\n");
+    let mut t = 500;
+    while t < 120_000 {
+        s.push_str(&format!(
+            "@{t} key-down ESCAPE\n@{} key-up ESCAPE\n",
+            t + 40
+        ));
+        t += 700;
+    }
+    s
+}
+
+/// `SDL_Init` failing: `main` logs and returns EXIT_FAILURE.
+#[test]
+fn main_sdl_init_failure_matches() {
+    let end = run_main_with(&["opentyrian"], "ots 1\n", |rig| {
+        rig.c_fake.fail_next("SDL_Init");
+        rig.r_fake.fail_next("SDL_Init");
+    });
+    assert_eq!(end, MainEnd::Returned(1));
+}
+
+/// Data directories holding the v1.0/v1.1 or Tyrian 2000 `tyrian.shp`
+/// (identified by its first word: 11 or 13) are refused. The rest of the
+/// freeware files are present, so `findDataFiles` succeeds.
+#[test]
+fn main_old_data_versions_match() {
+    for (version, name) in [(11u16, "v10"), (13, "t2000")] {
+        let dir = data_without("tyrian.shp");
+        std::fs::write(dir.join("tyrian.shp"), version.to_le_bytes()).expect("write");
+        let arg = format!("--data={}", dir.display());
+        assert_eq!(
+            run_main(&["opentyrian", &arg], "ots 1\n"),
+            MainEnd::Returned(1),
+            "{name}"
+        );
+    }
+}
+
+/// `--no-sound`, `--record` and `--xmas` (Christmas data missing from the
+/// freeware set), then logos, title and quit.
+#[test]
+fn main_options_logos_title_quit_match() {
+    let data = net_support::data_dir();
+    let arg = format!("--data={}", data.display());
+    let end = run_main(
+        &["opentyrian", &arg, "--no-sound", "--record", "--xmas"],
+        &quit_script(),
+    );
+    assert_eq!(end, MainEnd::Exited(0));
+}
+
+/// The freeware data without `skip`, as symlinks in a scratch directory.
+fn data_without(skip: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("rustyrian-no-{skip}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("dir");
+    for e in std::fs::read_dir(net_support::data_dir()).expect("data dir") {
+        let e = e.expect("entry");
+        if e.file_name() != skip {
+            std::os::unix::fs::symlink(e.path(), dir.join(e.file_name())).expect("symlink");
+        }
+    }
+    dir
+}
+
+/// `--xmas` without the Christmas data: the mode is dropped with a warning.
+#[test]
+fn main_xmas_missing_matches() {
+    let arg = format!("--data={}", data_without("tyrianc.shp").display());
+    let end = run_main(&["opentyrian", &arg, "--xmas"], &quit_script());
+    assert_eq!(end, MainEnd::Exited(0));
+}
+
+/// A network game whose delay overflows the packet queue: `network_init`
+/// fails and the game ends through `network_tyrian_halt(3)`.
+#[test]
+fn main_network_init_failure_matches() {
+    let data = net_support::data_dir();
+    let arg = format!("--data={}", data.display());
+    let end = run_main(
+        &["opentyrian", &arg, "--net=127.0.0.1", "--net-delay=9"],
+        &quit_script(),
+    );
+    assert_eq!(end, MainEnd::Exited(0));
 }

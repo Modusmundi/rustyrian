@@ -45,14 +45,25 @@ pub const M_PI_2: f64 = std::f64::consts::FRAC_PI_2;
 /// `M_PI_4`.
 pub const M_PI_4: f64 = std::f64::consts::FRAC_PI_4;
 
-/// Mutable globals of `opentyr.c` (rule R3).
+/// A handler `main` registers with `atexit`; the entry point runs them in
+/// reverse order before the process ends, as C's `exit` does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AtExit {
+    /// `SDL_Quit`.
+    SdlQuit,
+}
+
+/// Mutable globals of `opentyr.c` (rule R3), plus the `atexit` registrations
+/// `main` makes.
 ///
-/// Both are non-`const` pointers to string literals; they hold the string
-/// bytes without the NUL.
+/// `opentyrian_str`/`opentyrian_version` are non-`const` pointers to string
+/// literals; they hold the string bytes without the NUL.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct State {
     pub opentyrian_str: Vec<u8>,
     pub opentyrian_version: Vec<u8>,
+    /// `atexit` registrations, oldest first.
+    pub atexit: Vec<AtExit>,
 }
 
 impl Default for State {
@@ -60,6 +71,17 @@ impl Default for State {
         State {
             opentyrian_str: b"OpenTyrian".to_vec(),
             opentyrian_version: OPENTYRIAN_VERSION.as_bytes().to_vec(),
+            atexit: Vec::new(),
+        }
+    }
+}
+
+/// Runs the `atexit` registrations in reverse order and clears them, as C's
+/// `exit` does before the process ends.
+pub fn run_atexit(g: &mut Game) {
+    while let Some(handler) = g.opentyr.atexit.pop() {
+        match handler {
+            AtExit::SdlQuit => g.platform.quit(),
         }
     }
 }
@@ -909,4 +931,201 @@ fn change_volume(g: &mut Game, music_delta: i32, sample_delta: i32) {
     je_change_volume(g, &mut music, music_delta, &mut sample, sample_delta);
     g.nortsong.tyr_music_volume = music;
     g.nortsong.fx_volume = sample;
+}
+
+/// `main(argc, argv)`: initialises everything, then loops over the logos,
+/// title screen and game until the player quits. `return EXIT_FAILURE` paths
+/// return the code; the final `JE_tyrianHalt(0)` (and any other `exit`)
+/// arrives as `Err(Halt)`. The entry point then runs [`run_atexit`].
+pub fn main(g: &mut Game, argv: &[String]) -> Flow<i32> {
+    use crate::config::{load_configuration, load_saves};
+    use crate::editship::load_extra_shapes;
+    use crate::episodes::je_scan_for_episodes;
+    use crate::file;
+    use crate::helptext::je_load_help_text;
+    use crate::joystick::init_joysticks;
+    use crate::keyboard::init_keyboard;
+    use crate::logging::{SDL_LOG_CATEGORY_APPLICATION, log_fatal};
+    use crate::loudness::init_audio;
+    use crate::mainint::{je_init_player_data, je_sort_high_scores};
+    use crate::mtrand::mt_srand;
+    use crate::network::{network_init, network_tyrian_halt};
+    use crate::nortsong::load_snd_file;
+    use crate::palette::load_pals;
+    use crate::params::je_param_check;
+    use crate::sprite::{free_main_shape_tables, je_load_main_shape_tables};
+    use crate::tyrian2::{intro_logos, je_main, network_start_screen, title_screen};
+    use crate::varz::je_tyrian_halt;
+    use crate::video::init_video;
+    use crate::xmas::{xmas_prompt, xmas_time};
+
+    // `mt_srand(time(NULL))`: `time_t` to `unsigned long`.
+    let now = g.platform.time();
+    mt_srand(g, now as u64);
+
+    let version = String::from_utf8_lossy(&g.opentyr.opentyrian_version).into_owned();
+    let name = String::from_utf8_lossy(&g.opentyr.opentyrian_str).into_owned();
+    g.platform.log("");
+    g.platform
+        .log(&format!("Welcome to... >> {name} {version} <<"));
+    g.platform.log("");
+    g.platform
+        .log("Copyright (C) The OpenTyrian Development Team");
+    g.platform.log("");
+    g.platform
+        .log("This program comes with ABSOLUTELY NO WARRANTY.");
+    g.platform
+        .log("This is free software, and you are welcome to redistribute it");
+    g.platform
+        .log("under certain conditions.  See the file COPYING for details.");
+    g.platform.log("");
+
+    if g.platform.init(0) != 0 {
+        let e = g.platform.get_error();
+        log_fatal(g, &format!("Failed to initialize SDL: {e}"));
+        return Ok(EXIT_FAILURE);
+    }
+
+    g.opentyr.atexit.push(AtExit::SdlQuit);
+
+    load_configuration(g);
+    load_saves(g);
+
+    // The argument handler may override this.
+    g.xmas.xmas = xmas_time(g);
+
+    let mut args: Vec<Vec<u8>> = argv.iter().map(|a| a.as_bytes().to_vec()).collect();
+    je_param_check(g, &mut args)?;
+
+    if !file::find_data_files(g) {
+        log_fatal(
+            g,
+            "The Tyrian data files were not found.  OpenTyrian requires the Tyrian v2.0/v2.1 data files.",
+        );
+        return Ok(EXIT_FAILURE);
+    }
+
+    let mut f = file::data_file_open(g, "tyrian.shp", "rb");
+    let temp = file::file_read_u16(&mut f);
+    file::file_close(&mut f);
+
+    if temp == 11 {
+        log_fatal(
+            g,
+            "The Tyrian v1.0/v1.1 data files were found.  OpenTyrian requires the Tyrian v2.0/v2.1 data files.",
+        );
+        return Ok(EXIT_FAILURE);
+    } else if temp == 13 {
+        log_fatal(
+            g,
+            "The Tyrian 2000 data files were found.  OpenTyrian requires the Tyrian v2.0/v2.1 data files.",
+        );
+        return Ok(EXIT_FAILURE);
+    }
+
+    je_scan_for_episodes(g);
+
+    init_video(g)?;
+    init_keyboard(g);
+    init_joysticks(g);
+    if g.mouse.has_mouse {
+        // SDL cannot tell whether there is none.
+        g.platform.log("Assuming mouse detected.");
+    }
+
+    if g.xmas.xmas
+        && (!file::data_file_exists(g, "tyrianc.shp") || !file::data_file_exists(g, "voicesc.snd"))
+    {
+        g.xmas.xmas = false;
+
+        g.platform
+            .log_warn(SDL_LOG_CATEGORY_APPLICATION, "Christmas is missing.");
+    }
+
+    load_pals(g)?;
+    let shapes = if g.xmas.xmas {
+        "tyrianc.shp"
+    } else {
+        "tyrian.shp"
+    };
+    je_load_main_shape_tables(g, shapes)?;
+
+    if g.xmas.xmas && !xmas_prompt(g)? {
+        g.xmas.xmas = false;
+
+        free_main_shape_tables(g);
+        je_load_main_shape_tables(g, "tyrian.shp")?;
+    }
+
+    // Default options.
+    g.config.you_are_cheating = false;
+    g.config.smooth_scroll = true;
+    g.varz.load_destruct = false;
+
+    if !g.loudness.audio_disabled {
+        if init_audio(g) {
+            let xmas = g.xmas.xmas;
+            load_snd_file(g, xmas)?;
+        }
+    } else {
+        g.platform.log("Audio is disabled.");
+    }
+
+    if g.demo.record_demo {
+        g.platform.log("Game will be recorded.");
+    }
+
+    load_extra_shapes(g);
+
+    je_load_help_text(g)?;
+
+    if g.network.is_network_game && network_init(g) != 0 {
+        network_tyrian_halt(g, 3, false)?;
+    }
+
+    let mut do_logos = true;
+
+    loop {
+        do_logos |= g.demo.play_demo && !g.demo.stopped_demo;
+
+        if !g.network.is_network_game && do_logos {
+            // `NDEBUG` build (rule R11).
+            intro_logos(g)?;
+
+            do_logos = false;
+        }
+
+        je_init_player_data(g);
+        je_sort_high_scores(g);
+
+        g.demo.play_demo = false;
+        g.demo.stopped_demo = false;
+
+        g.varz.game_loaded = false;
+        g.mainint.jump_section = false;
+
+        if g.network.is_network_game {
+            network_start_screen(g)?;
+        } else if !title_screen(g)? {
+            // The player quit from the title screen.
+            break;
+        }
+
+        if g.varz.load_destruct {
+            je_destruct_game(g)?;
+
+            g.varz.load_destruct = false;
+        } else {
+            je_main(g)?;
+
+            if g.config.trent_win {
+                // The player beat SuperTyrian.
+                break;
+            }
+        }
+    }
+
+    je_tyrian_halt(g, 0)?;
+
+    Ok(0)
 }

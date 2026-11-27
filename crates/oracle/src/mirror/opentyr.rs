@@ -5,11 +5,16 @@
 //! mirrored by contents. Storing keeps C's pointer when the contents already
 //! match and otherwise frees a previous mirror-made copy and points the
 //! global at a fresh copy from the upstream allocator.
+//!
+//! `atexit` mirrors the handlers C registered through the `atexit` shim
+//! (upstream registers only `SDL_Quit`, i.e. the `ot_shim_SDL_Quit` adapter);
+//! storing replaces the shim's registry with the same handlers.
 
 use super::video::{c_heap_free, c_heap_from};
 use super::{Mirror, global, global_mut};
 use crate::bindings as b;
-use rustyrian_core::opentyr::State;
+use crate::session;
+use rustyrian_core::opentyr::{AtExit, State};
 use std::ffi::{CStr, c_char};
 
 /// # Safety
@@ -42,6 +47,7 @@ impl Mirror for State {
             self.opentyrian_str = load(*global(&raw const b::opentyrian_str));
             self.opentyrian_version = load(*global(&raw const b::opentyrian_version));
         }
+        self.atexit = vec![AtExit::SdlQuit; session::atexit_len()];
     }
 
     fn store_to_c(&self) {
@@ -53,5 +59,13 @@ impl Mirror for State {
                 global_mut(&raw mut b::opentyrian_version),
             );
         }
+        let handlers = self
+            .atexit
+            .iter()
+            .map(|h| match h {
+                AtExit::SdlQuit => crate::shim::ot_shim_SDL_Quit as unsafe extern "C" fn(),
+            })
+            .collect();
+        session::set_atexit(handlers);
     }
 }
