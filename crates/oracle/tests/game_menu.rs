@@ -101,6 +101,18 @@ fn fixture(frame: u64) -> rustyrian_core::game::Snapshot {
 /// nightly runs `PROPTEST_CASES=10000`.
 const HEAVY_CASES: u32 = 48;
 
+/// A runner for exactly `HEAVY_CASES` cases from a fixed seed, so the C line
+/// coverage these tests give is the same on every run.
+fn heavy_runner() -> proptest::test_runner::TestRunner {
+    use proptest::test_runner::{Config, TestRng, TestRunner};
+    let config = Config {
+        cases: HEAVY_CASES,
+        ..Config::default()
+    };
+    let rng = TestRng::deterministic_rng(config.rng_algorithm);
+    TestRunner::new_with_rng(config, rng)
+}
+
 /// Both engines with live video (`init_video`) in the `demo-cycle` fixture
 /// state at `frame`: items, shapes, help text and screens as in a game.
 fn setup(frame: u64) -> Both {
@@ -289,7 +301,7 @@ impl NavState {
 #[test]
 fn je_update_nav_screen_matches() {
     // whole game per case: capped (see HEAVY_CASES)
-    diff::capped_runner(HEAVY_CASES)
+    heavy_runner()
         .run(&(nav_state(),), |(s,)| {
             let mut d = setup(2000);
             // SAFETY: plain C call; indices in range per the strategy.
@@ -308,7 +320,7 @@ fn je_update_nav_screen_matches() {
 #[test]
 fn je_draw_nav_lines_dots_and_planets_match() {
     // whole game per case: capped (see HEAVY_CASES)
-    diff::capped_runner(HEAVY_CASES)
+    heavy_runner()
         .run(
             &(nav_state(), 0u8..21, any::<bool>()),
             |(s, planet, dark)| {
@@ -345,7 +357,7 @@ fn je_draw_nav_lines_dots_and_planets_match() {
 #[test]
 fn je_draw_menu_header_matches() {
     // whole game per case: capped (see HEAVY_CASES)
-    diff::capped_runner(HEAVY_CASES)
+    heavy_runner()
         .run(
             &(
                 0i16..14,
@@ -380,7 +392,7 @@ fn je_draw_menu_header_matches() {
 #[test]
 fn je_draw_menu_choices_matches() {
     // whole game per case: capped (see HEAVY_CASES)
-    diff::capped_runner(HEAVY_CASES)
+    heavy_runner()
         .run(
             &(0i16..14, 0u8..=11, any::<u8>()),
             |(menu, choices, sel)| {
@@ -411,7 +423,7 @@ fn je_draw_menu_choices_matches() {
 #[test]
 fn je_draw_main_menu_help_text_matches() {
     // whole game per case: capped (see HEAVY_CASES)
-    diff::capped_runner(HEAVY_CASES)
+    heavy_runner()
         .run(
             &(
                 (0i16..14).prop_flat_map(|m| {
@@ -469,7 +481,7 @@ fn je_draw_main_menu_help_text_matches() {
 #[test]
 fn je_gen_item_menu_matches() {
     // whole game per case: capped (see HEAVY_CASES)
-    diff::capped_runner(HEAVY_CASES)
+    heavy_runner()
         .run(
             &(
                 2u8..=8,
@@ -527,7 +539,7 @@ fn je_gen_item_menu_matches() {
 #[test]
 fn je_scale_bitmap_matches() {
     // whole game per case: capped (see HEAVY_CASES)
-    diff::capped_runner(HEAVY_CASES)
+    heavy_runner()
         .run(
             &(
                 (0i32..320).prop_flat_map(|a| (Just(a), a..320)),
@@ -566,7 +578,7 @@ fn je_scale_bitmap_matches() {
 #[test]
 fn je_init_weapon_view_and_weapon_view_frame_match() {
     // whole game per case: capped (see HEAVY_CASES)
-    diff::capped_runner(HEAVY_CASES)
+    heavy_runner()
         .run(
             &(
                 0u8..=PORT_NUM as u8,
@@ -627,7 +639,7 @@ fn je_init_weapon_view_and_weapon_view_frame_match() {
 #[test]
 fn je_draw_ship_specs_matches() {
     // whole game per case: capped (see HEAVY_CASES)
-    diff::capped_runner(HEAVY_CASES)
+    heavy_runner()
         .run(
             &(
                 1u8..=SHIP_NUM as u8,
@@ -924,7 +936,7 @@ fn ship_strategy() -> impl Strategy<Value = (u8, u8)> {
 #[test]
 fn je_draw_item_matches() {
     // whole game per case: capped (see HEAVY_CASES)
-    diff::capped_runner(HEAVY_CASES)
+    heavy_runner()
         .run(
             &(
                 (0u8..9).prop_flat_map(|t| {
@@ -974,7 +986,7 @@ fn je_draw_item_matches() {
 #[test]
 fn draw_ship_illustration_matches() {
     // whole game per case: capped (see HEAVY_CASES)
-    diff::capped_runner(HEAVY_CASES)
+    heavy_runner()
         .run(
             &(
                 ship_strategy(),
@@ -1015,7 +1027,7 @@ fn draw_ship_illustration_matches() {
 #[test]
 fn je_weapon_sim_update_matches() {
     // whole game per case: capped (see HEAVY_CASES)
-    diff::capped_runner(HEAVY_CASES)
+    heavy_runner()
         .run(
             &(
                 2u8..=8,
