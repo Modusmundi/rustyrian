@@ -2268,8 +2268,8 @@ notes = ""
 c = "jukebox.c::jukebox"
 c_sha = "4279faaecb9c"
 rust = "rustyrian_core::jukebox::jukebox"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:jukebox::jukebox_keys_match", "diff:jukebox::jukebox_quit_keys_and_click_match", "diff:jukebox::jukebox_looped_song_fade_matches"]
 notes = ""
 
 [[fn]]
@@ -4537,32 +4537,32 @@ notes = ""
 c = "varz.c::JE_getShipInfo"
 c_sha = "1b8060b2265a"
 rust = "rustyrian_core::varz::je_get_ship_info"
-status = "todo"
-verify = []
-notes = ""
+status = "verified"
+verify = ["diff:varz::je_get_ship_info_matches", "diff:varz::out_of_table_item_reads_are_zero"]
+notes = "D-UB-VARZ-2: item-table reads guarded"
 
 [[fn]]
 c = "varz.c::JE_SGr"
 c_sha = "29b337dc4963"
 rust = "rustyrian_core::varz::je_s_gr"
-status = "todo"
-verify = []
-notes = ""
+status = "verified"
+verify = ["diff:varz::je_get_ship_info_matches", "diff:varz::out_of_table_item_reads_are_zero"]
+notes = "D-UB-VARZ-2: graphic number guarded"
 
 [[fn]]
 c = "varz.c::JE_drawOptions"
 c_sha = "016b3f765fbd"
 rust = "rustyrian_core::varz::je_draw_options"
-status = "todo"
-verify = []
-notes = ""
+status = "verified"
+verify = ["diff:varz::je_draw_options_matches", "diff:varz::je_special_complete_matches"]
+notes = "D-UB-VARZ-2: option-table reads guarded"
 
 [[fn]]
 c = "varz.c::JE_drawOptionLevel"
 c_sha = "57284627f7ad"
 rust = "rustyrian_core::varz::je_draw_option_level"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:varz::je_draw_options_matches"]
 notes = ""
 
 [[fn]]
@@ -4577,88 +4577,88 @@ notes = ""
 c = "varz.c::JE_specialComplete"
 c_sha = "ece6527f4506"
 rust = "rustyrian_core::varz::je_special_complete"
-status = "todo"
-verify = []
-notes = ""
+status = "verified"
+verify = ["diff:varz::je_special_complete_matches", "diff:varz::je_do_special_shot_matches"]
+notes = "D-UB-VARZ-2: special-table reads guarded"
 
 [[fn]]
 c = "varz.c::JE_doSpecialShot"
 c_sha = "cb54c9be3b4f"
 rust = "rustyrian_core::varz::je_do_special_shot"
-status = "todo"
-verify = []
-notes = ""
+status = "verified"
+verify = ["diff:varz::je_do_special_shot_matches"]
+notes = "armor/shield pointers are the fields of player[p] (R8)"
 
 [[fn]]
 c = "varz.c::JE_setupExplosion"
 c_sha = "194f41de4b52"
 rust = "rustyrian_core::varz::je_setup_explosion"
-status = "todo"
-verify = []
-notes = ""
+status = "verified"
+verify = ["diff:varz::je_setup_explosion_matches", "diff:varz::je_player_damage_matches", "diff:varz::explosion_types_outside_the_table_set_nothing"]
+notes = "D-UB-VARZ-1: explosion types without a table entry"
 
 [[fn]]
 c = "varz.c::JE_setupExplosionLarge"
 c_sha = "778c58e630ad"
 rust = "rustyrian_core::varz::je_setup_explosion_large"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:varz::je_setup_explosion_matches"]
 notes = ""
 
 [[fn]]
 c = "varz.c::JE_wipeShieldArmorBars"
 c_sha = "6c6022f8a8b9"
 rust = "rustyrian_core::varz::je_wipe_shield_armor_bars"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:varz::hud_bars_and_port_configs_match", "diff:varz::je_player_damage_matches"]
 notes = ""
 
 [[fn]]
 c = "varz.c::JE_playerDamage"
 c_sha = "26b46b73513b"
 rust = "rustyrian_core::varz::je_player_damage"
-status = "todo"
-verify = []
-notes = ""
+status = "verified"
+verify = ["diff:varz::je_player_damage_matches"]
+notes = "Player pointer is the index p (R8)"
 
 [[fn]]
 c = "varz.c::JE_portConfigs"
 c_sha = "600212e381fc"
 rust = "rustyrian_core::varz::je_port_configs"
-status = "todo"
-verify = []
-notes = ""
+status = "verified"
+verify = ["diff:varz::hud_bars_and_port_configs_match", "diff:varz::out_of_table_item_reads_are_zero"]
+notes = "D-UB-VARZ-2: weapon-port read guarded"
 
 [[fn]]
 c = "varz.c::JE_drawShield"
 c_sha = "df74a725b164"
 rust = "rustyrian_core::varz::je_draw_shield"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:varz::hud_bars_and_port_configs_match", "diff:varz::je_player_damage_matches"]
 notes = ""
 
 [[fn]]
 c = "varz.c::JE_drawArmor"
 c_sha = "c00c07e7d805"
 rust = "rustyrian_core::varz::je_draw_armor"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:varz::hud_bars_and_port_configs_match", "diff:varz::je_player_damage_matches"]
 notes = ""
 
 [[fn]]
 c = "varz.c::JE_doSP"
 c_sha = "3e8a66da071f"
 rust = "rustyrian_core::varz::je_do_sp"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:varz::super_pixels_match"]
 notes = ""
 
 [[fn]]
 c = "varz.c::JE_drawSP"
 c_sha = "d6587f924f05"
 rust = "rustyrian_core::varz::je_draw_sp"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:varz::super_pixels_match"]
 notes = ""
 
 [[fn]]

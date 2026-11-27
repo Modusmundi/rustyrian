@@ -13,9 +13,16 @@
 //!   element index into the flattened `mainmap` (`row * columns + column`).
 
 use crate::Game;
+use crate::config::{SHOT_SPECIAL, SHOT_SPECIAL2};
+use crate::episodes::{JeOptionType, JePower, JeShip, JeSpecial, JeWeaponPort};
 use crate::game::{Flow, Halt};
 use crate::lvlmast::PORT_NUM;
-use crate::{config, joystick, loudness, sprite, video};
+use crate::player::{FRONT_WEAPON, LEFT_SIDEKICK, REAR_WEAPON, RIGHT_SIDEKICK};
+use crate::shots::MAX_PWEAPON;
+use crate::sndmast::{S_EXPLOSION_22, S_HULL_HIT, S_POWERUP, S_SHIELD_HIT, S_SOUL_OF_ZINGLON};
+use crate::sprite::OPTION_SHAPES;
+use crate::video::ScreenId;
+use crate::{config, joystick, loudness, mtrand, nortvars, shots, sprite, vga256d, video};
 use serde::{Deserialize, Serialize};
 
 pub const SA: usize = 7;
@@ -759,4 +766,961 @@ pub fn je_tyrian_halt(g: &mut Game, code: u8) -> Flow {
     Err(Halt {
         code: i32::from(code),
     })
+}
+
+// Item-table reads guarded per divergence D-UB-VARZ-2: an index outside its
+// table reads a zeroed entry.
+
+fn power_sys(g: &Game, i: u8) -> JePower {
+    g.episodes
+        .power_sys
+        .get(usize::from(i))
+        .copied()
+        .unwrap_or_default()
+}
+
+fn ship(g: &Game, i: u8) -> JeShip {
+    g.episodes
+        .ships
+        .get(usize::from(i))
+        .copied()
+        .unwrap_or_default()
+}
+
+fn option(g: &Game, i: u8) -> JeOptionType {
+    g.episodes
+        .options
+        .get(usize::from(i))
+        .copied()
+        .unwrap_or_default()
+}
+
+fn special(g: &Game, i: u8) -> JeSpecial {
+    g.episodes
+        .special
+        .get(usize::from(i))
+        .copied()
+        .unwrap_or_default()
+}
+
+fn weapon_port(g: &Game, i: u8) -> JeWeaponPort {
+    g.episodes
+        .weapon_port
+        .get(usize::from(i))
+        .copied()
+        .unwrap_or_default()
+}
+
+fn extra_ship(g: &Game, i: usize) -> u8 {
+    g.editship.extra_ships.get(i).copied().unwrap_or(0)
+}
+
+/// `VGAScreenSeg`.
+fn seg(g: &Game) -> ScreenId {
+    g.video
+        .vga_screen_seg
+        .expect("VGAScreenSeg used before init_video")
+}
+
+#[doc(alias = "JE_getShipInfo")]
+pub fn je_get_ship_info(g: &mut Game) {
+    g.varz.ship_gr_ptr = Some(Sprite2Ref::SpriteSheet9);
+    g.varz.ship_gr2ptr = Some(Sprite2Ref::SpriteSheet9);
+
+    g.config.power_add = u32::from(power_sys(g, g.player.player[0].items.generator).power);
+
+    let ship0 = g.player.player[0].items.ship;
+    let extra_ship1 = ship0 > 90;
+    if extra_ship1 {
+        let base = ((i32::from(ship0) - 91) * 15) as u8;
+        let mut ptr = g.varz.ship_gr_ptr;
+        g.varz.ship_gr = je_s_gr(g, u16::from(ship0) - 90, &mut ptr);
+        g.varz.ship_gr_ptr = ptr;
+        g.player.player[0].armor = u32::from(extra_ship(g, usize::from(base) + 7));
+    } else {
+        g.varz.ship_gr = ship(g, ship0).shipgraphic;
+        g.player.player[0].armor = u32::from(ship(g, ship0).dmg);
+    }
+
+    let ship1 = g.player.player[1].items.ship;
+    let extra_ship2 = ship1 > 90;
+    if extra_ship2 {
+        let base2 = ((i32::from(ship1) - 91) * 15) as u8;
+        let mut ptr = g.varz.ship_gr2ptr;
+        g.varz.ship_gr2 = je_s_gr(g, u16::from(ship1) - 90, &mut ptr);
+        g.varz.ship_gr2ptr = ptr;
+        g.player.player[1].armor = u32::from(extra_ship(g, usize::from(base2) + 7));
+    } else {
+        g.varz.ship_gr2 = 0;
+        g.player.player[1].armor = 10;
+    }
+
+    for i in 0..g.player.player.len() {
+        let p = &g.player.player[i];
+        let temp: u32 = if (i == 0 && extra_ship1) || (i == 1 && extra_ship2) {
+            2
+        } else {
+            u32::from(ship(g, p.items.ship).ani)
+        };
+
+        let p = &mut g.player.player[i];
+        p.initial_armor = p.armor;
+        if temp == 0 {
+            p.shot_hit_area_x = 12;
+            p.shot_hit_area_y = 10;
+        } else {
+            p.shot_hit_area_x = 11;
+            p.shot_hit_area_y = 14;
+        }
+    }
+}
+
+/// `JE_SGr(ship, &ptr)`: the graphic of custom ship `ship` (1-based); points
+/// `ptr` at `extraShapes` for the custom graphics. A graphic number outside
+/// `1..=15` returns 0 (divergence D-UB-VARZ-2).
+#[doc(alias = "JE_SGr")]
+pub fn je_s_gr(g: &mut Game, ship: u16, ptr: &mut Option<Sprite2Ref>) -> u16 {
+    const GR: [u16; 15] = [
+        233, 157, 195, 271, 81, 0, 119, 5, 43, 81, 119, 157, 195, 233, 271,
+    ];
+
+    let temp_w = u16::from(extra_ship(
+        g,
+        usize::from(ship).wrapping_sub(1).wrapping_mul(15),
+    ));
+    if temp_w > 7 {
+        *ptr = Some(Sprite2Ref::ExtraShapes);
+    }
+
+    usize::from(temp_w)
+        .checked_sub(1)
+        .and_then(|i| GR.get(i))
+        .copied()
+        .unwrap_or(0)
+}
+
+#[doc(alias = "JE_drawOptions")]
+pub fn je_draw_options(g: &mut Game) {
+    let temp_surface = g.video.vga_screen;
+    g.video.vga_screen = g.video.vga_screen_seg;
+
+    let tpm = usize::from(g.config.two_player_mode);
+
+    #[allow(clippy::needless_range_loop)] // `i` indexes the sidekicks and the HUD rows
+    for i in 0..2 {
+        let this_option = option(g, g.player.player[tpm].items.sidekick[i]);
+        let s = &mut g.player.player[tpm].sidekick[i];
+
+        s.ammo = i32::from(this_option.ammo);
+        s.ammo_max = s.ammo;
+
+        s.ammo_refill_ticks = ((105 - s.ammo) * 4) as u32;
+        s.ammo_refill_ticks_max = s.ammo_refill_ticks;
+
+        s.style = u32::from(this_option.tr);
+
+        s.animation_enabled = this_option.option == 1;
+        s.animation_frame = 0;
+
+        s.charge = 0;
+        s.charge_ticks = 20;
+        let (ammo_max, ammo) = (s.ammo_max, s.ammo);
+
+        // the initial sidekick HUD
+        let y = HUD_SIDEKICK_Y[tpm][i];
+        let surface = seg(g);
+
+        vga256d::fill_rectangle_xy(g, surface, 284, y, 284 + 28, y + 15, 0);
+        if this_option.icongr > 0 {
+            sprite::blit_sprite(
+                g,
+                surface,
+                284,
+                y,
+                OPTION_SHAPES as u32,
+                u32::from(this_option.icongr) - 1,
+            );
+        }
+        vga256d::draw_segmented_gauge(
+            g,
+            surface,
+            284,
+            y + 13,
+            112,
+            2,
+            2,
+            (ammo_max / 10).max(1) as u32,
+            ammo as u32,
+        );
+    }
+
+    g.video.vga_screen = temp_surface;
+
+    je_draw_option_level(g);
+}
+
+#[doc(alias = "JE_drawOptionLevel")]
+pub fn je_draw_option_level(g: &mut Game) {
+    if g.config.two_player_mode {
+        g.varz.temp = 1;
+        while g.varz.temp <= 3 {
+            let temp = i32::from(g.varz.temp);
+            let lit = i32::from(g.player.player[1].items.sidekick_level) - 100 == temp;
+            let surface = seg(g);
+            vga256d::fill_rectangle_xy(
+                g,
+                surface,
+                268,
+                127 + (temp - 1) * 6,
+                269,
+                127 + 3 + (temp - 1) * 6,
+                (193 + i32::from(lit) * 11) as u8,
+            );
+            g.varz.temp += 1;
+        }
+    }
+}
+
+/// `JE_specialComplete(playerNum, specialType)`.
+#[doc(alias = "JE_specialComplete")]
+pub fn je_special_complete(g: &mut Game, player_num: u8, special_type: u8) {
+    g.varz.next_special_wait = 0;
+    let sp = special(g, special_type);
+    let front_power = u16::from(g.player.player[0].items.weapon[FRONT_WEAPON].power);
+    match sp.stype {
+        // Weapon
+        1 => {
+            let shooter = if player_num == 1 { 0 } else { 1 };
+            let (px, py) = (g.player.player[shooter].x, g.player.player[shooter].y);
+            let (mx, my) = (g.player.player[0].mouse_x, g.player.player[0].mouse_y);
+            g.varz.b = shots::player_shot_create(
+                g,
+                0,
+                SHOT_SPECIAL2 as u32,
+                px as u16,
+                py as u16,
+                mx,
+                my,
+                sp.wpn,
+                player_num,
+            );
+
+            g.config.shot_repeat[SHOT_SPECIAL] = g.config.shot_repeat[SHOT_SPECIAL2];
+        }
+        // Repulsor
+        2 => {
+            let (px, py) = (g.player.player[0].x, g.player.player[0].y);
+            g.varz.temp = 0;
+            while usize::from(g.varz.temp) < ENEMY_SHOT_MAX {
+                let t = usize::from(g.varz.temp);
+                if !g.varz.enemy_shot_avail[t] {
+                    let s = &mut g.varz.enemy_shot[t];
+                    if px > i32::from(s.sx) {
+                        s.sxm = s.sxm.wrapping_sub(1);
+                    } else if px < i32::from(s.sx) {
+                        s.sxm = s.sxm.wrapping_add(1);
+                    }
+
+                    if py > i32::from(s.sy) {
+                        s.sym = s.sym.wrapping_sub(1);
+                    } else if py < i32::from(s.sy) {
+                        s.sym = s.sym.wrapping_add(1);
+                    }
+                }
+                g.varz.temp += 1;
+            }
+        }
+        // Zinglon Blast
+        3 => {
+            g.varz.zinglon_duration = 50;
+            g.config.shot_repeat[SHOT_SPECIAL] = 100;
+            g.varz.sound_queue[7] = S_SOUL_OF_ZINGLON;
+        }
+        // Attractor
+        4 => {
+            let (px, py) = (g.player.player[0].x, g.player.player[0].y);
+            g.varz.temp = 0;
+            while g.varz.temp < 100 {
+                let t = usize::from(g.varz.temp);
+                let e = &mut g.varz.enemy[t];
+                if g.varz.enemy_avail[t] != 1 && e.scoreitem && e.evalue != 0 {
+                    if px > i32::from(e.ex) {
+                        e.exc = e.exc.wrapping_add(1);
+                    } else if px < i32::from(e.ex) {
+                        e.exc = e.exc.wrapping_sub(1);
+                    }
+
+                    if py > i32::from(e.ey) {
+                        e.eyc = e.eyc.wrapping_add(1);
+                    } else if py < i32::from(e.ey) {
+                        e.eyc = e.eyc.wrapping_sub(1);
+                    }
+                }
+                g.varz.temp += 1;
+            }
+        }
+        // Flare
+        5..=11 | 16 => {
+            let v = &mut g.varz;
+            if v.flare_duration == 0 {
+                v.flare_start = true;
+            }
+
+            v.special_weapon_wpn = sp.wpn;
+            v.link_to_player = false;
+            v.spray_special = false;
+            match sp.stype {
+                5 => {
+                    v.special_weapon_filter = 7;
+                    v.special_weapon_freq = 2;
+                    v.flare_duration = 50;
+                }
+                6 => {
+                    v.special_weapon_filter = 1;
+                    v.special_weapon_freq = 7;
+                    v.flare_duration = 200u16.wrapping_add(25 * front_power);
+                }
+                7 => {
+                    v.special_weapon_filter = 3;
+                    v.special_weapon_freq = 3;
+                    v.flare_duration = 50u16.wrapping_add(10 * front_power);
+                    v.zinglon_duration = 50;
+                    g.config.shot_repeat[SHOT_SPECIAL] = 100;
+                    v.sound_queue[7] = S_SOUL_OF_ZINGLON;
+                }
+                8 => {
+                    v.special_weapon_filter = -99;
+                    v.special_weapon_freq = 7;
+                    v.flare_duration = 10 + front_power;
+                }
+                9 => {
+                    v.special_weapon_filter = -99;
+                    v.special_weapon_freq = 8;
+                    v.flare_duration = 8 + 2 * front_power;
+                    v.link_to_player = true;
+                    v.next_special_wait = sp.pwr;
+                }
+                10 => {
+                    v.special_weapon_filter = -99;
+                    v.special_weapon_freq = 8;
+                    v.flare_duration = 14 + 4 * front_power;
+                    v.link_to_player = true;
+                }
+                11 => {
+                    v.special_weapon_filter = -99;
+                    v.special_weapon_freq = sp.pwr as i8;
+                    v.flare_duration = 10u16.wrapping_add(10 * front_power);
+                    v.astral_duration = (20 + 10 * front_power) as u8;
+                }
+                _ => {
+                    // 16
+                    v.special_weapon_filter = -99;
+                    v.special_weapon_freq = 8;
+                    v.flare_duration = u16::from(v.temp2) * 16 + 8;
+                    v.link_to_player = true;
+                    v.spray_special = true;
+                }
+            }
+        }
+        // Invulnerability
+        12 => {
+            g.player.player[usize::from(player_num) - 1].invulnerable_ticks =
+                u32::from(g.varz.temp2) * 10;
+
+            let sam = g.config.super_arcade_mode;
+            if sam > 0 && usize::from(sam) <= SA {
+                g.config.shot_repeat[SHOT_SPECIAL] = 250;
+                let p = &g.player.player[0];
+                let (px, py, mx, my) = (p.x as u16, p.y as u16, p.mouse_x, p.mouse_y);
+                g.varz.b =
+                    shots::player_shot_create(g, 0, SHOT_SPECIAL2 as u32, px, py, mx, my, 707, 1);
+                g.player.player[0].invulnerable_ticks = 100;
+            }
+        }
+        // Repair Player 1
+        13 => {
+            let a = &mut g.player.player[0].armor;
+            *a = a.wrapping_add(u32::from(g.varz.temp2) / 4 + 1);
+
+            g.varz.sound_queue[3] = S_POWERUP;
+        }
+        // Repair Player 2
+        14 => {
+            let a = &mut g.player.player[1].armor;
+            *a = a.wrapping_add(u32::from(g.varz.temp2) / 4 + 1);
+
+            g.varz.sound_queue[3] = S_POWERUP;
+        }
+        // Spawn left or right sidekick
+        17 => {
+            g.varz.sound_queue[3] = S_POWERUP;
+
+            let items = &mut g.player.player[0].items;
+            if u16::from(items.sidekick[LEFT_SIDEKICK]) == sp.wpn {
+                items.sidekick[RIGHT_SIDEKICK] = sp.wpn as u8;
+                g.config.shot_multi_pos[RIGHT_SIDEKICK] = 0;
+            } else {
+                items.sidekick[LEFT_SIDEKICK] = sp.wpn as u8;
+                g.config.shot_multi_pos[LEFT_SIDEKICK] = 0;
+            }
+
+            je_draw_options(g);
+        }
+        // Spawn right sidekick
+        18 => {
+            g.player.player[0].items.sidekick[RIGHT_SIDEKICK] = sp.wpn as u8;
+
+            je_draw_options(g);
+
+            g.varz.sound_queue[4] = S_POWERUP;
+
+            g.config.shot_multi_pos[RIGHT_SIDEKICK] = 0;
+        }
+        _ => {}
+    }
+}
+
+/// `JE_doSpecialShot(playerNum, &armor, &shield)`; the only caller passes
+/// the armor and shield of one player, `player[p]` here (rule R8).
+#[doc(alias = "JE_doSpecialShot")]
+pub fn je_do_special_shot(g: &mut Game, player_num: u8, p: usize) {
+    if g.player.player[0].items.special > 0 {
+        let ready = g.config.shot_repeat[SHOT_SPECIAL] == 0
+            && g.varz.special_wait == 0
+            && g.varz.flare_duration < 2
+            && g.varz.zinglon_duration < 2;
+        let surface = g.video.vga_screen_id();
+        let index = if ready { 94 } else { 93 };
+        sprite::blit_sprite2(g, surface, 47, 4, Sprite2Ref::SpriteSheet9, index);
+    }
+
+    if g.config.shot_repeat[SHOT_SPECIAL] > 0 {
+        g.config.shot_repeat[SHOT_SPECIAL] -= 1;
+    }
+    if g.varz.special_wait > 0 {
+        g.varz.special_wait -= 1;
+    }
+    g.varz.temp = g.varz.sf_executed[usize::from(player_num) - 1];
+    if g.varz.temp > 0 && g.config.shot_repeat[SHOT_SPECIAL] == 0 && g.varz.flare_duration == 0 {
+        g.varz.temp2 = special(g, g.varz.temp).pwr;
+
+        let mut can_afford = true;
+        let temp2 = g.varz.temp2;
+        let pl = &mut g.player.player[p];
+
+        if temp2 > 0 {
+            if temp2 < 98 {
+                // costs some shield
+                if pl.shield >= u32::from(temp2) {
+                    pl.shield -= u32::from(temp2);
+                } else {
+                    can_afford = false;
+                }
+            } else if temp2 == 98 {
+                // costs all shield
+                if pl.shield < 4 {
+                    can_afford = false;
+                }
+                g.varz.temp2 = pl.shield as u8;
+                pl.shield = 0;
+            } else if temp2 == 99 {
+                // costs half shield
+                g.varz.temp2 = (pl.shield / 2) as u8;
+                pl.shield = u32::from(g.varz.temp2);
+            } else {
+                // costs some armor
+                g.varz.temp2 = temp2 - 100;
+                if pl.armor > u32::from(g.varz.temp2) {
+                    pl.armor -= u32::from(g.varz.temp2);
+                } else {
+                    can_afford = false;
+                }
+            }
+        }
+
+        g.config.shot_multi_pos[SHOT_SPECIAL] = 0;
+        g.config.shot_multi_pos[SHOT_SPECIAL2] = 0;
+
+        if can_afford {
+            let t = g.varz.temp;
+            je_special_complete(g, player_num, t);
+        }
+
+        g.varz.sf_executed[usize::from(player_num) - 1] = 0;
+
+        je_wipe_shield_armor_bars(g);
+        g.video.vga_screen = g.video.vga_screen_seg; // side-effect of game_screen
+        je_draw_shield(g);
+        je_draw_armor(g);
+        g.video.vga_screen = g.video.game_screen; // side-effect of game_screen
+    }
+
+    if player_num == 1 && g.player.player[0].items.special > 0 {
+        let button = g.mainint.button;
+        let sam = g.config.super_arcade_mode;
+        if sam > 0 && (button[1] || button[2]) {
+            g.varz.fire_button_held = false;
+        }
+        if !button[0] && !(sam != SA_NONE && (button[1] || button[2])) {
+            g.varz.fire_button_held = false;
+        } else if g.config.shot_repeat[SHOT_SPECIAL] == 0
+            && !g.varz.fire_button_held
+            && g.varz.flare_duration == 0
+            && g.varz.special_wait == 0
+        {
+            g.varz.fire_button_held = true;
+            let sp = g.player.player[0].items.special;
+            je_special_complete(g, player_num, sp);
+        }
+    }
+
+    if g.varz.astral_duration > 0 {
+        g.varz.astral_duration -= 1;
+    }
+
+    g.shots.shot_avail[MAX_PWEAPON - 1] = 0;
+    if g.varz.flare_duration > 1 {
+        if g.varz.special_weapon_filter != -99 {
+            let c = &mut g.config;
+            if c.level_filter == -99 && c.level_brightness == -99 {
+                c.filter_active = false;
+            }
+            if !c.filter_active {
+                c.level_filter = g.varz.special_weapon_filter;
+                if c.level_filter == 7 {
+                    c.level_brightness = 0;
+                }
+                c.filter_active = true;
+            }
+
+            g.varz.flare_col_chg = if mtrand::mt_rand(g).is_multiple_of(2) {
+                -1
+            } else {
+                1
+            };
+
+            if g.config.level_filter == 7 {
+                if g.config.level_brightness < -6 {
+                    g.varz.flare_col_chg = 1;
+                }
+                if g.config.level_brightness > 6 {
+                    g.varz.flare_col_chg = -1;
+                }
+                g.config.level_brightness =
+                    g.config.level_brightness.wrapping_add(g.varz.flare_col_chg);
+            }
+        }
+
+        if ((mtrand::mt_rand(g) % 6) as i32) < i32::from(g.varz.special_weapon_freq) {
+            g.varz.b = MAX_PWEAPON as i16;
+
+            let wpn = g.varz.special_weapon_wpn;
+            let (mx, my) = (g.player.player[0].mouse_x, g.player.player[0].mouse_y);
+            if g.varz.link_to_player {
+                if g.config.shot_repeat[SHOT_SPECIAL] == 0 {
+                    let (px, py) = (g.player.player[0].x as u16, g.player.player[0].y as u16);
+                    g.varz.b = shots::player_shot_create(
+                        g,
+                        0,
+                        SHOT_SPECIAL as u32,
+                        px,
+                        py,
+                        mx,
+                        my,
+                        wpn,
+                        player_num,
+                    );
+                }
+            } else {
+                let px = (mtrand::mt_rand(g) % 280) as u16;
+                let py = (mtrand::mt_rand(g) % 180) as u16;
+                g.varz.b = shots::player_shot_create(
+                    g,
+                    0,
+                    SHOT_SPECIAL as u32,
+                    px,
+                    py,
+                    mx,
+                    my,
+                    wpn,
+                    player_num,
+                );
+            }
+
+            if g.varz.spray_special && g.varz.b != MAX_PWEAPON as i16 {
+                let b = g.varz.b as usize;
+                let xm = (mtrand::mt_rand(g) % 5).wrapping_sub(2) as i16;
+                let ym = (mtrand::mt_rand(g) % 5).wrapping_sub(2) as i16;
+                let shot = &mut g.shots.player_shot_data[b];
+                shot.shot_xm = xm;
+                shot.shot_ym = ym;
+                if shot.shot_ym == 0 {
+                    shot.shot_ym += 1;
+                }
+            }
+        }
+
+        g.varz.flare_duration -= 1;
+        if g.varz.flare_duration == 1 {
+            g.varz.special_wait = g.varz.next_special_wait;
+        }
+    } else if g.varz.flare_start {
+        g.varz.flare_start = false;
+        g.config.shot_repeat[SHOT_SPECIAL] = if g.varz.link_to_player { 15 } else { 200 };
+        g.varz.flare_duration = 0;
+        if g.config.level_filter == g.varz.special_weapon_filter {
+            g.config.level_filter = -99;
+            g.config.level_brightness = -99;
+            g.config.filter_active = false;
+        }
+    }
+
+    if g.varz.zinglon_duration > 1 {
+        g.varz.temp = (25 - (i32::from(g.varz.zinglon_duration) - 25).abs()) as u8;
+        let temp = i32::from(g.varz.temp);
+        let x = g.player.player[0].x;
+        let surface = g.video.vga_screen_id();
+
+        vga256d::je_bar_bright(g, surface, x + 7 - temp, 0, x + 7 + temp, 184);
+        vga256d::je_bar_bright(g, surface, x + 7 - temp - 2, 0, x + 7 + temp + 2, 184);
+
+        g.varz.zinglon_duration -= 1;
+        if g.varz.zinglon_duration.is_multiple_of(5) {
+            g.shots.shot_avail[MAX_PWEAPON - 1] = 1;
+        }
+    }
+}
+
+/// `explosion_data[type]`: sprite and time to live of each explosion type.
+const EXPLOSION_DATA: [(u16, u8); 53] = [
+    (144, 7),
+    (120, 12),
+    (190, 12),
+    (209, 12),
+    (152, 12),
+    (171, 12),
+    (133, 7), // White Smoke
+    (1, 12),
+    (20, 12),
+    (39, 12),
+    (58, 12),
+    (110, 3),
+    (76, 7),
+    (91, 3),
+    (227, 3), // 15
+    (230, 3),
+    (233, 3),
+    (252, 3),
+    (246, 3),
+    (249, 3), // 20
+    (265, 3),
+    (268, 3),
+    (271, 3),
+    (236, 3),
+    (239, 3), // 25
+    (242, 3),
+    (261, 3),
+    (274, 3),
+    (277, 3),
+    (280, 3), // 30
+    (299, 3),
+    (284, 3),
+    (287, 3),
+    (290, 3),
+    (293, 3), // 35
+    (165, 8), // Coin Values
+    (184, 8),
+    (203, 8),
+    (222, 8),
+    (168, 8),
+    (187, 8),
+    (206, 8),
+    (225, 10),
+    (169, 10),
+    (188, 10),
+    (207, 20),
+    (226, 14),
+    (170, 14),
+    (189, 14),
+    (208, 14),
+    (246, 14),
+    (227, 14),
+    (265, 14),
+];
+
+/// `JE_setupExplosion(x, y, deltaY, type, fixedPosition, followPlayer)`:
+/// `fixedPosition` for coin/gem values, `followPlayer` for the player's
+/// shield (one player). A type with no table entry sets up nothing
+/// (divergence D-UB-VARZ-1).
+#[doc(alias = "JE_setupExplosion")]
+pub fn je_setup_explosion(
+    g: &mut Game,
+    x: i16,
+    y: i16,
+    delta_y: i16,
+    r#type: i16,
+    fixed_position: bool,
+    follow_player: bool,
+) {
+    if y > -16 && y < 190 {
+        for e in g.varz.explosions.iter_mut() {
+            if e.ttl == 0 {
+                let mut t = r#type;
+                let (mut ex, mut ey) = (x, y);
+                if t == 6 {
+                    ey = ey.wrapping_add(12);
+                    ex = ex.wrapping_add(2);
+                } else if t == 98 {
+                    t = 6;
+                }
+                let Some(&(sprite, ttl)) =
+                    usize::try_from(t).ok().and_then(|t| EXPLOSION_DATA.get(t))
+                else {
+                    return;
+                };
+                e.x = ex;
+                e.y = ey;
+                e.sprite = sprite;
+                e.ttl = ttl;
+                e.follow_player = follow_player;
+                e.fixed_position = fixed_position;
+                e.delta_y = delta_y;
+                break;
+            }
+        }
+    }
+}
+
+#[doc(alias = "JE_setupExplosionLarge")]
+pub fn je_setup_explosion_large(g: &mut Game, enemy_ground: bool, explo_num: u8, x: i16, y: i16) {
+    if y >= 0 {
+        let (l, r) = (x.wrapping_sub(6), x.wrapping_add(6));
+        let top = y.wrapping_sub(14);
+        let types = if enemy_ground {
+            [2, 4, 3, 5]
+        } else {
+            [7, 9, 8, 10]
+        };
+        je_setup_explosion(g, l, top, 0, types[0], false, false);
+        je_setup_explosion(g, r, top, 0, types[1], false, false);
+        je_setup_explosion(g, l, y, 0, types[2], false, false);
+        je_setup_explosion(g, r, y, 0, types[3], false, false);
+
+        let (explo_num, big) = if explo_num > 10 {
+            (explo_num - 10, true)
+        } else {
+            (explo_num, false)
+        };
+
+        if explo_num != 0 {
+            for e in g.varz.rep_explosions.iter_mut() {
+                if e.ttl == 0 {
+                    e.ttl = u32::from(explo_num);
+                    e.delay = 2;
+                    e.x = x as u32;
+                    e.y = y as u32;
+                    e.big = big;
+                    break;
+                }
+            }
+        }
+    }
+}
+
+#[doc(alias = "JE_wipeShieldArmorBars")]
+pub fn je_wipe_shield_armor_bars(g: &mut Game) {
+    let surface = seg(g);
+    let one_bar = !g.config.two_player_mode || g.config.galaga_mode;
+    let p0 = &g.player.player[0];
+    let (shield, armor) = (p0.shield, p0.armor);
+    if one_bar {
+        let y2 = 194u32.wrapping_sub(shield.wrapping_mul(2)) as i32;
+        vga256d::fill_rectangle_xy(g, surface, 270, 137, 278, y2, 0);
+    } else {
+        vga256d::fill_rectangle_xy(g, surface, 270, 60 - 44, 278, 60, 0);
+        vga256d::fill_rectangle_xy(g, surface, 270, 194 - 44, 278, 194, 0);
+    }
+    if one_bar {
+        let y2 = 194u32.wrapping_sub(armor.wrapping_mul(2)) as i32;
+        vga256d::fill_rectangle_xy(g, surface, 307, 137, 315, y2, 0);
+    } else {
+        vga256d::fill_rectangle_xy(g, surface, 307, 60 - 44, 315, 60, 0);
+        vga256d::fill_rectangle_xy(g, surface, 307, 194 - 44, 315, 194, 0);
+    }
+}
+
+/// `JE_playerDamage(temp, &player[p])`: applies `temp` damage to shield,
+/// then armor; returns the damage when it went past the shield, else 0.
+#[doc(alias = "JE_playerDamage")]
+pub fn je_player_damage(g: &mut Game, temp: u8, p: usize) -> u8 {
+    let mut temp = temp;
+    let mut player_damage = 0i32;
+    g.varz.sound_queue[7] = S_SHIELD_HIT;
+
+    if g.player.player[p].shield < u32::from(temp) {
+        player_damage = i32::from(temp);
+        temp = (u32::from(temp) - g.player.player[p].shield) as u8;
+        g.player.player[p].shield = 0;
+
+        if temp > 0 {
+            // through the shield, now the armor
+            let pl = &mut g.player.player[p];
+            if pl.armor < u32::from(temp) {
+                pl.armor = 0;
+
+                if pl.is_alive && !g.config.you_are_cheating {
+                    g.varz.level_timer = false;
+                    pl.is_alive = false;
+                    pl.exploding_ticks = 60;
+                    g.varz.level_end = 40;
+                    g.nortsong.temp_volume = g.nortsong.tyr_music_volume;
+                    g.varz.sound_queue[1] = S_EXPLOSION_22;
+                }
+            } else {
+                pl.armor -= u32::from(temp);
+                g.varz.sound_queue[7] = S_HULL_HIT;
+            }
+        }
+    } else {
+        g.player.player[p].shield -= u32::from(temp);
+
+        let follow = !g.config.two_player_mode;
+        let (x, y) = (g.player.player[p].x, g.player.player[p].y);
+        for (dx, dy, t) in [
+            (-17, -12, 14),
+            (-5, -12, 15),
+            (7, -12, 16),
+            (19, -12, 17),
+            (-17, 2, 18),
+            (19, 2, 19),
+            (-17, 16, 20),
+            (-5, 16, 21),
+            (7, 16, 22),
+        ] {
+            je_setup_explosion(g, (x + dx) as i16, (y + dy) as i16, 0, t, false, follow);
+        }
+    }
+
+    je_wipe_shield_armor_bars(g);
+    g.video.vga_screen = g.video.vga_screen_seg; // side-effect of game_screen
+    je_draw_shield(g);
+    je_draw_armor(g);
+    g.video.vga_screen = g.video.game_screen; // side-effect of game_screen
+
+    player_damage as u8
+}
+
+#[doc(alias = "JE_portConfigs")]
+pub fn je_port_configs(g: &mut Game) -> u16 {
+    let player_index = usize::from(g.config.two_player_mode);
+    let id = g.player.player[player_index].items.weapon[REAR_WEAPON].id;
+    g.varz.temp_w = u16::from(weapon_port(g, id).opnum);
+    g.varz.temp_w
+}
+
+#[doc(alias = "JE_drawShield")]
+pub fn je_draw_shield(g: &mut Game) {
+    let surface = g.video.vga_screen_id();
+    if g.config.two_player_mode && !g.config.galaga_mode {
+        for i in 0..g.player.player.len() {
+            let num = (g.player.player[i].shield as f32 * 0.8f32).round() as i16;
+            nortvars::je_d_bar3(g, surface, 270, (60 + 134 * i) as i16, num, 144);
+        }
+    } else {
+        let p0 = &g.player.player[0];
+        let (shield, shield_max) = (p0.shield, p0.shield_max);
+        nortvars::je_d_bar3(g, surface, 270, 194, shield as i16, 144);
+        if shield != shield_max {
+            let y = 193u32.wrapping_sub(shield_max.wrapping_mul(2)) as i32;
+            vga256d::je_rectangle(g, surface, 270, y, 278, y, 68);
+        }
+    }
+}
+
+#[doc(alias = "JE_drawArmor")]
+pub fn je_draw_armor(g: &mut Game) {
+    for p in g.player.player.iter_mut() {
+        if p.armor > 28 {
+            p.armor = 28;
+        }
+    }
+
+    let surface = g.video.vga_screen_id();
+    if g.config.two_player_mode && !g.config.galaga_mode {
+        for i in 0..g.player.player.len() {
+            let num = (g.player.player[i].armor as f32 * 0.8f32).round() as i16;
+            nortvars::je_d_bar3(g, surface, 307, (60 + 134 * i) as i16, num, 224);
+        }
+    } else {
+        let armor = g.player.player[0].armor as i16;
+        nortvars::je_d_bar3(g, surface, 307, 194, armor, 224);
+    }
+}
+
+/// `JE_doSP(x, y, num, explowidth, color)`: `num` super pixels.
+#[doc(alias = "JE_doSP")]
+pub fn je_do_sp(g: &mut Game, x: u16, y: u16, num: u16, explowidth: u8, color: u8) {
+    g.varz.temp = 0;
+    while u16::from(g.varz.temp) < num {
+        let tempr = (f64::from(mtrand::mt_rand_lt1(g)) * (2.0 * std::f64::consts::PI)) as f32;
+        let tempy =
+            (libm::cosf(tempr) * mtrand::mt_rand_1(g) * f32::from(explowidth)).round() as i32;
+        let tempx =
+            (libm::sinf(tempr) * mtrand::mt_rand_1(g) * f32::from(explowidth)).round() as i32;
+
+        let v = &mut g.varz;
+        v.last_superpixel += 1;
+        if v.last_superpixel as usize >= MAX_SUPERPIXELS {
+            v.last_superpixel = 0;
+        }
+        let s = &mut v.superpixels[v.last_superpixel as usize];
+        s.x = (tempx + i32::from(x)) as u32;
+        s.y = (tempy + i32::from(y)) as u32;
+        s.delta_x = tempx;
+        s.delta_y = tempy + 1;
+        s.color = color;
+        s.z = 15;
+
+        g.varz.temp = g.varz.temp.wrapping_add(1);
+    }
+}
+
+#[doc(alias = "JE_drawSP")]
+pub fn je_draw_sp(g: &mut Game) {
+    let id = g.video.vga_screen_id();
+    for i in (0..MAX_SUPERPIXELS).rev() {
+        let sp = &mut g.varz.superpixels[i];
+        if sp.z == 0 {
+            continue;
+        }
+        sp.x = sp.x.wrapping_add(sp.delta_x as u32);
+        sp.y = sp.y.wrapping_add(sp.delta_y as u32);
+        let sp = *sp;
+
+        let s = g.video.screen_mut(id);
+        let (w, h, pitch) = (s.w as u32, s.h as u32, s.pitch as usize);
+        if sp.x < w && sp.y < h {
+            let at = sp.y as usize * pitch + sp.x as usize;
+            let px = &mut s.pixels;
+            let blend = |p: u8, z: u32| {
+                ((u32::from(p) & 0x0f).wrapping_add(z) >> 1).wrapping_add(u32::from(sp.color)) as u8
+            };
+
+            px[at] = blend(px[at], sp.z);
+            if sp.x > 0 {
+                px[at - 1] = blend(px[at - 1], sp.z >> 1);
+            }
+            if sp.x < w - 1 {
+                px[at + 1] = blend(px[at + 1], sp.z >> 1);
+            }
+            if sp.y > 0 {
+                px[at - pitch] = blend(px[at - pitch], sp.z >> 1);
+            }
+            if sp.y < h - 1 {
+                px[at + pitch] = blend(px[at + pitch], sp.z >> 1);
+            }
+        }
+
+        g.varz.superpixels[i].z -= 1;
+    }
 }
