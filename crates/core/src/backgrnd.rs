@@ -233,11 +233,14 @@ fn blit_row_with(
                 continue;
             };
 
-            let mut si = ty as usize * 24;
+            let si = ty as usize * 24;
+            let src_row = &data[si..si + 24];
+            let dst_row = &mut dst.pixels[di..di + 24];
 
-            for _ in 0..24 / SW {
-                let mut dst_pixels = swar8_read(&dst.pixels[di..]);
-                let src_pixels = swar8_read(&data[si..]);
+            let dst_lanes = dst_row.as_chunks_mut::<SW>().0;
+            for (d, s) in dst_lanes.iter_mut().zip(src_row.as_chunks::<SW>().0) {
+                let mut dst_pixels = swar8_read(d);
+                let src_pixels = swar8_read(s);
 
                 let mask = nonzero_mask(src_pixels);
                 let src_pixels = blend(src_pixels, dst_pixels);
@@ -245,11 +248,9 @@ fn blit_row_with(
                 // Conditionally select each lane by mask.
                 dst_pixels ^= (dst_pixels ^ src_pixels) & mask;
 
-                swar8_write(&mut dst.pixels[di..], dst_pixels);
-
-                si += SW;
-                di += SW;
+                swar8_write(d, dst_pixels);
             }
+            di += 24;
         }
 
         di += dst_pitch - 12 * 24;
