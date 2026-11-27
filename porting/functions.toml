@@ -822,48 +822,50 @@ notes = ""
 c = "demo.c::beginPlayDemo"
 c_sha = "31f20f6e31c2"
 rust = "rustyrian_core::demo::begin_play_demo"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:demo::shipped_demos_play_identically", "diff:demo::damaged_demos_match", "diff:demo::record_then_replay_round_trips"]
 notes = ""
 
 [[fn]]
 c = "demo.c::playDemoKeys"
 c_sha = "c3ffd2fddfef"
 rust = "rustyrian_core::demo::play_demo_keys"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:demo::shipped_demos_play_identically", "diff:demo::damaged_demos_match", "diff:demo::record_then_replay_round_trips"]
+waived_lines = [{ line = 113, reason = "fileReadAtMost fails only on a stream I/O error; at the end of a regular file it returns a short read (handled at line 117)" }, { line = 114, reason = "as line 113" }]
 notes = ""
 
 [[fn]]
 c = "demo.c::endPlayDemo"
 c_sha = "e56760bff115"
 rust = "rustyrian_core::demo::end_play_demo"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:demo::shipped_demos_play_identically"]
 notes = ""
 
 [[fn]]
 c = "demo.c::beginRecordDemo"
 c_sha = "65c810b1f85d"
 rust = "rustyrian_core::demo::begin_record_demo"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:demo::record_then_replay_round_trips", "diff:demo::record_without_free_name_exits", "diff:demo::record_into_unusable_directory_exits"]
 notes = ""
 
 [[fn]]
 c = "demo.c::recordDemoKeys"
 c_sha = "2a394d23e3c8"
 rust = "rustyrian_core::demo::record_demo_keys"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:demo::record_then_replay_round_trips", "diff:demo::recorded_keys_follow_key_settings"]
 notes = ""
 
 [[fn]]
 c = "demo.c::endRecordDemo"
 c_sha = "56dc4464c828"
 rust = "rustyrian_core::demo::end_record_demo"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:demo::record_then_replay_round_trips", "diff:demo::recorded_keys_follow_key_settings"]
+waived_lines = [{ line = 254, reason = "needs fileWrite/fileFlush to fail on an open regular file (disk full or I/O error)" }, { line = 255, reason = "as line 254" }]
 notes = ""
 
 [[fn]]
@@ -1342,16 +1344,16 @@ notes = ""
 c = "editship.c::loadExtraShapes"
 c_sha = "9cca06b87f5d"
 rust = "rustyrian_core::editship::load_extra_shapes"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:editship::load_extra_shapes_matches", "diff:editship::load_extra_shapes_short_files_match", "diff:editship::load_extra_shapes_missing_file_matches"]
 notes = ""
 
 [[fn]]
 c = "editship.c::decryptExtraShipsData"
 c_sha = "cbeb2a054483"
 rust = "rustyrian_core::editship::decrypt_extra_ships_data"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:editship::load_extra_shapes_matches"]
 notes = ""
 
 [[fn]]
@@ -3222,24 +3224,25 @@ notes = ""
 c = "menus.c::gameplaySelect"
 c_sha = "45b993391926"
 rust = "rustyrian_core::menus::gameplay_select"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:menus::gameplay_select_matches"]
+waived_lines = [{ line = 216, reason = "unreachable: selectedIndex is always one of the four menu items handled above" }]
 notes = ""
 
 [[fn]]
 c = "menus.c::episodeSelect"
 c_sha = "978979144429"
 rust = "rustyrian_core::menus::episode_select"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:menus::episode_select_matches"]
 notes = ""
 
 [[fn]]
 c = "menus.c::difficultySelect"
 c_sha = "f10f41683f3c"
 rust = "rustyrian_core::menus::difficulty_select"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:menus::difficulty_select_matches", "diff:menus::difficulty_select_every_level_matches", "diff:menus::difficulty_select_held_lord_keys_match"]
 notes = ""
 
 [[fn]]
@@ -3606,48 +3609,48 @@ notes = ""
 c = "opentyr.c::getDisplayPickerItemsCount"
 c_sha = "11f082c4e71c"
 rust = "rustyrian_core::opentyr::get_display_picker_items_count"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opentyr::display_picker_items_count_matches"]
 notes = ""
 
 [[fn]]
 c = "opentyr.c::getDisplayPickerItem"
 c_sha = "c0f7de2a0aaa"
 rust = "rustyrian_core::opentyr::get_display_picker_item"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opentyr::display_picker_item_matches"]
 notes = ""
 
 [[fn]]
 c = "opentyr.c::getScalerPickerItemsCount"
 c_sha = "2bd557c6482a"
 rust = "rustyrian_core::opentyr::get_scaler_picker_items_count"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opentyr::scaler_and_scaling_mode_pickers_match"]
 notes = ""
 
 [[fn]]
 c = "opentyr.c::getScalerPickerItem"
 c_sha = "3e0b6d825e9d"
 rust = "rustyrian_core::opentyr::get_scaler_picker_item"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opentyr::scaler_and_scaling_mode_pickers_match"]
 notes = ""
 
 [[fn]]
 c = "opentyr.c::getScalingModePickerItemsCount"
 c_sha = "0be7e3f33b4f"
 rust = "rustyrian_core::opentyr::get_scaling_mode_picker_items_count"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opentyr::scaler_and_scaling_mode_pickers_match"]
 notes = ""
 
 [[fn]]
 c = "opentyr.c::getScalingModePickerItem"
 c_sha = "b1c46666f222"
 rust = "rustyrian_core::opentyr::get_scaling_mode_picker_item"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opentyr::scaler_and_scaling_mode_pickers_match"]
 notes = ""
 
 [[fn]]
@@ -5066,16 +5069,16 @@ notes = ""
 c = "xmas.c::xmas_time"
 c_sha = "91a99274441b"
 rust = "rustyrian_core::xmas::xmas_time"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:xmas::xmas_time_matches"]
 notes = ""
 
 [[fn]]
 c = "xmas.c::xmas_prompt"
 c_sha = "e4f0a2988efb"
 rust = "rustyrian_core::xmas::xmas_prompt"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:xmas::xmas_prompt_matches", "diff:xmas::xmas_prompt_answers_match"]
 notes = ""
 # Port status per upstream C function. Maintained by `cargo xtask manifest-sync`;
 # see porting/RULES.md for the meaning of each field.
