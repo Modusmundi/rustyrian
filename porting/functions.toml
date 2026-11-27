@@ -1405,7 +1405,7 @@ c = "file.c::fileOpen"
 c_sha = "4fdf11abcabc"
 rust = "rustyrian_core::file::file_open"
 status = "verified"
-verify = ["diff:file::file_open_matches", "diff:file::file_operations_match", "diff:rustyrian_core::file::tests::missing_file_errno_and_message_match_c"]
+verify = ["diff:file::file_open_matches", "diff:file::file_operations_match", "diff:rustyrian_core::file::tests::missing_file_errno_and_message_match_c", "diff:rustyrian_core::file::tests::text_mode_applies_to_modes_without_b_on_windows", "diff:rustyrian_core::file::tests::text_streams_translate_through_the_buffer", "diff:rustyrian_core::file::tests::text_read_translates_like_the_crt", "diff:rustyrian_core::file::tests::text_write_translates_like_the_crt"]
 notes = ""
 
 [[fn]]
