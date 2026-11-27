@@ -1772,15 +1772,15 @@ fn je_load_map_runs_script_commands() {
         "]h[",
         "]x[",
         "]H[ 02",
-        "]J[ 03",
+        "]J[ 02",
     ]);
     let second = lines(&["]g[", "]b[", "]e[", "]J[ 03"]);
-    let jumps = lines(&["]2[ 04", "]w[ 05", "]t[ 06", "]l[ 07", "]J[ 08"]);
-    let mut sections = vec![first, second, jumps];
-    for k in 4..=8u8 {
+    let jumps = lines(&["]w[ 03", "]t[ 04", "]l[ 05", "]2[ 06", "]J[ 07"]);
+    let mut sections = vec![first, jumps];
+    for k in 3..=7u8 {
         sections.push(vec![level_line(k, &format!("SEC {k}"), k, k, false, false)]);
     }
-    let setups: [fn(&mut Game); 6] = [
+    let setups: [fn(&mut Game); 8] = [
         |_| {},
         |g| g.config.initial_difficulty = 4,
         |g| g.config.two_player_mode = true,
@@ -1792,6 +1792,13 @@ fn je_load_map_runs_script_commands() {
         |g| {
             g.config.initial_difficulty = 3;
             g.player.player[0].is_alive = false;
+        },
+        // Netplay skips the fades and syncs the (unused) `]S[` text.
+        |g| g.network.is_network_game = true,
+        |g| {
+            // The fixture is mid-demo: close its demo file first.
+            rustyrian_core::file::file_close(&mut g.demo.demo_file);
+            g.demo.record_demo = true;
         },
     ];
     for (i, setup) in setups.into_iter().enumerate() {
@@ -1806,7 +1813,7 @@ fn je_load_map_runs_script_commands() {
         "commands-modes",
         1,
         &[
-            sections[1].clone(),
+            second,
             vec![],
             vec![level_line(0, "MODES", 4, 2, true, false)],
         ],
@@ -1814,6 +1821,96 @@ fn je_load_map_runs_script_commands() {
         |_| {},
     );
     assert_eq!(r, Ok(()));
+}
+
+/// The pans broken off by ESC: during the first (its input check), then at
+/// the start of each later one (ESC still pressed).
+#[test]
+fn je_load_map_pans_stop_on_escape() {
+    let sections = [lines(&[
+        "]U 008[",
+        "]U 008[",
+        "]V 005[",
+        "]R 009[",
+        "]n[",
+        "]L[      000 PANS     03 02",
+    ])];
+    let mut script = String::from("ots 1\n");
+    for t in (1_000..20_000).step_by(400) {
+        script.push_str(&format!(
+            "@{t} key-down ESCAPE\n@{} key-up ESCAPE\n",
+            t + 45
+        ));
+    }
+    assert_eq!(
+        run_script_case("pans-escape", 1, &sections, &script, |_| {}),
+        Ok(())
+    );
+}
+
+/// Missing or broken data files: the episode script, the level file, its
+/// shape file, a level with too many events, and short shape and level
+/// files. Both engines log the error and exit.
+#[test]
+fn je_load_map_reports_bad_files() {
+    let start = vec![vec![level_line(0, "FILES", 3, 1, false, false)]];
+    let level = std::fs::read(data_dir().join("tyrian1.lvl")).expect("level file");
+    let shapes = std::fs::read(data_dir().join("shapesz.dat")).expect("shape file");
+    /// (name, files replaced, file removed)
+    type Case<'a> = (&'a str, Vec<(String, Vec<u8>)>, Option<&'a str>);
+    let cases: Vec<Case> = vec![
+        ("no-script", vec![], Some("levels1.dat")),
+        ("no-level", vec![], Some("tyrian1.lvl")),
+        ("no-shapes", vec![], Some("shapesz.dat")),
+        (
+            "many-events",
+            vec![(
+                "tyrian1.lvl".to_owned(),
+                crafted_level(|b, at| {
+                    let e = first_event(b, at) - 2;
+                    b[e..e + 2].copy_from_slice(&2500u16.to_le_bytes());
+                }),
+            )],
+            None,
+        ),
+        (
+            "short-shapes",
+            vec![(
+                "shapesz.dat".to_owned(),
+                shapes[..shapes.len() / 2].to_vec(),
+            )],
+            None,
+        ),
+        (
+            "short-level",
+            vec![(
+                "tyrian1.lvl".to_owned(),
+                level[..level_offset(&level, 1) - 100].to_vec(),
+            )],
+            None,
+        ),
+    ];
+    for (name, files, remove) in cases {
+        let mut all: Vec<(String, Vec<u8>)> = (1..=4u8)
+            .map(|e| (format!("levels{e}.dat"), episode_script(&starred(&start))))
+            .collect();
+        all.extend(files);
+        let data = crafted_data(&format!("files-{name}"), &all);
+        if let Some(f) = remove {
+            std::fs::remove_file(data.join(f)).expect("crafted file");
+        }
+        let mut rig = load_map_rig("ots 1\n", &data, 1);
+        rig.g.config.main_level = 1;
+        assert_eq!(run_load_map(rig), Err(1), "{name}");
+    }
+}
+
+/// Episode-script lines for `sections`, each opened by a `*` line.
+fn starred(sections: &[Vec<String>]) -> Vec<String> {
+    sections
+        .iter()
+        .flat_map(|s| std::iter::once("*".to_owned()).chain(s.iter().cloned()))
+        .collect()
 }
 
 /// Text windows (with and without the warning, too many lines), the three
@@ -1916,15 +2013,14 @@ fn je_load_map_ends_an_episode() {
     let mut end = vec!["]Q[".to_owned()];
     for h in 0..12 {
         end.push(format!("Hint {h}"));
-        if h == 4 {
-            end.extend((0..11).map(|i| format!("Hint line {i}")));
-        }
+        // Every hint is longer than the warning text holds.
+        end.extend((0..9).map(|i| format!("Hint {h} line {i}")));
         end.push("#".to_owned());
     }
     end.push(level_line(0, "AFTER", 7, 5, false, false));
     let sections = [end];
     type Setup = fn(&mut Game);
-    let cases: [(u8, Setup); 7] = [
+    let cases: [(u8, Setup); 8] = [
         (1, |_| {}),
         (1, |g| g.config.two_player_mode = true),
         (4, |g| g.config.super_arcade_mode = 0),
@@ -1935,6 +2031,8 @@ fn je_load_map_ends_an_episode() {
             g.config.initial_difficulty = rustyrian_core::config::DIFFICULTY_ZINGLON;
         }),
         (4, |g| g.config.super_tyrian = true),
+        // Netplay syncs the text after the super-arcade screen.
+        (4, |g| g.network.is_network_game = true),
     ];
     for (i, (ep, setup)) in cases.into_iter().enumerate() {
         let r = run_script_case(
@@ -2288,14 +2386,23 @@ fn run_main_on_level(
     script: &str,
     setup: impl FnOnce(&mut Game),
 ) -> (Result<(), i32>, usize, u8) {
+    run_main_on_level_with(name, &[], level, script, setup)
+}
+
+/// [`run_main_on_level`] with script lines `prefix` before the level starts.
+fn run_main_on_level_with(
+    name: &str,
+    prefix: &[&str],
+    level: Vec<u8>,
+    script: &str,
+    setup: impl FnOnce(&mut Game),
+) -> (Result<(), i32>, usize, u8) {
     let mut files: Vec<(String, Vec<u8>)> = (1..=4u8)
         .map(|e| {
             let lines: Vec<String> = if e == 1 {
-                let mut l = vec![
-                    "*".to_owned(),
-                    level_line(2, "PLAY", 2, 1, false, false),
-                    "*".to_owned(),
-                ];
+                let mut l = vec!["*".to_owned()];
+                l.extend(prefix.iter().map(|&p| p.to_owned()));
+                l.extend([level_line(2, "PLAY", 2, 1, false, false), "*".to_owned()]);
                 l.extend(lines(&[
                     "]G[ 01 1 02 001",
                     "]I[",
@@ -2360,6 +2467,9 @@ fn je_main_plays_one_player() {
             (6_000, "P"),
             (9_000, "ESCAPE"),
             (10_000, "ESCAPE"),
+            // In-game help, left again (the frame is skipped).
+            (12_000, "F1"),
+            (13_000, "ESCAPE"),
         ],
     );
     let (r, frames) = run_main_case("main-1p", 1, 1, &script, |_| {});
@@ -2403,12 +2513,14 @@ fn level_with_events(events: &[(u8, i16, i16, i8)]) -> Vec<u8> {
 }
 
 /// The level-loop features levels switch on through events: every smoothie
-/// (with a fast processor), the level timer running out, random
-/// explosions, a return jump, filters, the background layer orders, and the
-/// debug overlay; under wild and super-wild modes.
+/// (with fast and slow processors, and the flipped and headlight views),
+/// the level timer running out, random explosions, a return jump, layer
+/// orders, forced events with the background stopped, the debug overlay
+/// and transparent explosions; under wild and super-wild modes.
 #[test]
 fn je_main_runs_level_features() {
-    let events = [
+    type Event = (u8, i16, i16, i8);
+    let all_smoothies: Vec<Event> = vec![
         (64, 1, 1, 0),
         (64, 2, 1, 0),
         (64, 3, 1, 0),
@@ -2416,19 +2528,52 @@ fn je_main_runs_level_features() {
         (64, 5, 1, 0),
         (64, 6, 1, 0),
         (64, 9, 1, 0),
-        (67, 1, 400, 6),
+    ];
+    let rest: Vec<Event> = vec![
+        (67, 1, 400, 4),
         (68, 1, 0, 0),
-        // A return needs an earlier jump (upstream reads `eventRec[-1]` when
-        // it returns to location 0, D-UB-TYRIAN2-4): jump to 1 first.
-        (54, 1, 0, 0),
-        (76, 0, 0, 0),
         (43, 0, 0, 0),
         (42, 0, 0, 0),
         (73, 1, 0, 0),
         (29, 0, 0, 0),
+        // A return needs an earlier jump (upstream reads `eventRec[-1]` when
+        // it returns to location 0, D-UB-TYRIAN2-4): jump to 1 first.
+        (76, 0, 0, 0),
+        (54, 1, 0, 0),
     ];
     let script = play_script(9_000, &[]);
-    for (i, processor) in [4u8, 2].into_iter().enumerate() {
+    let runs: Vec<(Vec<Event>, u8, bool)> = vec![
+        ([all_smoothies.clone(), rest.clone()].concat(), 4, true),
+        ([all_smoothies.clone(), rest.clone()].concat(), 2, false),
+        // The lava smoothie with its second variant, and one view each.
+        (
+            [vec![(64, 1, 1, 5), (64, 9, 1, 0)], rest.clone()].concat(),
+            3,
+            false,
+        ),
+        (
+            [vec![(64, 6, 1, 0), (64, 2, 1, 3)], rest.clone()].concat(),
+            3,
+            true,
+        ),
+        // The background stopped, events forced on.
+        (vec![(2, 0, 0, 0), (53, 0, 0, 0), (4, 2, 0, 0)], 4, false),
+        // Opaque background 2 under and over the enemies, the sky enemies
+        // drawn last with the background stopped for them, and the map
+        // wrapped back from near its top.
+        // (Positions 13: the drawing reads from 12 rows before.)
+        (
+            vec![(43, 0, 0, 0), (48, 0, 0, 0), (77, 26, 26, 0)],
+            4,
+            false,
+        ),
+        (
+            vec![(43, 2, 0, 0), (48, 0, 0, 0), (73, 1, 0, 0), (4, 2, 0, 0)],
+            4,
+            false,
+        ),
+    ];
+    for (i, (events, processor, super_wild)) in runs.into_iter().enumerate() {
         let (r, frames, _) = run_main_on_level(
             &format!("main-features-{i}"),
             level_with_events(&events),
@@ -2436,26 +2581,102 @@ fn je_main_runs_level_features() {
             |g| {
                 g.config.processor_type = processor;
                 g.config.wild = true;
-                g.config.super_wild = i == 0;
+                g.config.super_wild = super_wild;
+                g.config.explosion_transparent = i % 2 == 0;
                 g.varz.debug = true;
             },
         );
-        assert_eq!(r, Err(0));
-        assert!(frames > 200, "{frames} frames");
+        assert_eq!(r, Err(0), "run {i}");
+        assert!(frames > 200, "run {i}: {frames} frames");
     }
-    // The other background-2 orders, transparent.
-    let layers = [(43, 2, 0, 0), (48, 0, 0, 0), (21, 0, 0, 0), (65, 0, 0, 0)];
+    // The other background-2 orders, transparent or not.
+    let layers = [(43, 2, 0, 0), (21, 0, 0, 0), (65, 0, 0, 0)];
     let (r, _, _) = run_main_on_level("main-layers", level_with_events(&layers), &script, |g| {
         g.config.wild = true;
     });
     assert_eq!(r, Err(0));
-    let layers = [(43, 3, 0, 0), (22, 0, 0, 0), (72, 1, 0, 0)];
+    let layers = [
+        (43, 2, 0, 0),
+        (48, 0, 0, 0),
+        (43, 3, 0, 0),
+        (22, 0, 0, 0),
+        (72, 1, 0, 0),
+    ];
     let (r, _, _) = run_main_on_level("main-layers-3", level_with_events(&layers), &script, |_| {});
     assert_eq!(r, Err(0));
 }
 
+/// A level that ends at once (backgrounds stopped, ready to end, no
+/// enemies): the end-of-frame checks, the level's end in episode 4 with
+/// fast play, a recorded demo, and galaga mode, on to the next section.
+#[test]
+fn je_main_ends_quiet_levels() {
+    let events = [(4, 1, 0, 0), (36, 0, 0, 0), (67, 1, 0, 5)];
+    let mut s = String::from("ots 1\n");
+    for t in (3_000..40_000).step_by(1_500) {
+        s.push_str(&format!(
+            "@{t} key-down RETURN\n@{} key-up RETURN\n",
+            t + 45
+        ));
+    }
+    s.push_str("@45000 quit\n");
+    type Setup = fn(&mut Game);
+    let setups: [Setup; 3] = [
+        |g| g.config.fast_play = 1,
+        |g| {
+            // The fixture is mid-demo: close its demo file first.
+            rustyrian_core::file::file_close(&mut g.demo.demo_file);
+            g.demo.record_demo = true;
+        },
+        |g| {
+            g.config.galaga_mode = true;
+            g.config.two_player_mode = true;
+        },
+    ];
+    for (i, setup) in setups.into_iter().enumerate() {
+        let (r, _, section) = run_main_on_level(
+            &format!("main-quiet-{i}"),
+            level_with_events(&events),
+            &s,
+            |g| {
+                g.config.initial_difficulty = 1;
+                g.config.difficulty_level = 1;
+                setup(g);
+            },
+        );
+        assert_eq!(r, Err(0), "setup {i}");
+        assert_eq!(section, 2, "setup {i}: the level ended");
+    }
+}
+
+/// A galaga level ending (the second ship leaves at the level's end).
+#[test]
+fn je_main_quits_and_ends_bonus_levels() {
+    let mut s = String::from("ots 1\n");
+    for t in (5_000..30_000).step_by(1_000) {
+        s.push_str(&format!(
+            "@{t} key-down RETURN\n@{} key-up RETURN\n",
+            t + 45
+        ));
+    }
+    s.push_str("@35000 quit\n");
+    let quiet = [(4, 1, 0, 0), (36, 0, 0, 0)];
+    let (r, _, section) = run_main_on_level_with(
+        "main-galaga-end",
+        &["]g["],
+        level_with_events(&quiet),
+        &s,
+        |g| {
+            g.config.initial_difficulty = 2;
+            g.config.difficulty_level = 2;
+        },
+    );
+    assert_eq!(r, Err(0));
+    assert_eq!(section, 2, "the galaga level ended");
+}
+
 /// Galaga mode (the `]g[` bonus game): no shields, the second ship, extra
-/// lives from cash.
+/// lives and then cash from a large score.
 #[test]
 fn je_main_plays_galaga() {
     let sections = [
@@ -2466,10 +2687,23 @@ fn je_main_plays_galaga() {
     let mut rig = load_map_rig(&play_script(10_000, &[]), &data, 1);
     rig.g.config.main_level = 1;
     rig.g.config.two_player_mode = true;
-    rig.g.player.player[0].cash = 9_990;
+    rig.g.player.player[0].cash = 1_000_000;
     let (r, frames) = run_main(rig);
     assert_eq!(r, Err(0));
     assert!(frames > 300, "{frames} frames");
+}
+
+/// Episode 4's levels play one difficulty step easier; a level whose random
+/// enemies include the sound-making enemy 2.
+#[test]
+fn je_main_plays_episode_4_and_random_enemy_2() {
+    let script = play_script(6_000, &[]);
+    let (r, _) = run_main_case("main-ep4", 4, 1, &script, |g| {
+        g.config.difficulty_level = 1;
+    });
+    assert_eq!(r, Err(0));
+    let (r, _) = run_main_case("main-enemy2", 1, 17, &script, |_| {});
+    assert_eq!(r, Err(0));
 }
 
 /// No input near the level's boss: the player dies, the game-over text
