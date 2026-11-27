@@ -3136,6 +3136,83 @@ fn link_gun_above_the_screen_matches_c() {
     }
 }
 
+/// A real loopback network game, frame by frame as `JE_main` runs it:
+/// movement (this PC's player writes its state packet), then
+/// `network_state_send` and `network_state_update`, with the opponent's
+/// state packets arriving over the socket. Once the state queues are full,
+/// the remote player moves by the opponent's packets and the local one by
+/// its delayed own; on player 2's PC the difficulty comes from player 1.
+#[test]
+fn player_movement_net_session_matches_c() {
+    for me in [1u32, 2] {
+        let s = input(&[], &[], &[]);
+        let mut rig = net_rig(&s, |g| {
+            g.demo.play_demo = false;
+            g.config.two_player_mode = true;
+            g.config.two_player_linked = false;
+            g.config.galaga_mode = false;
+            g.config.input_device = [1, 1];
+            g.network.this_player_num = me;
+            for (p, pl) in g.player.player.iter_mut().enumerate() {
+                pl.is_alive = true;
+                (pl.x, pl.y) = (100 + 60 * p as i32, 120);
+                pl.items.weapon[REAR].id = pl.items.weapon[REAR].id.clamp(1, 38);
+            }
+            g.varz.ship_gr2 = 0;
+            g.varz.ship_gr2ptr = Some(Sprite2Ref::SpriteSheet9);
+            let right = g.config.key_settings[3] as usize;
+            let fire = g.config.key_settings[4] as usize;
+            g.keyboard.keysactive[right] = true;
+            g.keyboard.keysactive[fire] = true;
+        });
+        let out = rig.run(
+            // SAFETY: plain C call.
+            || unsafe { b::network_state_reset() },
+            |g| {
+                rustyrian_core::network::network_state_reset(g);
+                Ok(())
+            },
+        );
+        assert_eq!(out, Ok(()));
+        // The opponent's state for frames 0..6: moving left and up, with
+        // the fire and left-sidekick buttons, at difficulty 4.
+        for sync in 0..6u16 {
+            let mut p = vec![0u8; 28];
+            p[..2].copy_from_slice(&rustyrian_core::network::PACKET_STATE.to_be_bytes());
+            p[2..4].copy_from_slice(&sync.to_be_bytes());
+            p[4..6].copy_from_slice(&(-2i16 as u16).to_be_bytes());
+            p[6..8].copy_from_slice(&(-1i16 as u16).to_be_bytes());
+            p[8..10].copy_from_slice(&(-1i16 as u16).to_be_bytes());
+            p[12..14].copy_from_slice(&0b0011u16.to_be_bytes());
+            p[16..18].copy_from_slice(&4u16.to_be_bytes());
+            rig.push(&p);
+        }
+        rig.clear();
+        for frame in 0..5 {
+            let out = rig.run(
+                || {
+                    // SAFETY: plain C calls on the test thread.
+                    unsafe {
+                        b::JE_mainGamePlayerFunctions();
+                        b::network_state_send();
+                        b::network_state_update()
+                    }
+                },
+                |g| {
+                    mi::je_main_game_player_functions(g)?;
+                    rustyrian_core::network::network_state_send(g);
+                    rustyrian_core::network::network_state_update(g)
+                },
+            );
+            assert_eq!(out, Ok(frame >= 1), "frame {frame}");
+        }
+        if me == 2 {
+            assert_eq!(rig.g.config.difficulty_level, 4);
+        }
+        rig.check();
+    }
+}
+
 /// D-UB-MAININT-TABLES, D-UB-MAININT-JOYSTICK, D-UB-MAININT-SHOTAVAIL:
 /// item numbers, pick-up values and sidekick frames outside their tables
 /// read zeroed entries, a device past the connected joysticks polls
@@ -3165,14 +3242,15 @@ fn movement_and_collision_guards_hold() {
     }
     g.config.shot_repeat = [0; 11];
     mi::je_main_game_player_functions(g).expect("no exit");
+    // Weapon 250 has no `weaponPort` entry: its zeroed `opnum` keeps mode 0
+    // and its zeroed `op` table fires nothing.
+    assert_eq!(g.player.player[1].weapon_mode, 0);
     // The linked turret and charge shot of a player 2 without a rear weapon.
     g.config.two_player_linked = true;
     mi::je_main_game_player_functions(g).expect("no exit");
 
-    // Pick-ups with values past every table (super arcade weapon, special,
-    // sidekick series), and the asteroid killer from the last enemy slot.
     let (x, y) = (g.player.player[0].x, g.player.player[0].y);
-    for (sam, z, evalue) in [(3, 10, 30999), (0, 11, 32767), (0, 12, 32050), (0, 99, -3)] {
+    let pick_up = |g: &mut rustyrian_core::Game, sam: u8, z: usize, evalue: i16, p: usize| {
         g.config.super_arcade_mode = sam;
         g.varz.enemy_avail = [1; 100];
         g.varz.enemy_avail[z] = 0;
@@ -3181,16 +3259,30 @@ fn movement_and_collision_guards_hold() {
         e.evalue = evalue;
         e.scoreitem = true;
         e.enemytype = 1;
-        for p in 0..2 {
-            g.player.player[p].is_alive = true;
-            (g.player.player[p].x, g.player.player[p].y) = (x, y);
-            mi::je_player_collide(g, p, p as u8 + 1).expect("no exit");
-        }
+        let pl = &mut g.player.player[p];
+        pl.is_alive = true;
+        (pl.x, pl.y) = (x, y);
+        mi::je_player_collide(g, p, p as u8 + 1).expect("no exit");
+        assert_eq!(g.varz.enemy_avail[z], 1, "picked up {evalue}");
+    };
+
+    // A super-arcade pick-up past `SAWeapon`'s row reads weapon 0.
+    pick_up(g, 3, 10, 30999, 0);
+    assert_eq!(g.varz.temp_w, 0);
+    assert_eq!(g.player.player[0].items.weapon[0].id, 0);
+    // A special past `special` is stored as C stores it, named "".
+    pick_up(g, 0, 11, 32767, 0);
+    assert_eq!(g.player.player[0].items.special, (32767 - 32100) as u8);
+    // A sidekick series past `optionSelect` gives no sidekicks.
+    pick_up(g, 0, 12, 32050, 1);
+    assert_eq!(g.player.player[1].items.sidekick_series, 50);
+    assert_eq!(g.player.player[1].items.sidekick, [0, 0]);
+    // The asteroid killer from slot 99 clears no shot.
+    let before = g.shots.shot_avail;
+    pick_up(g, 0, 99, -3, 0);
+    for (i, (&b, &a)) in before.iter().zip(&g.shots.shot_avail).enumerate() {
+        assert!(b == 0 || a == b, "shot {i} changed from {b} to {a}");
     }
-    assert_eq!(
-        g.varz.enemy_avail[99], 1,
-        "the asteroid killer was picked up"
-    );
 }
 
 /// The full key combinations: the Nort ship (local and requested), both

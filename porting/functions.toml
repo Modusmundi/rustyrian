@@ -2844,7 +2844,7 @@ c = "mainint.c::JE_playerMovement"
 c_sha = "109a2c331abc"
 rust = "rustyrian_core::mainint::je_player_movement"
 status = "verified"
-verify = ["diff:mainint::player_movement_matches_c", "diff:mainint::player_movement_edge_cases_match_c", "diff:mainint::player_movement_joystick_matches_c", "diff:mainint::player_movement_netplay_matches_c", "diff:mainint::player_movement_records_demo_matches_c", "diff:mainint::player_movement_demo_end_matches_c", "diff:mainint::link_gun_above_the_screen_matches_c", "diff:mainint::player_functions_follow_demo_500_match_c", "diff:mainint::player_functions_follow_demo_2000_match_c", "diff:mainint::movement_and_collision_guards_hold"]
+verify = ["diff:mainint::player_movement_matches_c", "diff:mainint::player_movement_edge_cases_match_c", "diff:mainint::player_movement_joystick_matches_c", "diff:mainint::player_movement_netplay_matches_c", "diff:mainint::player_movement_net_session_matches_c", "diff:mainint::player_movement_records_demo_matches_c", "diff:mainint::player_movement_demo_end_matches_c", "diff:mainint::link_gun_above_the_screen_matches_c", "diff:mainint::player_functions_follow_demo_500_match_c", "diff:mainint::player_functions_follow_demo_2000_match_c", "diff:mainint::movement_and_collision_guards_hold"]
 waived_lines = [{ line = 3435, reason = "unreachable: inside `if (!endLevel)` with no assignment of endLevel in between, `if (endLevel)` is never true" }, { line = 3436, reason = "unreachable: closing brace of the dead `if (endLevel)` body (line 3435)" }, { line = 4160, reason = "unreachable: playerNum_ is 1 or 2 (JE_mainGamePlayerFunctions is the only caller)" }]
 notes = ""
 
@@ -2853,7 +2853,7 @@ c = "mainint.c::JE_mainGamePlayerFunctions"
 c_sha = "46277c11a927"
 rust = "rustyrian_core::mainint::je_main_game_player_functions"
 status = "verified"
-verify = ["diff:mainint::player_movement_matches_c", "diff:mainint::player_movement_edge_cases_match_c", "diff:mainint::player_functions_follow_demo_500_match_c", "diff:mainint::player_functions_follow_demo_2000_match_c"]
+verify = ["diff:mainint::player_movement_matches_c", "diff:mainint::player_movement_edge_cases_match_c", "diff:mainint::player_movement_net_session_matches_c", "diff:mainint::player_functions_follow_demo_500_match_c", "diff:mainint::player_functions_follow_demo_2000_match_c"]
 notes = ""
 
 [[fn]]
