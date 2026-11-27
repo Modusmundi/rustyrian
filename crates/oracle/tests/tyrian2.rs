@@ -1772,15 +1772,15 @@ fn je_load_map_runs_script_commands() {
         "]h[",
         "]x[",
         "]H[ 02",
-        "]J[ 03",
+        "]J[ 02",
     ]);
     let second = lines(&["]g[", "]b[", "]e[", "]J[ 03"]);
-    let jumps = lines(&["]2[ 04", "]w[ 05", "]t[ 06", "]l[ 07", "]J[ 08"]);
-    let mut sections = vec![first, second, jumps];
-    for k in 4..=8u8 {
+    let jumps = lines(&["]w[ 03", "]t[ 04", "]l[ 05", "]2[ 06", "]J[ 07"]);
+    let mut sections = vec![first, jumps];
+    for k in 3..=7u8 {
         sections.push(vec![level_line(k, &format!("SEC {k}"), k, k, false, false)]);
     }
-    let setups: [fn(&mut Game); 6] = [
+    let setups: [fn(&mut Game); 8] = [
         |_| {},
         |g| g.config.initial_difficulty = 4,
         |g| g.config.two_player_mode = true,
@@ -1792,6 +1792,13 @@ fn je_load_map_runs_script_commands() {
         |g| {
             g.config.initial_difficulty = 3;
             g.player.player[0].is_alive = false;
+        },
+        // Netplay skips the fades and syncs the (unused) `]S[` text.
+        |g| g.network.is_network_game = true,
+        |g| {
+            // The fixture is mid-demo: close its demo file first.
+            rustyrian_core::file::file_close(&mut g.demo.demo_file);
+            g.demo.record_demo = true;
         },
     ];
     for (i, setup) in setups.into_iter().enumerate() {
@@ -1806,7 +1813,7 @@ fn je_load_map_runs_script_commands() {
         "commands-modes",
         1,
         &[
-            sections[1].clone(),
+            second,
             vec![],
             vec![level_line(0, "MODES", 4, 2, true, false)],
         ],
@@ -1814,6 +1821,94 @@ fn je_load_map_runs_script_commands() {
         |_| {},
     );
     assert_eq!(r, Ok(()));
+}
+
+/// The pans broken off by ESC: during the first (its input check), then at
+/// the start of each later one (ESC still pressed).
+#[test]
+fn je_load_map_pans_stop_on_escape() {
+    let sections = [lines(&[
+        "]U 008[",
+        "]U 008[",
+        "]V 005[",
+        "]R 009[",
+        "]n[",
+        "]L[      000 PANS     03 02",
+    ])];
+    let mut script = String::from("ots 1\n");
+    for t in (1_000..20_000).step_by(400) {
+        script.push_str(&format!(
+            "@{t} key-down ESCAPE\n@{} key-up ESCAPE\n",
+            t + 45
+        ));
+    }
+    assert_eq!(
+        run_script_case("pans-escape", 1, &sections, &script, |_| {}),
+        Ok(())
+    );
+}
+
+/// Missing or broken data files: the episode script, the level file, its
+/// shape file, a level with too many events, and short shape and level
+/// files. Both engines log the error and exit.
+#[test]
+fn je_load_map_reports_bad_files() {
+    let start = vec![vec![level_line(0, "FILES", 3, 1, false, false)]];
+    let level = std::fs::read(data_dir().join("tyrian1.lvl")).expect("level file");
+    let shapes = std::fs::read(data_dir().join("shapesz.dat")).expect("shape file");
+    let cases: Vec<(&str, Vec<(String, Vec<u8>)>, Option<&str>)> = vec![
+        ("no-script", vec![], Some("levels1.dat")),
+        ("no-level", vec![], Some("tyrian1.lvl")),
+        ("no-shapes", vec![], Some("shapesz.dat")),
+        (
+            "many-events",
+            vec![(
+                "tyrian1.lvl".to_owned(),
+                crafted_level(|b, at| {
+                    let e = first_event(b, at) - 2;
+                    b[e..e + 2].copy_from_slice(&2500u16.to_le_bytes());
+                }),
+            )],
+            None,
+        ),
+        (
+            "short-shapes",
+            vec![(
+                "shapesz.dat".to_owned(),
+                shapes[..shapes.len() / 2].to_vec(),
+            )],
+            None,
+        ),
+        (
+            "short-level",
+            vec![(
+                "tyrian1.lvl".to_owned(),
+                level[..level_offset(&level, 1) - 100].to_vec(),
+            )],
+            None,
+        ),
+    ];
+    for (name, files, remove) in cases {
+        let mut all: Vec<(String, Vec<u8>)> = (1..=4u8)
+            .map(|e| (format!("levels{e}.dat"), episode_script(&starred(&start))))
+            .collect();
+        all.extend(files);
+        let data = crafted_data(&format!("files-{name}"), &all);
+        if let Some(f) = remove {
+            std::fs::remove_file(data.join(f)).expect("crafted file");
+        }
+        let mut rig = load_map_rig("ots 1\n", &data, 1);
+        rig.g.config.main_level = 1;
+        assert_eq!(run_load_map(rig), Err(1), "{name}");
+    }
+}
+
+/// Episode-script lines for `sections`, each opened by a `*` line.
+fn starred(sections: &[Vec<String>]) -> Vec<String> {
+    sections
+        .iter()
+        .flat_map(|s| std::iter::once("*".to_owned()).chain(s.iter().cloned()))
+        .collect()
 }
 
 /// Text windows (with and without the warning, too many lines), the three
@@ -1916,15 +2011,14 @@ fn je_load_map_ends_an_episode() {
     let mut end = vec!["]Q[".to_owned()];
     for h in 0..12 {
         end.push(format!("Hint {h}"));
-        if h == 4 {
-            end.extend((0..11).map(|i| format!("Hint line {i}")));
-        }
+        // Every hint is longer than the warning text holds.
+        end.extend((0..9).map(|i| format!("Hint {h} line {i}")));
         end.push("#".to_owned());
     }
     end.push(level_line(0, "AFTER", 7, 5, false, false));
     let sections = [end];
     type Setup = fn(&mut Game);
-    let cases: [(u8, Setup); 7] = [
+    let cases: [(u8, Setup); 8] = [
         (1, |_| {}),
         (1, |g| g.config.two_player_mode = true),
         (4, |g| g.config.super_arcade_mode = 0),
@@ -1935,6 +2029,8 @@ fn je_load_map_ends_an_episode() {
             g.config.initial_difficulty = rustyrian_core::config::DIFFICULTY_ZINGLON;
         }),
         (4, |g| g.config.super_tyrian = true),
+        // Netplay syncs the text after the super-arcade screen.
+        (4, |g| g.network.is_network_game = true),
     ];
     for (i, (ep, setup)) in cases.into_iter().enumerate() {
         let r = run_script_case(
