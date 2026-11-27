@@ -1,0 +1,3 @@
+[submodule "vendor/opentyrian"]
+	path = vendor/opentyrian
+	url = https://github.com/opentyrian/opentyrian

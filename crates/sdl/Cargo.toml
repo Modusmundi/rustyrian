@@ -1,0 +1,15 @@
+[package]
+name = "rustyrian-sdl"
+description = "SDL2 implementation of the rustyrian Platform trait"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+rustyrian-core.workspace = true
+sdl2-sys = { version = "0.39", features = ["bundled", "static-link"] }
+
+[lints]
+workspace = true

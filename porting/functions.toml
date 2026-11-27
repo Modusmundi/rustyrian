@@ -1,0 +1,5057 @@
+[[fn]]
+c = "animlib.c::readFileHeader"
+c_sha = "d846388443c3"
+rust = "rustyrian_core::animlib::read_file_header"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "animlib.c::readPalette"
+c_sha = "22e4c373aec1"
+rust = "rustyrian_core::animlib::read_palette"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "animlib.c::readPageDescriptors"
+c_sha = "cf6891d88425"
+rust = "rustyrian_core::animlib::read_page_descriptors"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "animlib.c::decodeRunSkipDump"
+c_sha = "ff6743080e8d"
+rust = "rustyrian_core::animlib::decode_run_skip_dump"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "animlib.c::playAnim"
+c_sha = "dfde81e9444b"
+rust = "rustyrian_core::animlib::play_anim"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "arg_parse.c::parse_args"
+c_sha = "8eca8455d901"
+rust = "rustyrian_core::arg_parse::parse_args"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "arg_parse.c::permute"
+c_sha = "4a0449055173"
+rust = "rustyrian_core::arg_parse::permute"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "arg_parse.c::parse_short_opt"
+c_sha = "4739fd1a89ac"
+rust = "rustyrian_core::arg_parse::parse_short_opt"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "arg_parse.c::parse_long_opt"
+c_sha = "05dddd9ffd0c"
+rust = "rustyrian_core::arg_parse::parse_long_opt"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "arg_parse.c::ot_strchrnul"
+c_sha = "cab2cc950ed7"
+rust = "rustyrian_core::arg_parse::ot_strchrnul"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "backgrnd.c::JE_darkenBackground"
+c_sha = "444879c72853"
+rust = "rustyrian_core::backgrnd::je_darken_background"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "backgrnd.c::blitBackground1Row"
+c_sha = "778155aaf85a"
+rust = "rustyrian_core::backgrnd::blit_background1_row"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "backgrnd.c::blitBackgroundRow"
+c_sha = "ced68febc0a9"
+rust = "rustyrian_core::backgrnd::blit_background_row"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "backgrnd.c::blitBackgroundRowBlend"
+c_sha = "d52ae28d1c60"
+rust = "rustyrian_core::backgrnd::blit_background_row_blend"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "backgrnd.c::draw_background_1"
+c_sha = "f21b73804932"
+rust = "rustyrian_core::backgrnd::draw_background_1"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "backgrnd.c::draw_background_2"
+c_sha = "cc42917c1b40"
+rust = "rustyrian_core::backgrnd::draw_background_2"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "backgrnd.c::draw_background_2_blend"
+c_sha = "65adbe8f53af"
+rust = "rustyrian_core::backgrnd::draw_background_2_blend"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "backgrnd.c::draw_background_3"
+c_sha = "3f137b07b38f"
+rust = "rustyrian_core::backgrnd::draw_background_3"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "backgrnd.c::filterScreenHue"
+c_sha = "4b0cb0f5e375"
+rust = "rustyrian_core::backgrnd::filter_screen_hue"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "backgrnd.c::filterScreenValue"
+c_sha = "f2369b6aa155"
+rust = "rustyrian_core::backgrnd::filter_screen_value"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "backgrnd.c::JE_filterScreen"
+c_sha = "c21fb82de3a2"
+rust = "rustyrian_core::backgrnd::je_filter_screen"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "backgrnd.c::JE_checkSmoothies"
+c_sha = "fe9d9e5018c3"
+rust = "rustyrian_core::backgrnd::je_check_smoothies"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "backgrnd.c::lava_filter"
+c_sha = "345e1b99d034"
+rust = "rustyrian_core::backgrnd::lava_filter"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "backgrnd.c::water_filter"
+c_sha = "70ce939e5999"
+rust = "rustyrian_core::backgrnd::water_filter"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "backgrnd.c::iced_blur_filter"
+c_sha = "665083150fba"
+rust = "rustyrian_core::backgrnd::iced_blur_filter"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "backgrnd.c::blur_filter"
+c_sha = "bf32283390b5"
+rust = "rustyrian_core::backgrnd::blur_filter"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "backgrnd.c::showHeadlight"
+c_sha = "562f770b22a6"
+rust = "rustyrian_core::backgrnd::show_headlight"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "backgrnd.c::showFlipped"
+c_sha = "f739323e4a3d"
+rust = "rustyrian_core::backgrnd::show_flipped"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "backgrnd.c::showNormal"
+c_sha = "6e9d07a7c550"
+rust = "rustyrian_core::backgrnd::show_normal"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "backgrnd.c::initialize_starfield"
+c_sha = "b81efeacf4b3"
+rust = "rustyrian_core::backgrnd::initialize_starfield"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "backgrnd.c::update_and_draw_starfield"
+c_sha = "4ba20b5dfccc"
+rust = "rustyrian_core::backgrnd::update_and_draw_starfield"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config.c::loadOpenTyrianConfig"
+c_sha = "a70b46effbe3"
+rust = "rustyrian_core::config::load_open_tyrian_config"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config.c::saveOpenTyrianConfig"
+c_sha = "23ea1a316955"
+rust = "rustyrian_core::config::save_open_tyrian_config"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config.c::playeritems_to_pitems"
+c_sha = "7b3d1603ed55"
+rust = "rustyrian_core::config::playeritems_to_pitems"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config.c::pitems_to_playeritems"
+c_sha = "108510ed5dee"
+rust = "rustyrian_core::config::pitems_to_playeritems"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config.c::JE_saveGame"
+c_sha = "57ef99469ed8"
+rust = "rustyrian_core::config::je_save_game"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config.c::JE_loadGame"
+c_sha = "0b1f5dd71fc1"
+rust = "rustyrian_core::config::je_load_game"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config.c::JE_initProcessorType"
+c_sha = "7f1d6f5f2c1d"
+rust = "rustyrian_core::config::je_init_processor_type"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config.c::JE_setNewGameSpeed"
+c_sha = "dddc846424a8"
+rust = "rustyrian_core::config::je_set_new_game_speed"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config.c::loadConfiguration"
+c_sha = "5dc24cedaefc"
+rust = "rustyrian_core::config::load_configuration"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config.c::saveConfiguration"
+c_sha = "54325d0ae63e"
+rust = "rustyrian_core::config::save_configuration"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config.c::loadSaves"
+c_sha = "ea7b687f0d52"
+rust = "rustyrian_core::config::load_saves"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config.c::saveSaves"
+c_sha = "d50a4fcbd363"
+rust = "rustyrian_core::config::save_saves"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config.c::encryptSaveData"
+c_sha = "7805c75500b3"
+rust = "rustyrian_core::config::encrypt_save_data"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config.c::decryptSaveData"
+c_sha = "d423fd353f3b"
+rust = "rustyrian_core::config::decrypt_save_data"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_oom"
+c_sha = "d92cabda2c76"
+rust = "rustyrian_core::config_file::config_oom"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::string_init_len"
+c_sha = "76504427da49"
+rust = "rustyrian_core::config_file::string_init_len"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::string_deinit"
+c_sha = "8c27d49041c7"
+rust = "rustyrian_core::config_file::string_deinit"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::string_equal_len"
+c_sha = "a3d5a9a6b1d2"
+rust = "rustyrian_core::config_file::string_equal_len"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_init"
+c_sha = "ccc2a621828c"
+rust = "rustyrian_core::config_file::config_init"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_deinit"
+c_sha = "aa5733fa7cf9"
+rust = "rustyrian_core::config_file::config_deinit"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::init_section"
+c_sha = "92e3977d1e50"
+rust = "rustyrian_core::config_file::init_section"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::deinit_section"
+c_sha = "74856e9240cf"
+rust = "rustyrian_core::config_file::deinit_section"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_add_section_len"
+c_sha = "a2946be1deab"
+rust = "rustyrian_core::config_file::config_add_section_len"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_find_sections"
+c_sha = "217abf0e1035"
+rust = "rustyrian_core::config_file::config_find_sections"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_find_section"
+c_sha = "f7ac2d17aa7d"
+rust = "rustyrian_core::config_file::config_find_section"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_find_or_add_section"
+c_sha = "1b78e7e8a09b"
+rust = "rustyrian_core::config_file::config_find_or_add_section"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::init_option_value"
+c_sha = "58d7fb563f6e"
+rust = "rustyrian_core::config_file::init_option_value"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::deinit_option_value"
+c_sha = "5dd3d3a8a3be"
+rust = "rustyrian_core::config_file::deinit_option_value"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::init_option"
+c_sha = "3773ac6cad7d"
+rust = "rustyrian_core::config_file::init_option"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::deinit_option"
+c_sha = "62e5a90ab4f2"
+rust = "rustyrian_core::config_file::deinit_option"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::append_option"
+c_sha = "8fa33fff224c"
+rust = "rustyrian_core::config_file::append_option"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::get_option_len"
+c_sha = "c451330c542d"
+rust = "rustyrian_core::config_file::get_option_len"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_set_option_len"
+c_sha = "7e536b9c3009"
+rust = "rustyrian_core::config_file::config_set_option_len"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_get_option"
+c_sha = "d19f1821c6fe"
+rust = "rustyrian_core::config_file::config_get_option"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_get_or_set_option_len"
+c_sha = "e59b7c5de945"
+rust = "rustyrian_core::config_file::config_get_or_set_option_len"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_set_string_option_len"
+c_sha = "7e4da7f5aa2f"
+rust = "rustyrian_core::config_file::config_set_string_option_len"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_get_string_option"
+c_sha = "0d04684d3519"
+rust = "rustyrian_core::config_file::config_get_string_option"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_get_or_set_string_option"
+c_sha = "79e74dbcef1b"
+rust = "rustyrian_core::config_file::config_get_or_set_string_option"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_set_bool_option"
+c_sha = "7e760d4330aa"
+rust = "rustyrian_core::config_file::config_set_bool_option"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_get_bool_option"
+c_sha = "51afb7c8708b"
+rust = "rustyrian_core::config_file::config_get_bool_option"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_get_or_set_bool_option"
+c_sha = "868cf6c23dd3"
+rust = "rustyrian_core::config_file::config_get_or_set_bool_option"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_set_int_option"
+c_sha = "6695c9b961fc"
+rust = "rustyrian_core::config_file::config_set_int_option"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_get_int_option"
+c_sha = "54f86a2176e1"
+rust = "rustyrian_core::config_file::config_get_int_option"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_get_or_set_int_option"
+c_sha = "bbcb64b80ade"
+rust = "rustyrian_core::config_file::config_get_or_set_int_option"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_set_uint_option"
+c_sha = "8aaf04c0f3bf"
+rust = "rustyrian_core::config_file::config_set_uint_option"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_get_uint_option"
+c_sha = "14af241f23b2"
+rust = "rustyrian_core::config_file::config_get_uint_option"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_get_or_set_uint_option"
+c_sha = "c710f0f7fc3e"
+rust = "rustyrian_core::config_file::config_get_or_set_uint_option"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_set_value_len"
+c_sha = "4bcc0110db70"
+rust = "rustyrian_core::config_file::config_set_value_len"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_add_value_len"
+c_sha = "3a3999e27ff2"
+rust = "rustyrian_core::config_file::config_add_value_len"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_remove_value"
+c_sha = "ab7e399a89b0"
+rust = "rustyrian_core::config_file::config_remove_value"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_get_value"
+c_sha = "973112429256"
+rust = "rustyrian_core::config_file::config_get_value"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::is_whitespace"
+c_sha = "785842c008d0"
+rust = "rustyrian_core::config_file::is_whitespace"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::is_end"
+c_sha = "d68f2bff6b76"
+rust = "rustyrian_core::config_file::is_end"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::is_whitespace_or_end"
+c_sha = "2e474a8cf432"
+rust = "rustyrian_core::config_file::is_whitespace_or_end"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::match_directive"
+c_sha = "874c6b038a68"
+rust = "rustyrian_core::config_file::match_directive"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::match_nonquote_field"
+c_sha = "71a457667ff9"
+rust = "rustyrian_core::config_file::match_nonquote_field"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::parse_quote_field"
+c_sha = "70bfa99a95fe"
+rust = "rustyrian_core::config_file::parse_quote_field"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::parse_field"
+c_sha = "0462ba384df8"
+rust = "rustyrian_core::config_file::parse_field"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_parse"
+c_sha = "632158c817d1"
+rust = "rustyrian_core::config_file::config_parse"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::write_field"
+c_sha = "6934414c1747"
+rust = "rustyrian_core::config_file::write_field"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.c::config_write"
+c_sha = "377fa274e70e"
+rust = "rustyrian_core::config_file::config_write"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.h::config_string_to_cstr"
+c_sha = "e8eadcaae67d"
+rust = "rustyrian_core::config_file::config_string_to_cstr"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.h::config_add_section"
+c_sha = "15c1ee231991"
+rust = "rustyrian_core::config_file::config_add_section"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.h::config_set_option"
+c_sha = "e58493b1041b"
+rust = "rustyrian_core::config_file::config_set_option"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.h::config_get_or_set_option"
+c_sha = "ef04be2be50c"
+rust = "rustyrian_core::config_file::config_get_or_set_option"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.h::config_set_string_option"
+c_sha = "02b5c69bf559"
+rust = "rustyrian_core::config_file::config_set_string_option"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.h::config_set_value"
+c_sha = "2e26a039de2c"
+rust = "rustyrian_core::config_file::config_set_value"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.h::config_add_value"
+c_sha = "d06b4534a75e"
+rust = "rustyrian_core::config_file::config_add_value"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.h::config_is_value_list"
+c_sha = "ba0317342b75"
+rust = "rustyrian_core::config_file::config_is_value_list"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "config_file.h::config_get_value_count"
+c_sha = "4836a529035d"
+rust = "rustyrian_core::config_file::config_get_value_count"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "demo.c::beginPlayDemo"
+c_sha = "31f20f6e31c2"
+rust = "rustyrian_core::demo::begin_play_demo"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "demo.c::playDemoKeys"
+c_sha = "c3ffd2fddfef"
+rust = "rustyrian_core::demo::play_demo_keys"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "demo.c::endPlayDemo"
+c_sha = "e56760bff115"
+rust = "rustyrian_core::demo::end_play_demo"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "demo.c::beginRecordDemo"
+c_sha = "65c810b1f85d"
+rust = "rustyrian_core::demo::begin_record_demo"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "demo.c::recordDemoKeys"
+c_sha = "2a394d23e3c8"
+rust = "rustyrian_core::demo::record_demo_keys"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "demo.c::endRecordDemo"
+c_sha = "56dc4464c828"
+rust = "rustyrian_core::demo::end_record_demo"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::get_unit_by_name"
+c_sha = "f98d2d04bcb6"
+rust = "rustyrian_core::destruct::get_unit_by_name"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::load_destruct_config"
+c_sha = "c9ce306957b9"
+rust = "rustyrian_core::destruct::load_destruct_config"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::JE_destructGame"
+c_sha = "091aaaaf6400"
+rust = "rustyrian_core::destruct::je_destruct_game"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::JE_destructMain"
+c_sha = "5371263e6cd2"
+rust = "rustyrian_core::destruct::je_destruct_main"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::JE_introScreen"
+c_sha = "cc0a55aabacc"
+rust = "rustyrian_core::destruct::je_intro_screen"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DrawModeSelectMenu"
+c_sha = "62f647ea434b"
+rust = "rustyrian_core::destruct::draw_mode_select_menu"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::JE_modeSelect"
+c_sha = "8561fee5a717"
+rust = "rustyrian_core::destruct::je_mode_select"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::JE_generateTerrain"
+c_sha = "eff6915cbba0"
+rust = "rustyrian_core::destruct::je_generate_terrain"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_generateBaseTerrain"
+c_sha = "62ed711c2f0b"
+rust = "rustyrian_core::destruct::de_generate_base_terrain"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_drawBaseTerrain"
+c_sha = "ed5f8a9e26bd"
+rust = "rustyrian_core::destruct::de_draw_base_terrain"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_generateUnits"
+c_sha = "a80ad804fff4"
+rust = "rustyrian_core::destruct::de_generate_units"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_generateWalls"
+c_sha = "f3385bcd2005"
+rust = "rustyrian_core::destruct::de_generate_walls"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_generateRings"
+c_sha = "90dff5a16338"
+rust = "rustyrian_core::destruct::de_generate_rings"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::aliasDirtPixel"
+c_sha = "07fc89c7b1a5"
+rust = "rustyrian_core::destruct::alias_dirt_pixel"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::JE_aliasDirt"
+c_sha = "96b1d0d38717"
+rust = "rustyrian_core::destruct::je_alias_dirt"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::JE_placementPosition"
+c_sha = "765ab3cff02c"
+rust = "rustyrian_core::destruct::je_placement_position"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::JE_stabilityCheck"
+c_sha = "7472342add9f"
+rust = "rustyrian_core::destruct::je_stability_check"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::JE_tempScreenChecking"
+c_sha = "0e65f2b58e58"
+rust = "rustyrian_core::destruct::je_temp_screen_checking"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::JE_makeExplosion"
+c_sha = "2d155797dbdf"
+rust = "rustyrian_core::destruct::je_make_explosion"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::JE_eSound"
+c_sha = "1219b406e97e"
+rust = "rustyrian_core::destruct::je_e_sound"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::JE_superPixel"
+c_sha = "c63676415eb7"
+rust = "rustyrian_core::destruct::je_super_pixel"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::JE_helpScreen"
+c_sha = "962d5323111f"
+rust = "rustyrian_core::destruct::je_help_screen"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::JE_pauseScreen"
+c_sha = "ad066cbb9f8c"
+rust = "rustyrian_core::destruct::je_pause_screen"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_ResetUnits"
+c_sha = "38fc0befa573"
+rust = "rustyrian_core::destruct::de_reset_units"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_ResetPlayers"
+c_sha = "aa4e74ee7eac"
+rust = "rustyrian_core::destruct::de_reset_players"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_ResetWeapons"
+c_sha = "1283528e83bb"
+rust = "rustyrian_core::destruct::de_reset_weapons"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_ResetLevel"
+c_sha = "7a4ab8e1e91c"
+rust = "rustyrian_core::destruct::de_reset_level"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_ResetAI"
+c_sha = "4361e919b01f"
+rust = "rustyrian_core::destruct::de_reset_ai"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_ResetActions"
+c_sha = "a70d021097b4"
+rust = "rustyrian_core::destruct::de_reset_actions"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_RunTick"
+c_sha = "8fb5b22d6c3b"
+rust = "rustyrian_core::destruct::de_run_tick"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_RunTickCycleDeadUnits"
+c_sha = "6d6ad36bae93"
+rust = "rustyrian_core::destruct::de_run_tick_cycle_dead_units"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_RunTickGravity"
+c_sha = "525c110d148d"
+rust = "rustyrian_core::destruct::de_run_tick_gravity"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_GravityDrawUnit"
+c_sha = "b10ccc69e2d7"
+rust = "rustyrian_core::destruct::de_gravity_draw_unit"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_GravityLowerUnit"
+c_sha = "0c189b213989"
+rust = "rustyrian_core::destruct::de_gravity_lower_unit"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_GravityFlyUnit"
+c_sha = "21cbf1850ec4"
+rust = "rustyrian_core::destruct::de_gravity_fly_unit"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_RunTickAnimate"
+c_sha = "f77723d1900e"
+rust = "rustyrian_core::destruct::de_run_tick_animate"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_RunTickDrawWalls"
+c_sha = "cf9f43d87b6d"
+rust = "rustyrian_core::destruct::de_run_tick_draw_walls"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_RunTickExplosions"
+c_sha = "87124370e47a"
+rust = "rustyrian_core::destruct::de_run_tick_explosions"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_TestExplosionCollision"
+c_sha = "3eb236131284"
+rust = "rustyrian_core::destruct::de_test_explosion_collision"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_DestroyUnit"
+c_sha = "f1da9fdd82a8"
+rust = "rustyrian_core::destruct::de_destroy_unit"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_RunTickShots"
+c_sha = "59ce92e0cb41"
+rust = "rustyrian_core::destruct::de_run_tick_shots"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_DrawTrails"
+c_sha = "fd0b627e9dc3"
+rust = "rustyrian_core::destruct::de_draw_trails"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_RunTickAI"
+c_sha = "95472241b220"
+rust = "rustyrian_core::destruct::de_run_tick_ai"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_RunTickDrawCrosshairs"
+c_sha = "c3dd004c07f1"
+rust = "rustyrian_core::destruct::de_run_tick_draw_crosshairs"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_RunTickDrawHUD"
+c_sha = "f36baf0c6731"
+rust = "rustyrian_core::destruct::de_run_tick_draw_hud"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_RunTickGetInput"
+c_sha = "af27413979c2"
+rust = "rustyrian_core::destruct::de_run_tick_get_input"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_ProcessInput"
+c_sha = "84c1eca55547"
+rust = "rustyrian_core::destruct::de_process_input"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_CycleWeaponUp"
+c_sha = "1432c0812188"
+rust = "rustyrian_core::destruct::de_cycle_weapon_up"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_CycleWeaponDown"
+c_sha = "bdb935d4076c"
+rust = "rustyrian_core::destruct::de_cycle_weapon_down"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_MakeShot"
+c_sha = "9a4ccbebd6ae"
+rust = "rustyrian_core::destruct::de_make_shot"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_RunMagnet"
+c_sha = "a067459084cf"
+rust = "rustyrian_core::destruct::de_run_magnet"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_RaiseAngle"
+c_sha = "c14b2f3d8dfd"
+rust = "rustyrian_core::destruct::de_raise_angle"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_LowerAngle"
+c_sha = "02c7761da154"
+rust = "rustyrian_core::destruct::de_lower_angle"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_RaisePower"
+c_sha = "800510ee8850"
+rust = "rustyrian_core::destruct::de_raise_power"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_LowerPower"
+c_sha = "efbe5f1d238c"
+rust = "rustyrian_core::destruct::de_lower_power"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_isValidUnit"
+c_sha = "36eb36739055"
+rust = "rustyrian_core::destruct::de_is_valid_unit"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_RunTickCheckEndgame"
+c_sha = "e4469ec5a3c6"
+rust = "rustyrian_core::destruct::de_run_tick_check_endgame"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::DE_RunTickPlaySounds"
+c_sha = "412ba148558a"
+rust = "rustyrian_core::destruct::de_run_tick_play_sounds"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "destruct.c::JE_pixCool"
+c_sha = "396edcaef17a"
+rust = "rustyrian_core::destruct::je_pix_cool"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "editship.c::loadExtraShapes"
+c_sha = "9cca06b87f5d"
+rust = "rustyrian_core::editship::load_extra_shapes"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "editship.c::decryptExtraShipsData"
+c_sha = "cbeb2a054483"
+rust = "rustyrian_core::editship::decrypt_extra_ships_data"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "episodes.c::JE_loadItemDat"
+c_sha = "71012a02aa72"
+rust = "rustyrian_core::episodes::je_load_item_dat"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "episodes.c::JE_initEpisode"
+c_sha = "4e64bd69e18d"
+rust = "rustyrian_core::episodes::je_init_episode"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "episodes.c::JE_scanForEpisodes"
+c_sha = "87f6c57988ed"
+rust = "rustyrian_core::episodes::je_scan_for_episodes"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "episodes.c::JE_findNextEpisode"
+c_sha = "38a5de99614f"
+rust = "rustyrian_core::episodes::je_find_next_episode"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.c::fileExists"
+c_sha = "8bc7423c372e"
+rust = "rustyrian_core::file::file_exists"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.c::fileOpen"
+c_sha = "4fdf11abcabc"
+rust = "rustyrian_core::file::file_open"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.c::findDataFiles"
+c_sha = "6183855d5b54"
+rust = "rustyrian_core::file::find_data_files"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.c::dataFileExists"
+c_sha = "3824ea0321ff"
+rust = "rustyrian_core::file::data_file_exists"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.c::userFileExists"
+c_sha = "5495f3751fea"
+rust = "rustyrian_core::file::user_file_exists"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.c::dataFileOpen"
+c_sha = "27b901ea4ce4"
+rust = "rustyrian_core::file::data_file_open"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.c::determineUserDirPath"
+c_sha = "6789e9459b49"
+rust = "rustyrian_core::file::determine_user_dir_path"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.c::userFileOpen"
+c_sha = "59ac7a6da73a"
+rust = "rustyrian_core::file::user_file_open"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.c::fileSetPosition"
+c_sha = "cf3ead337265"
+rust = "rustyrian_core::file::file_set_position"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.c::fileGetPosition"
+c_sha = "e51f3e710495"
+rust = "rustyrian_core::file::file_get_position"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.c::fileGetLength"
+c_sha = "065ebd83d203"
+rust = "rustyrian_core::file::file_get_length"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.c::fileReadAtMost"
+c_sha = "3eecdbd888ad"
+rust = "rustyrian_core::file::file_read_at_most"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.c::fileReadExactly"
+c_sha = "9ef174c5590e"
+rust = "rustyrian_core::file::file_read_exactly"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.c::fileWrite"
+c_sha = "d4bc778c0013"
+rust = "rustyrian_core::file::file_write"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.c::fileFlush"
+c_sha = "8b496833fc16"
+rust = "rustyrian_core::file::file_flush"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.c::fileClose"
+c_sha = "1604e91fdfbc"
+rust = "rustyrian_core::file::file_close"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.c::fileGetError"
+c_sha = "20c72b492138"
+rust = "rustyrian_core::file::file_get_error"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.h::fileReadU8"
+c_sha = "67f104312888"
+rust = "rustyrian_core::file::file_read_u8"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.h::fileReadU8Array"
+c_sha = "50b7d8e5e642"
+rust = "rustyrian_core::file::file_read_u8_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.h::fileReadU16"
+c_sha = "428006999e94"
+rust = "rustyrian_core::file::file_read_u16"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.h::fileReadU16Array"
+c_sha = "c2c7888228f5"
+rust = "rustyrian_core::file::file_read_u16_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.h::fileReadU16BE"
+c_sha = "f9de97b4441f"
+rust = "rustyrian_core::file::file_read_u16be"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.h::fileReadU16BEArray"
+c_sha = "619810e1c21d"
+rust = "rustyrian_core::file::file_read_u16be_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.h::fileReadU32"
+c_sha = "8d865111e127"
+rust = "rustyrian_core::file::file_read_u32"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.h::fileReadU32Array"
+c_sha = "d01160287c46"
+rust = "rustyrian_core::file::file_read_u32_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.h::fileReadBool"
+c_sha = "df746ff6056b"
+rust = "rustyrian_core::file::file_read_bool"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.h::fileReadBoolArray"
+c_sha = "9fe55548f64f"
+rust = "rustyrian_core::file::file_read_bool_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.h::fileReadChar"
+c_sha = "d37ecdaab749"
+rust = "rustyrian_core::file::file_read_char"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.h::fileReadCharArray"
+c_sha = "c4eacc1604c1"
+rust = "rustyrian_core::file::file_read_char_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.h::fileReadS8"
+c_sha = "ff68f1541f0b"
+rust = "rustyrian_core::file::file_read_s8"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.h::fileReadS8Array"
+c_sha = "97b78d4ff453"
+rust = "rustyrian_core::file::file_read_s8_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.h::fileReadS16"
+c_sha = "850e2d3697c1"
+rust = "rustyrian_core::file::file_read_s16"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.h::fileReadS16Array"
+c_sha = "5a61011f93fc"
+rust = "rustyrian_core::file::file_read_s16_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.h::fileReadS32"
+c_sha = "580de6711725"
+rust = "rustyrian_core::file::file_read_s32"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.h::fileReadS32Array"
+c_sha = "2f019d73b1a0"
+rust = "rustyrian_core::file::file_read_s32_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.h::fileWriteU8"
+c_sha = "ee2cd677ec34"
+rust = "rustyrian_core::file::file_write_u8"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.h::fileWriteU8Array"
+c_sha = "131c244d385d"
+rust = "rustyrian_core::file::file_write_u8_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "file.h::fileWriteCharArray"
+c_sha = "34df2029d9b4"
+rust = "rustyrian_core::file::file_write_char_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "font.c::drawFontHvShadow"
+c_sha = "d41b47fd6214"
+rust = "rustyrian_core::font::draw_font_hv_shadow"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "font.c::drawFontHvShadowAligned"
+c_sha = "b132f3a29d1c"
+rust = "rustyrian_core::font::draw_font_hv_shadow_aligned"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "font.c::drawFontHvFullShadow"
+c_sha = "60caa33b0773"
+rust = "rustyrian_core::font::draw_font_hv_full_shadow"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "font.c::drawFontHvFullShadowAligned"
+c_sha = "6ceb7c6f5349"
+rust = "rustyrian_core::font::draw_font_hv_full_shadow_aligned"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "font.c::drawFontHv"
+c_sha = "d533a33a3929"
+rust = "rustyrian_core::font::draw_font_hv"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "font.c::drawFontHvAligned"
+c_sha = "2be402a25be3"
+rust = "rustyrian_core::font::draw_font_hv_aligned"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "font.c::drawFontHvBlend"
+c_sha = "3e499b6fde40"
+rust = "rustyrian_core::font::draw_font_hv_blend"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "font.c::drawFontHvBlendAligned"
+c_sha = "5528d20c3468"
+rust = "rustyrian_core::font::draw_font_hv_blend_aligned"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "font.c::drawFontDark"
+c_sha = "c7165d75c00b"
+rust = "rustyrian_core::font::draw_font_dark"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "font.c::drawFontDarkAligned"
+c_sha = "b926f011032c"
+rust = "rustyrian_core::font::draw_font_dark_aligned"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "fonthand.c::JE_dString"
+c_sha = "f50159a5c01e"
+rust = "rustyrian_core::fonthand::je_d_string"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "fonthand.c::JE_fontCenter"
+c_sha = "9503e2ed7209"
+rust = "rustyrian_core::fonthand::je_font_center"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "fonthand.c::JE_textWidth"
+c_sha = "0f8898701cfc"
+rust = "rustyrian_core::fonthand::je_text_width"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "fonthand.c::JE_textShade"
+c_sha = "8bec3b7f5a06"
+rust = "rustyrian_core::fonthand::je_text_shade"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "fonthand.c::JE_outText"
+c_sha = "a44e534af6fa"
+rust = "rustyrian_core::fonthand::je_out_text"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "fonthand.c::JE_outTextModify"
+c_sha = "f4e78d7e1f8f"
+rust = "rustyrian_core::fonthand::je_out_text_modify"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "fonthand.c::JE_outTextAdjust"
+c_sha = "caf6d20222d1"
+rust = "rustyrian_core::fonthand::je_out_text_adjust"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "fonthand.c::JE_outTextAndDarken"
+c_sha = "ed344211ce24"
+rust = "rustyrian_core::fonthand::je_out_text_and_darken"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "fonthand.c::JE_updateWarning"
+c_sha = "9ec43433fec1"
+rust = "rustyrian_core::fonthand::je_update_warning"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "fonthand.c::JE_outTextGlow"
+c_sha = "11bd44c5447b"
+rust = "rustyrian_core::fonthand::je_out_text_glow"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::playeritem_map"
+c_sha = "d5fe4a8b41f4"
+rust = "rustyrian_core::game_menu::playeritem_map"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_cashLeft"
+c_sha = "7e0deec4bf1b"
+rust = "rustyrian_core::game_menu::je_cash_left"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_itemScreen"
+c_sha = "430d104f1ebc"
+rust = "rustyrian_core::game_menu::je_item_screen"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::draw_ship_illustration"
+c_sha = "10dce864108e"
+rust = "rustyrian_core::game_menu::draw_ship_illustration"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::load_cubes"
+c_sha = "5db56d25190c"
+rust = "rustyrian_core::game_menu::load_cubes"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::load_cube"
+c_sha = "9ef81733f079"
+rust = "rustyrian_core::game_menu::load_cube"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_drawItem"
+c_sha = "65d7d6aa4621"
+rust = "rustyrian_core::game_menu::je_draw_item"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_drawMenuHeader"
+c_sha = "26ef2a9ac10b"
+rust = "rustyrian_core::game_menu::je_draw_menu_header"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_drawMenuChoices"
+c_sha = "8bde110d80ed"
+rust = "rustyrian_core::game_menu::je_draw_menu_choices"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_updateNavScreen"
+c_sha = "9c54fd93bcad"
+rust = "rustyrian_core::game_menu::je_update_nav_screen"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_drawLines"
+c_sha = "32f60b4b9462"
+rust = "rustyrian_core::game_menu::je_draw_lines"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_drawNavLines"
+c_sha = "6e50b42b4eea"
+rust = "rustyrian_core::game_menu::je_draw_nav_lines"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_drawDots"
+c_sha = "c87adda55745"
+rust = "rustyrian_core::game_menu::je_draw_dots"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_drawPlanet"
+c_sha = "2974858904cb"
+rust = "rustyrian_core::game_menu::je_draw_planet"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_scaleBitmap"
+c_sha = "4ffbadba20f0"
+rust = "rustyrian_core::game_menu::je_scale_bitmap"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_initWeaponView"
+c_sha = "68bef30aea2b"
+rust = "rustyrian_core::game_menu::je_init_weapon_view"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_computeDots"
+c_sha = "6bc736730817"
+rust = "rustyrian_core::game_menu::je_compute_dots"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_partWay"
+c_sha = "53755b8ae872"
+rust = "rustyrian_core::game_menu::je_part_way"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_doShipSpecs"
+c_sha = "a31baa8fd104"
+rust = "rustyrian_core::game_menu::je_do_ship_specs"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_drawMainMenuHelpText"
+c_sha = "1fd42ef5b9b0"
+rust = "rustyrian_core::game_menu::je_draw_main_menu_help_text"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_quitRequest"
+c_sha = "88a9b159523d"
+rust = "rustyrian_core::game_menu::je_quit_request"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_genItemMenu"
+c_sha = "e9d3ae8a4b1b"
+rust = "rustyrian_core::game_menu::je_gen_item_menu"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_scaleInPicture"
+c_sha = "b7dbf4f81f76"
+rust = "rustyrian_core::game_menu::je_scale_in_picture"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_drawScore"
+c_sha = "285886c602d0"
+rust = "rustyrian_core::game_menu::je_draw_score"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_menuFunction"
+c_sha = "af1c3eb6dc9d"
+rust = "rustyrian_core::game_menu::je_menu_function"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_drawShipSpecs"
+c_sha = "067202b13325"
+rust = "rustyrian_core::game_menu::je_draw_ship_specs"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_weaponSimUpdate"
+c_sha = "a658e66e5b3b"
+rust = "rustyrian_core::game_menu::je_weapon_sim_update"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "game_menu.c::JE_weaponViewFrame"
+c_sha = "e591f17c717c"
+rust = "rustyrian_core::game_menu::je_weapon_view_frame"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "helptext.c::decrypt_string"
+c_sha = "0076a7f81d13"
+rust = "rustyrian_core::helptext::decrypt_string"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "helptext.c::readEncryptedString"
+c_sha = "30d997091333"
+rust = "rustyrian_core::helptext::read_encrypted_string"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "helptext.c::JE_helpBox"
+c_sha = "8eeb302f5e14"
+rust = "rustyrian_core::helptext::je_help_box"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "helptext.c::JE_HBox"
+c_sha = "996b37b4691e"
+rust = "rustyrian_core::helptext::je_h_box"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "helptext.c::JE_loadHelpText"
+c_sha = "badd68909b01"
+rust = "rustyrian_core::helptext::je_load_help_text"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "joystick.c::joystick_axis_threshold"
+c_sha = "ce1c40c2309b"
+rust = "rustyrian_core::joystick::joystick_axis_threshold"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "joystick.c::joystick_axis_reduce"
+c_sha = "1c4a823e63b8"
+rust = "rustyrian_core::joystick::joystick_axis_reduce"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "joystick.c::joystick_analog_angle"
+c_sha = "316e73d837a8"
+rust = "rustyrian_core::joystick::joystick_analog_angle"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "joystick.c::check_assigned"
+c_sha = "a807461eebfd"
+rust = "rustyrian_core::joystick::check_assigned"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "joystick.c::poll_joystick"
+c_sha = "17b2a465cbbf"
+rust = "rustyrian_core::joystick::poll_joystick"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "joystick.c::poll_joysticks"
+c_sha = "acb1b5e79f24"
+rust = "rustyrian_core::joystick::poll_joysticks"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "joystick.c::push_key"
+c_sha = "ea8e4e7a8fa2"
+rust = "rustyrian_core::joystick::push_key"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "joystick.c::push_joysticks_as_keyboard"
+c_sha = "7182b05b9798"
+rust = "rustyrian_core::joystick::push_joysticks_as_keyboard"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "joystick.c::init_joysticks"
+c_sha = "a0b60482102a"
+rust = "rustyrian_core::joystick::init_joysticks"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "joystick.c::deinit_joysticks"
+c_sha = "8c7664588d9f"
+rust = "rustyrian_core::joystick::deinit_joysticks"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "joystick.c::reset_joystick_assignments"
+c_sha = "476693fb23a2"
+rust = "rustyrian_core::joystick::reset_joystick_assignments"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "joystick.c::load_joystick_assignments"
+c_sha = "3b3df39a1fcf"
+rust = "rustyrian_core::joystick::load_joystick_assignments"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "joystick.c::save_joystick_assignments"
+c_sha = "f955bafbd399"
+rust = "rustyrian_core::joystick::save_joystick_assignments"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "joystick.c::joystick_assignments_to_string"
+c_sha = "cd6df062e4df"
+rust = "rustyrian_core::joystick::joystick_assignments_to_string"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "joystick.c::code_to_assignment"
+c_sha = "32878b8a5abc"
+rust = "rustyrian_core::joystick::code_to_assignment"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "joystick.c::assignment_to_code"
+c_sha = "00cadcff7041"
+rust = "rustyrian_core::joystick::assignment_to_code"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "joystick.c::detect_joystick_assignment"
+c_sha = "598d2f0778dd"
+rust = "rustyrian_core::joystick::detect_joystick_assignment"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "joystick.c::joystick_assignment_cmp"
+c_sha = "669023961da3"
+rust = "rustyrian_core::joystick::joystick_assignment_cmp"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "jukebox.c::jukebox"
+c_sha = "4279faaecb9c"
+rust = "rustyrian_core::jukebox::jukebox"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "keyboard.c::init_keyboard"
+c_sha = "6b2f5ac994f3"
+rust = "rustyrian_core::keyboard::init_keyboard"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "keyboard.c::keyboardHasInput"
+c_sha = "ad884e427331"
+rust = "rustyrian_core::keyboard::keyboard_has_input"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "keyboard.c::keyboardGetInput"
+c_sha = "c58f97aa10ab"
+rust = "rustyrian_core::keyboard::keyboard_get_input"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "keyboard.c::keyboardClearInput"
+c_sha = "a9598a14ba18"
+rust = "rustyrian_core::keyboard::keyboard_clear_input"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "keyboard.c::mouseHasInput"
+c_sha = "1ce9c60aff5b"
+rust = "rustyrian_core::keyboard::mouse_has_input"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "keyboard.c::mouseGetInput"
+c_sha = "40182031a309"
+rust = "rustyrian_core::keyboard::mouse_get_input"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "keyboard.c::mouseClearInput"
+c_sha = "887dcec3832b"
+rust = "rustyrian_core::keyboard::mouse_clear_input"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "keyboard.c::mouseSetRelative"
+c_sha = "423c86dd06da"
+rust = "rustyrian_core::keyboard::mouse_set_relative"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "keyboard.c::mouseGetRelativePosition"
+c_sha = "0122c35766f4"
+rust = "rustyrian_core::keyboard::mouse_get_relative_position"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "keyboard.c::handleSdlEvents"
+c_sha = "211b22b6bd1f"
+rust = "rustyrian_core::keyboard::handle_sdl_events"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "keyboard.c::hasInput"
+c_sha = "9a69b6a58b6a"
+rust = "rustyrian_core::keyboard::has_input"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "keyboard.c::getInput"
+c_sha = "ad67a1808253"
+rust = "rustyrian_core::keyboard::get_input"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "keyboard.c::waitUntilHasInput"
+c_sha = "84642df9d8a7"
+rust = "rustyrian_core::keyboard::wait_until_has_input"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "keyboard.c::waitUntilGetInput"
+c_sha = "5644b8ea6ad7"
+rust = "rustyrian_core::keyboard::wait_until_get_input"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "keyboard.c::waitUntilElapsed"
+c_sha = "e90222542789"
+rust = "rustyrian_core::keyboard::wait_until_elapsed"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "keyboard.c::waitUntilHasInputOrElapsed"
+c_sha = "b75f2957c21b"
+rust = "rustyrian_core::keyboard::wait_until_has_input_or_elapsed"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "keyboard.c::waitUntilGetInputOrElapsed"
+c_sha = "ed2bf1df4819"
+rust = "rustyrian_core::keyboard::wait_until_get_input_or_elapsed"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "lds_play.c::lds_load"
+c_sha = "54c8c2ef5fdb"
+rust = "rustyrian_core::lds_play::lds_load"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "lds_play.c::lds_free"
+c_sha = "0a407222f1b3"
+rust = "rustyrian_core::lds_play::lds_free"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "lds_play.c::lds_rewind"
+c_sha = "f7c9806d349f"
+rust = "rustyrian_core::lds_play::lds_rewind"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "lds_play.c::lds_fade"
+c_sha = "a73871646b79"
+rust = "rustyrian_core::lds_play::lds_fade"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "lds_play.c::lds_setregs"
+c_sha = "d36f5d745854"
+rust = "rustyrian_core::lds_play::lds_setregs"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "lds_play.c::lds_setregs_adv"
+c_sha = "14bcfcf81d51"
+rust = "rustyrian_core::lds_play::lds_setregs_adv"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "lds_play.c::lds_update"
+c_sha = "5439c5177f62"
+rust = "rustyrian_core::lds_play::lds_update"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "lds_play.c::lds_playsound"
+c_sha = "e2adf6f02cb9"
+rust = "rustyrian_core::lds_play::lds_playsound"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "logging.c::logFatal"
+c_sha = "5cf17dbedbd3"
+rust = "rustyrian_core::logging::log_fatal"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "loudness.c::init_audio"
+c_sha = "f1b10ba06a74"
+rust = "rustyrian_core::loudness::init_audio"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "loudness.c::audioCallback"
+c_sha = "36a5c0a2ff0a"
+rust = "rustyrian_core::loudness::audio_callback"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "loudness.c::deinit_audio"
+c_sha = "e9432fb87c87"
+rust = "rustyrian_core::loudness::deinit_audio"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "loudness.c::load_song"
+c_sha = "4372618a8e82"
+rust = "rustyrian_core::loudness::load_song"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "loudness.c::play_song"
+c_sha = "cdabc11d8b35"
+rust = "rustyrian_core::loudness::play_song"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "loudness.c::restart_song"
+c_sha = "6b9ffda0f716"
+rust = "rustyrian_core::loudness::restart_song"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "loudness.c::stop_song"
+c_sha = "b718d1788569"
+rust = "rustyrian_core::loudness::stop_song"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "loudness.c::fade_song"
+c_sha = "5821996b16f7"
+rust = "rustyrian_core::loudness::fade_song"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "loudness.c::set_volume"
+c_sha = "6e9d75f5f0d0"
+rust = "rustyrian_core::loudness::set_volume"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "loudness.c::multiSamplePlay"
+c_sha = "47046cb4da9c"
+rust = "rustyrian_core::loudness::multi_sample_play"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "lvllib.c::analyzeLevel"
+c_sha = "1cc869ccc0e4"
+rust = "rustyrian_core::lvllib::analyze_level"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_drawTextWindow"
+c_sha = "a004cbc72bf3"
+rust = "rustyrian_core::mainint::je_draw_text_window"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_outCharGlow"
+c_sha = "df56c10ae45a"
+rust = "rustyrian_core::mainint::je_out_char_glow"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_drawPortConfigButtons"
+c_sha = "aa62b4a5d3d1"
+rust = "rustyrian_core::mainint::je_draw_port_config_buttons"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_helpSystem"
+c_sha = "f8caad887ace"
+rust = "rustyrian_core::mainint::je_help_system"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::helpSystemPage"
+c_sha = "5aae61cc131c"
+rust = "rustyrian_core::mainint::help_system_page"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::weapon_upgrade_cost"
+c_sha = "745b3245616c"
+rust = "rustyrian_core::mainint::weapon_upgrade_cost"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_getCost"
+c_sha = "2e4250ff7ad7"
+rust = "rustyrian_core::mainint::je_get_cost"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_loadScreen"
+c_sha = "f611470cfcde"
+rust = "rustyrian_core::mainint::je_load_screen"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_totalScore"
+c_sha = "fbb2aa0dbfff"
+rust = "rustyrian_core::mainint::je_total_score"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_getValue"
+c_sha = "df8ba8b94d3e"
+rust = "rustyrian_core::mainint::je_get_value"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_nextEpisode"
+c_sha = "9c8fdf652c38"
+rust = "rustyrian_core::mainint::je_next_episode"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_initPlayerData"
+c_sha = "0c716143a0e2"
+rust = "rustyrian_core::mainint::je_init_player_data"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_sortHighScores"
+c_sha = "8973fd648755"
+rust = "rustyrian_core::mainint::je_sort_high_scores"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_highScoreScreen"
+c_sha = "e2778a7474f6"
+rust = "rustyrian_core::mainint::je_high_score_screen"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_gammaCorrect_func"
+c_sha = "5027d8709512"
+rust = "rustyrian_core::mainint::je_gamma_correct_func"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_gammaCorrect"
+c_sha = "a838f8c7a4ec"
+rust = "rustyrian_core::mainint::je_gamma_correct"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_gammaCheck"
+c_sha = "0f2964c130f0"
+rust = "rustyrian_core::mainint::je_gamma_check"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_doInGameSetup"
+c_sha = "f6c57f1b37f2"
+rust = "rustyrian_core::mainint::je_do_in_game_setup"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_inGameSetup"
+c_sha = "ae2a65a2c2d4"
+rust = "rustyrian_core::mainint::je_in_game_setup"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_inGameHelp"
+c_sha = "3465d938c08b"
+rust = "rustyrian_core::mainint::je_in_game_help"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_highScoreCheck"
+c_sha = "318746664938"
+rust = "rustyrian_core::mainint::je_high_score_check"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::adjust_difficulty"
+c_sha = "817e01d93729"
+rust = "rustyrian_core::mainint::adjust_difficulty"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_SFCodes"
+c_sha = "37be49aee8cd"
+rust = "rustyrian_core::mainint::je_sf_codes"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_sort"
+c_sha = "523e853c6d14"
+rust = "rustyrian_core::mainint::je_sort"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_playCredits"
+c_sha = "38783e0b0976"
+rust = "rustyrian_core::mainint::je_play_credits"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_endLevelAni"
+c_sha = "a113114fa00f"
+rust = "rustyrian_core::mainint::je_end_level_ani"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_drawCube"
+c_sha = "a37193ce6fa4"
+rust = "rustyrian_core::mainint::je_draw_cube"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_handleChat"
+c_sha = "081854595424"
+rust = "rustyrian_core::mainint::je_handle_chat"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::str_pop_int"
+c_sha = "b56e9cfa9a6a"
+rust = "rustyrian_core::mainint::str_pop_int"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_operation"
+c_sha = "be8cd06b1424"
+rust = "rustyrian_core::mainint::je_operation"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_inGameDisplays"
+c_sha = "d24204845622"
+rust = "rustyrian_core::mainint::je_in_game_displays"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_mainKeyboardInput"
+c_sha = "2e5845f8e9e9"
+rust = "rustyrian_core::mainint::je_main_keyboard_input"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_pauseGame"
+c_sha = "c21133529ebc"
+rust = "rustyrian_core::mainint::je_pause_game"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_playerMovement"
+c_sha = "109a2c331abc"
+rust = "rustyrian_core::mainint::je_player_movement"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_mainGamePlayerFunctions"
+c_sha = "46277c11a927"
+rust = "rustyrian_core::mainint::je_main_game_player_functions"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_getName"
+c_sha = "27f9223ba1be"
+rust = "rustyrian_core::mainint::je_get_name"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mainint.c::JE_playerCollide"
+c_sha = "aa7852698c7f"
+rust = "rustyrian_core::mainint::je_player_collide"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memreader.c::memReaderSplit"
+c_sha = "5f05fc895abd"
+rust = "rustyrian_core::memreader::mem_reader_split"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memreader.c::memReaderSkip"
+c_sha = "4af1bc46c4c0"
+rust = "rustyrian_core::memreader::mem_reader_skip"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memreader.c::memReadU8"
+c_sha = "0258b5b45ad6"
+rust = "rustyrian_core::memreader::mem_read_u8"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memreader.c::memReadU8Array"
+c_sha = "0ed36da8a222"
+rust = "rustyrian_core::memreader::mem_read_u8_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memreader.c::loadU16"
+c_sha = "1b2384629fc1"
+rust = "rustyrian_core::memreader::load_u16"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memreader.c::memReadU16"
+c_sha = "1dbb3a8f8a74"
+rust = "rustyrian_core::memreader::mem_read_u16"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memreader.c::memReadU16Array"
+c_sha = "8f0ae5f04816"
+rust = "rustyrian_core::memreader::mem_read_u16_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memreader.c::loadU16BE"
+c_sha = "cd1ddcbea1d7"
+rust = "rustyrian_core::memreader::load_u16be"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memreader.c::memReadU16BE"
+c_sha = "d787b6195f12"
+rust = "rustyrian_core::memreader::mem_read_u16be"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memreader.c::loadU32"
+c_sha = "228e7c7eef4b"
+rust = "rustyrian_core::memreader::load_u32"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memreader.c::memReadU32"
+c_sha = "579885900af0"
+rust = "rustyrian_core::memreader::mem_read_u32"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memreader.c::memReadU32Array"
+c_sha = "d49595858c70"
+rust = "rustyrian_core::memreader::mem_read_u32_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memreader.h::memReadBool"
+c_sha = "7ba4a8ad0993"
+rust = "rustyrian_core::memreader::mem_read_bool"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memreader.h::memReadChar"
+c_sha = "5699c39ef538"
+rust = "rustyrian_core::memreader::mem_read_char"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memreader.h::memReadCharArray"
+c_sha = "80e8381a1fc7"
+rust = "rustyrian_core::memreader::mem_read_char_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memreader.h::memReadS8"
+c_sha = "d0445f213b3f"
+rust = "rustyrian_core::memreader::mem_read_s8"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memreader.h::memReadS8Array"
+c_sha = "94463cb7dae6"
+rust = "rustyrian_core::memreader::mem_read_s8_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memreader.h::memReadS16"
+c_sha = "5fba8fb6d743"
+rust = "rustyrian_core::memreader::mem_read_s16"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memreader.h::memReadS16Array"
+c_sha = "a030872ff9f8"
+rust = "rustyrian_core::memreader::mem_read_s16_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memreader.h::memReadS32"
+c_sha = "60a369428419"
+rust = "rustyrian_core::memreader::mem_read_s32"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memreader.h::memReadS32Array"
+c_sha = "e9f6162e147f"
+rust = "rustyrian_core::memreader::mem_read_s32_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.c::memWriterSplit"
+c_sha = "f4877c5110a8"
+rust = "rustyrian_core::memwriter::mem_writer_split"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.c::memWriterSkip"
+c_sha = "7ba8f38e655f"
+rust = "rustyrian_core::memwriter::mem_writer_skip"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.c::memWriteFill"
+c_sha = "e205eb2ff948"
+rust = "rustyrian_core::memwriter::mem_write_fill"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.c::memWriteRead"
+c_sha = "9b54bf40d5df"
+rust = "rustyrian_core::memwriter::mem_write_read"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.c::memWriteU8"
+c_sha = "8958957ab378"
+rust = "rustyrian_core::memwriter::mem_write_u8"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.c::memWriteU8Array"
+c_sha = "8466eedc5005"
+rust = "rustyrian_core::memwriter::mem_write_u8_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.c::storeU16"
+c_sha = "c54a5c690a62"
+rust = "rustyrian_core::memwriter::store_u16"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.c::memWriteU16"
+c_sha = "b72e1522033c"
+rust = "rustyrian_core::memwriter::mem_write_u16"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.c::memWriteU16Array"
+c_sha = "01f9aa2f0043"
+rust = "rustyrian_core::memwriter::mem_write_u16_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.c::storeU16BE"
+c_sha = "c1113cc4199f"
+rust = "rustyrian_core::memwriter::store_u16be"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.c::memWriteU16BE"
+c_sha = "327ecc612074"
+rust = "rustyrian_core::memwriter::mem_write_u16be"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.c::storeU32"
+c_sha = "3fc00b027f48"
+rust = "rustyrian_core::memwriter::store_u32"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.c::memWriteU32"
+c_sha = "34e0f93de752"
+rust = "rustyrian_core::memwriter::mem_write_u32"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.c::memWriteU32Array"
+c_sha = "d9e02eb49f61"
+rust = "rustyrian_core::memwriter::mem_write_u32_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.h::memWriteBool"
+c_sha = "fcaae9d7fc09"
+rust = "rustyrian_core::memwriter::mem_write_bool"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.h::memWriteChar"
+c_sha = "ec3e4712b8a8"
+rust = "rustyrian_core::memwriter::mem_write_char"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.h::memWriteCharArray"
+c_sha = "9b978e292b6b"
+rust = "rustyrian_core::memwriter::mem_write_char_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.h::memWriteS8"
+c_sha = "30c0a46d53ac"
+rust = "rustyrian_core::memwriter::mem_write_s8"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.h::memWriteS8Array"
+c_sha = "e5e645aca73c"
+rust = "rustyrian_core::memwriter::mem_write_s8_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.h::memWriteS16"
+c_sha = "da5648373296"
+rust = "rustyrian_core::memwriter::mem_write_s16"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.h::memWriteS16Array"
+c_sha = "b85088e4c525"
+rust = "rustyrian_core::memwriter::mem_write_s16_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.h::memWriteS32"
+c_sha = "641d7bc45422"
+rust = "rustyrian_core::memwriter::mem_write_s32"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "memwriter.h::memWriteS32Array"
+c_sha = "cfbf8f345e09"
+rust = "rustyrian_core::memwriter::mem_write_s32_array"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "menus.c::gameplaySelect"
+c_sha = "45b993391926"
+rust = "rustyrian_core::menus::gameplay_select"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "menus.c::episodeSelect"
+c_sha = "978979144429"
+rust = "rustyrian_core::menus::episode_select"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "menus.c::difficultySelect"
+c_sha = "f10f41683f3c"
+rust = "rustyrian_core::menus::difficulty_select"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mouse.c::JE_drawShapeTypeOne"
+c_sha = "34c3f16dca6b"
+rust = "rustyrian_core::mouse::je_draw_shape_type_one"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mouse.c::JE_grabShapeTypeOne"
+c_sha = "70245b488cda"
+rust = "rustyrian_core::mouse::je_grab_shape_type_one"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mouse.c::JE_mouseStart"
+c_sha = "49793a4f68f0"
+rust = "rustyrian_core::mouse::je_mouse_start"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mouse.c::JE_mouseStartFilter"
+c_sha = "0489027a0607"
+rust = "rustyrian_core::mouse::je_mouse_start_filter"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mouse.c::JE_mouseReplace"
+c_sha = "083b3a25fbde"
+rust = "rustyrian_core::mouse::je_mouse_replace"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mtrand.c::mt_srand_r"
+c_sha = "d6c01054e4c6"
+rust = "rustyrian_core::mtrand::mt_srand_r"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mtrand.c::mt_rand_r"
+c_sha = "25556071125b"
+rust = "rustyrian_core::mtrand::mt_rand_r"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mtrand.c::mt_rand_1_r"
+c_sha = "04556b3a6968"
+rust = "rustyrian_core::mtrand::mt_rand_1_r"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mtrand.c::mt_rand_lt1_r"
+c_sha = "9b7240b91217"
+rust = "rustyrian_core::mtrand::mt_rand_lt1_r"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mtrand.h::mt_srand"
+c_sha = "4b6b0bfbbe2c"
+rust = "rustyrian_core::mtrand::mt_srand"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mtrand.h::mt_rand"
+c_sha = "989c7cfd72cd"
+rust = "rustyrian_core::mtrand::mt_rand"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mtrand.h::mt_rand_1"
+c_sha = "9fa897ec3588"
+rust = "rustyrian_core::mtrand::mt_rand_1"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "mtrand.h::mt_rand_lt1"
+c_sha = "3cefb476f4fe"
+rust = "rustyrian_core::mtrand::mt_rand_lt1"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "network.c::packet_copy"
+c_sha = "08b91e1a0391"
+rust = "rustyrian_core::network::packet_copy"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "network.c::packets_shift_up"
+c_sha = "a4122d925747"
+rust = "rustyrian_core::network::packets_shift_up"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "network.c::packets_shift_down"
+c_sha = "542803b89a07"
+rust = "rustyrian_core::network::packets_shift_down"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "network.c::network_prepare"
+c_sha = "745c870369a3"
+rust = "rustyrian_core::network::network_prepare"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "network.c::network_send_no_ack"
+c_sha = "76a64d5a89bf"
+rust = "rustyrian_core::network::network_send_no_ack"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "network.c::network_send"
+c_sha = "b8a96cd7480f"
+rust = "rustyrian_core::network::network_send"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "network.c::network_acknowledge"
+c_sha = "107b5d71fa18"
+rust = "rustyrian_core::network::network_acknowledge"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "network.c::network_is_alive"
+c_sha = "bd4b40846c58"
+rust = "rustyrian_core::network::network_is_alive"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "network.c::network_check"
+c_sha = "e5e81b3dd246"
+rust = "rustyrian_core::network::network_check"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "network.c::network_update"
+c_sha = "c83323150eb1"
+rust = "rustyrian_core::network::network_update"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "network.c::network_is_sync"
+c_sha = "72fa2f4de7f9"
+rust = "rustyrian_core::network::network_is_sync"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "network.c::network_state_prepare"
+c_sha = "9de8de7b6b91"
+rust = "rustyrian_core::network::network_state_prepare"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "network.c::network_state_send"
+c_sha = "63868c728fe7"
+rust = "rustyrian_core::network::network_state_send"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "network.c::network_state_update"
+c_sha = "7e30aed7855d"
+rust = "rustyrian_core::network::network_state_update"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "network.c::network_state_is_reset"
+c_sha = "060edcb8ca65"
+rust = "rustyrian_core::network::network_state_is_reset"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "network.c::network_state_reset"
+c_sha = "75171f3b5759"
+rust = "rustyrian_core::network::network_state_reset"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "network.c::network_connect"
+c_sha = "dd79f3876457"
+rust = "rustyrian_core::network::network_connect"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "network.c::network_tyrian_halt"
+c_sha = "ab7eb2b59f4e"
+rust = "rustyrian_core::network::network_tyrian_halt"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "network.c::network_init"
+c_sha = "8e2cbca187a5"
+rust = "rustyrian_core::network::network_init"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "network.c::JE_clearSpecialRequests"
+c_sha = "7043b2797574"
+rust = "rustyrian_core::network::je_clear_special_requests"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "nortsong.c::setFrameSpeed"
+c_sha = "0b10252e5631"
+rust = "rustyrian_core::nortsong::set_frame_speed"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "nortsong.c::setFrameCount"
+c_sha = "790abcf9e332"
+rust = "rustyrian_core::nortsong::set_frame_count"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "nortsong.c::setFrameCount2"
+c_sha = "42aa602e0983"
+rust = "rustyrian_core::nortsong::set_frame_count2"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "nortsong.c::getFrameCountTicks"
+c_sha = "c1d4015037f8"
+rust = "rustyrian_core::nortsong::get_frame_count_ticks"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "nortsong.c::getFrameCount2Ticks"
+c_sha = "3d6d001d3c6f"
+rust = "rustyrian_core::nortsong::get_frame_count2_ticks"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "nortsong.c::delayUntilElapsed"
+c_sha = "6f27f7ece358"
+rust = "rustyrian_core::nortsong::delay_until_elapsed"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "nortsong.c::loadSounds"
+c_sha = "399a53481026"
+rust = "rustyrian_core::nortsong::load_sounds"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "nortsong.c::loadSndFile"
+c_sha = "dd0c05343b3c"
+rust = "rustyrian_core::nortsong::load_snd_file"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "nortsong.c::JE_playSampleNum"
+c_sha = "18c4b82001c4"
+rust = "rustyrian_core::nortsong::je_play_sample_num"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "nortsong.c::JE_changeVolume"
+c_sha = "312055314cb6"
+rust = "rustyrian_core::nortsong::je_change_volume"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "nortvars.c::JE_dBar3"
+c_sha = "8e8738ae2863"
+rust = "rustyrian_core::nortvars::je_d_bar3"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "nortvars.c::JE_barDrawShadow"
+c_sha = "6cbe078e9871"
+rust = "rustyrian_core::nortvars::je_bar_draw_shadow"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opentyr.c::getDisplayPickerItemsCount"
+c_sha = "11f082c4e71c"
+rust = "rustyrian_core::opentyr::get_display_picker_items_count"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opentyr.c::getDisplayPickerItem"
+c_sha = "c0f7de2a0aaa"
+rust = "rustyrian_core::opentyr::get_display_picker_item"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opentyr.c::getScalerPickerItemsCount"
+c_sha = "2bd557c6482a"
+rust = "rustyrian_core::opentyr::get_scaler_picker_items_count"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opentyr.c::getScalerPickerItem"
+c_sha = "3e0b6d825e9d"
+rust = "rustyrian_core::opentyr::get_scaler_picker_item"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opentyr.c::getScalingModePickerItemsCount"
+c_sha = "0be7e3f33b4f"
+rust = "rustyrian_core::opentyr::get_scaling_mode_picker_items_count"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opentyr.c::getScalingModePickerItem"
+c_sha = "b1c46666f222"
+rust = "rustyrian_core::opentyr::get_scaling_mode_picker_item"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opentyr.c::setupMenu"
+c_sha = "2403ee7222a6"
+rust = "rustyrian_core::opentyr::setup_menu"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opentyr.c::main"
+c_sha = "cfb081131cf0"
+rust = "rustyrian_core::opentyr::main"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::operator_advance"
+c_sha = "4c32cc593a2e"
+rust = "rustyrian_core::opl::operator_advance"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::operator_advance_drums"
+c_sha = "59d85b5b5d01"
+rust = "rustyrian_core::opl::operator_advance_drums"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::operator_output"
+c_sha = "153b955c496b"
+rust = "rustyrian_core::opl::operator_output"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::operator_off"
+c_sha = "061347b7408f"
+rust = "rustyrian_core::opl::operator_off"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::operator_sustain"
+c_sha = "4db58aedb3a8"
+rust = "rustyrian_core::opl::operator_sustain"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::operator_release"
+c_sha = "db817466221f"
+rust = "rustyrian_core::opl::operator_release"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::operator_decay"
+c_sha = "eb42ce25129b"
+rust = "rustyrian_core::opl::operator_decay"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::operator_attack"
+c_sha = "43a91aa007a9"
+rust = "rustyrian_core::opl::operator_attack"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::change_attackrate"
+c_sha = "fe7db7183475"
+rust = "rustyrian_core::opl::change_attackrate"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::change_decayrate"
+c_sha = "d43aecf66f2a"
+rust = "rustyrian_core::opl::change_decayrate"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::change_releaserate"
+c_sha = "53839a1e4199"
+rust = "rustyrian_core::opl::change_releaserate"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::change_sustainlevel"
+c_sha = "5d4448bd055d"
+rust = "rustyrian_core::opl::change_sustainlevel"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::change_waveform"
+c_sha = "50efabafa18d"
+rust = "rustyrian_core::opl::change_waveform"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::change_keepsustain"
+c_sha = "bc8c5629af8e"
+rust = "rustyrian_core::opl::change_keepsustain"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::change_vibrato"
+c_sha = "504058302d75"
+rust = "rustyrian_core::opl::change_vibrato"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::change_feedback"
+c_sha = "53e9bd4d39f5"
+rust = "rustyrian_core::opl::change_feedback"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::change_frequency"
+c_sha = "66b091ff0cc5"
+rust = "rustyrian_core::opl::change_frequency"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::enable_operator"
+c_sha = "b4c7e2da0bc8"
+rust = "rustyrian_core::opl::enable_operator"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::disable_operator"
+c_sha = "997169d68d99"
+rust = "rustyrian_core::opl::disable_operator"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::adlib_init"
+c_sha = "ed20b77d056b"
+rust = "rustyrian_core::opl::adlib_init"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::adlib_write"
+c_sha = "57a98d8ec00c"
+rust = "rustyrian_core::opl::adlib_write"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::adlib_reg_read"
+c_sha = "ae486248bbaf"
+rust = "rustyrian_core::opl::adlib_reg_read"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::adlib_write_index"
+c_sha = "73af0f6d5e31"
+rust = "rustyrian_core::opl::adlib_write_index"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::clipit16"
+c_sha = "4c60b93d6842"
+rust = "rustyrian_core::opl::clipit16"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "opl.c::adlib_getsample"
+c_sha = "d323ec475792"
+rust = "rustyrian_core::opl::adlib_getsample"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "palette.c::loadPals"
+c_sha = "d4f07d05f444"
+rust = "rustyrian_core::palette::load_pals"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "palette.c::set_palette"
+c_sha = "514eac564173"
+rust = "rustyrian_core::palette::set_palette"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "palette.c::set_colors"
+c_sha = "557a22b44724"
+rust = "rustyrian_core::palette::set_colors"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "palette.c::init_step_fade_palette"
+c_sha = "6e4297dda632"
+rust = "rustyrian_core::palette::init_step_fade_palette"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "palette.c::init_step_fade_solid"
+c_sha = "8261949e3364"
+rust = "rustyrian_core::palette::init_step_fade_solid"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "palette.c::step_fade_palette"
+c_sha = "eadccec0cfb6"
+rust = "rustyrian_core::palette::step_fade_palette"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "palette.c::fade_palette"
+c_sha = "689f8eb01272"
+rust = "rustyrian_core::palette::fade_palette"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "palette.c::fade_solid"
+c_sha = "86b6e5f4bf14"
+rust = "rustyrian_core::palette::fade_solid"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "palette.c::fade_black"
+c_sha = "f9640314e57d"
+rust = "rustyrian_core::palette::fade_black"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "palette.c::fade_white"
+c_sha = "336191a4665f"
+rust = "rustyrian_core::palette::fade_white"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "palette.c::rgb_to_yuv"
+c_sha = "53c6fe21cd50"
+rust = "rustyrian_core::palette::rgb_to_yuv"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "params.c::JE_paramCheck"
+c_sha = "644761dd06ec"
+rust = "rustyrian_core::params::je_param_check"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "pcxload.c::JE_loadPCX"
+c_sha = "9f14b8171d48"
+rust = "rustyrian_core::pcxload::je_load_pcx"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "picload.c::JE_loadPic"
+c_sha = "0b5e6b4925a9"
+rust = "rustyrian_core::picload::je_load_pic"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "player.c::calc_purple_balls_needed"
+c_sha = "703ed2007d34"
+rust = "rustyrian_core::player::calc_purple_balls_needed"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "player.c::power_up_weapon"
+c_sha = "40a09889cb27"
+rust = "rustyrian_core::player::power_up_weapon"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "player.c::handle_got_purple_ball"
+c_sha = "990a9de1332d"
+rust = "rustyrian_core::player::handle_got_purple_ball"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "player.h::all_players_dead"
+c_sha = "5e02a24b669c"
+rust = "rustyrian_core::player::all_players_dead"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "player.h::all_players_alive"
+c_sha = "9fea4cbf9366"
+rust = "rustyrian_core::player::all_players_alive"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "shots.c::simulate_player_shots"
+c_sha = "996feb306dcc"
+rust = "rustyrian_core::shots::simulate_player_shots"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "shots.c::player_shot_set_direction"
+c_sha = "11d4a325dc63"
+rust = "rustyrian_core::shots::player_shot_set_direction"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "shots.c::player_shot_move_and_draw"
+c_sha = "de1d09ee601d"
+rust = "rustyrian_core::shots::player_shot_move_and_draw"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "shots.c::player_shot_create"
+c_sha = "ea7914075221"
+rust = "rustyrian_core::shots::player_shot_create"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::load_sprites_file"
+c_sha = "b365b92682d8"
+rust = "rustyrian_core::sprite::load_sprites_file"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::load_sprites"
+c_sha = "17df7fd61700"
+rust = "rustyrian_core::sprite::load_sprites"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::free_sprites"
+c_sha = "28241da79789"
+rust = "rustyrian_core::sprite::free_sprites"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::blit_sprite"
+c_sha = "3c822653d92e"
+rust = "rustyrian_core::sprite::blit_sprite"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::blit_sprite_blend"
+c_sha = "02232dcf1c58"
+rust = "rustyrian_core::sprite::blit_sprite_blend"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::blit_sprite_hv_unsafe"
+c_sha = "ffb68d644550"
+rust = "rustyrian_core::sprite::blit_sprite_hv_unsafe"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::blit_sprite_hv"
+c_sha = "938de5b25f19"
+rust = "rustyrian_core::sprite::blit_sprite_hv"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::blit_sprite_hv_blend"
+c_sha = "ba926a73ba3c"
+rust = "rustyrian_core::sprite::blit_sprite_hv_blend"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::blit_sprite_dark"
+c_sha = "53cbc2d7b003"
+rust = "rustyrian_core::sprite::blit_sprite_dark"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::JE_loadCompShapes"
+c_sha = "8ce117474b59"
+rust = "rustyrian_core::sprite::je_load_comp_shapes"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::JE_loadCompShapesB"
+c_sha = "b39cb8eca73d"
+rust = "rustyrian_core::sprite::je_load_comp_shapes_b"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::free_sprite2s"
+c_sha = "80831ad837e1"
+rust = "rustyrian_core::sprite::free_sprite2s"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::blit_sprite2"
+c_sha = "bc3fb2b609f4"
+rust = "rustyrian_core::sprite::blit_sprite2"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::blit_sprite2_clip"
+c_sha = "a95cdeb9a566"
+rust = "rustyrian_core::sprite::blit_sprite2_clip"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::blit_sprite2_blend"
+c_sha = "cc566ea78fdd"
+rust = "rustyrian_core::sprite::blit_sprite2_blend"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::blit_sprite2_darken"
+c_sha = "e0332e2df85d"
+rust = "rustyrian_core::sprite::blit_sprite2_darken"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::blit_sprite2_filter"
+c_sha = "5e7a07b28bfc"
+rust = "rustyrian_core::sprite::blit_sprite2_filter"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::blit_sprite2_filter_clip"
+c_sha = "77bf13607005"
+rust = "rustyrian_core::sprite::blit_sprite2_filter_clip"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::blit_sprite2x2"
+c_sha = "84f07402516d"
+rust = "rustyrian_core::sprite::blit_sprite2x2"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::blit_sprite2x2_clip"
+c_sha = "7ef9efea06e7"
+rust = "rustyrian_core::sprite::blit_sprite2x2_clip"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::blit_sprite2x2_blend"
+c_sha = "5d6ad94c601e"
+rust = "rustyrian_core::sprite::blit_sprite2x2_blend"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::blit_sprite2x2_darken"
+c_sha = "3163782efc86"
+rust = "rustyrian_core::sprite::blit_sprite2x2_darken"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::blit_sprite2x2_filter"
+c_sha = "02a03761cb43"
+rust = "rustyrian_core::sprite::blit_sprite2x2_filter"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::blit_sprite2x2_filter_clip"
+c_sha = "3516a17e5d90"
+rust = "rustyrian_core::sprite::blit_sprite2x2_filter_clip"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::JE_loadMainShapeTables"
+c_sha = "5ea952a7aa2a"
+rust = "rustyrian_core::sprite::je_load_main_shape_tables"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.c::free_main_shape_tables"
+c_sha = "564c48803c4e"
+rust = "rustyrian_core::sprite::free_main_shape_tables"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.h::sprite"
+c_sha = "4e3ef1c91f3a"
+rust = "rustyrian_core::sprite::sprite"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.h::sprite_exists"
+c_sha = "7d89b145514b"
+rust = "rustyrian_core::sprite::sprite_exists"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.h::get_sprite_width"
+c_sha = "06e654b7b206"
+rust = "rustyrian_core::sprite::get_sprite_width"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "sprite.h::get_sprite_height"
+c_sha = "b51c5ebb7d28"
+rust = "rustyrian_core::sprite::get_sprite_height"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "starlib.c::starLibMain"
+c_sha = "c2e0525812df"
+rust = "rustyrian_core::starlib::star_lib_main"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "starlib.c::JE_wackyCol"
+c_sha = "aff44893c5aa"
+rust = "rustyrian_core::starlib::je_wacky_col"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "starlib.c::JE_starlib_init"
+c_sha = "f6381da63942"
+rust = "rustyrian_core::starlib::je_starlib_init"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "starlib.c::JE_resetValues"
+c_sha = "a9102368349d"
+rust = "rustyrian_core::starlib::je_reset_values"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "starlib.c::JE_changeSetup"
+c_sha = "092d24bf21e4"
+rust = "rustyrian_core::starlib::je_change_setup"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "starlib.c::JE_newStar"
+c_sha = "47a3e5af7e1a"
+rust = "rustyrian_core::starlib::je_new_star"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "swar.h::swar8Read"
+c_sha = "6f0e1f64e26d"
+rust = "rustyrian_core::swar::swar8_read"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "swar.h::swar8Write"
+c_sha = "b1317e9e0da1"
+rust = "rustyrian_core::swar::swar8_write"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::blit_enemy"
+c_sha = "dc6c30bb2403"
+rust = "rustyrian_core::tyrian2::blit_enemy"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::JE_drawEnemy"
+c_sha = "4991ecfcf656"
+rust = "rustyrian_core::tyrian2::je_draw_enemy"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::JE_main"
+c_sha = "42f38628a2f9"
+rust = "rustyrian_core::tyrian2::je_main"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::readEpisodeString"
+c_sha = "500ac3646951"
+rust = "rustyrian_core::tyrian2::read_episode_string"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::JE_loadMap"
+c_sha = "25307f5c5725"
+rust = "rustyrian_core::tyrian2::je_load_map"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::networkStartScreen"
+c_sha = "d766dc5b8203"
+rust = "rustyrian_core::tyrian2::network_start_screen"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::titleScreen"
+c_sha = "b847f645294c"
+rust = "rustyrian_core::tyrian2::title_screen"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::newGame"
+c_sha = "36d34f3771ea"
+rust = "rustyrian_core::tyrian2::new_game"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::newSuperArcadeGame"
+c_sha = "6bf32b4f7389"
+rust = "rustyrian_core::tyrian2::new_super_arcade_game"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::newSuperTyrianGame"
+c_sha = "05a86a288888"
+rust = "rustyrian_core::tyrian2::new_super_tyrian_game"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::intro_logos"
+c_sha = "cb423c0c5459"
+rust = "rustyrian_core::tyrian2::intro_logos"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::JE_readTextSync"
+c_sha = "f70b3fce6a87"
+rust = "rustyrian_core::tyrian2::je_read_text_sync"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::JE_displayText"
+c_sha = "50f54ee0aec2"
+rust = "rustyrian_core::tyrian2::je_display_text"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::JE_newEnemy"
+c_sha = "942b84f10b70"
+rust = "rustyrian_core::tyrian2::je_new_enemy"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::JE_makeEnemy"
+c_sha = "bade59bcf56c"
+rust = "rustyrian_core::tyrian2::je_make_enemy"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::JE_createNewEventEnemy"
+c_sha = "6ebb456d48a6"
+rust = "rustyrian_core::tyrian2::je_create_new_event_enemy"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::JE_eventJump"
+c_sha = "bf8113ad7c2f"
+rust = "rustyrian_core::tyrian2::je_event_jump"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::JE_searchFor"
+c_sha = "f6ba385f6734"
+rust = "rustyrian_core::tyrian2::je_search_for"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::JE_eventSystem"
+c_sha = "00d9b3b2c71b"
+rust = "rustyrian_core::tyrian2::je_event_system"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::JE_whoa"
+c_sha = "59e0af6bd69a"
+rust = "rustyrian_core::tyrian2::je_whoa"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::JE_barX"
+c_sha = "51e39e200c34"
+rust = "rustyrian_core::tyrian2::je_bar_x"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "tyrian2.c::draw_boss_bar"
+c_sha = "7820fb971d34"
+rust = "rustyrian_core::tyrian2::draw_boss_bar"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "varz.c::JE_getShipInfo"
+c_sha = "1b8060b2265a"
+rust = "rustyrian_core::varz::je_get_ship_info"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "varz.c::JE_SGr"
+c_sha = "29b337dc4963"
+rust = "rustyrian_core::varz::je_s_gr"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "varz.c::JE_drawOptions"
+c_sha = "016b3f765fbd"
+rust = "rustyrian_core::varz::je_draw_options"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "varz.c::JE_drawOptionLevel"
+c_sha = "57284627f7ad"
+rust = "rustyrian_core::varz::je_draw_option_level"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "varz.c::JE_tyrianHalt"
+c_sha = "d376e8da4339"
+rust = "rustyrian_core::varz::je_tyrian_halt"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "varz.c::JE_specialComplete"
+c_sha = "ece6527f4506"
+rust = "rustyrian_core::varz::je_special_complete"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "varz.c::JE_doSpecialShot"
+c_sha = "cb54c9be3b4f"
+rust = "rustyrian_core::varz::je_do_special_shot"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "varz.c::JE_setupExplosion"
+c_sha = "194f41de4b52"
+rust = "rustyrian_core::varz::je_setup_explosion"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "varz.c::JE_setupExplosionLarge"
+c_sha = "778c58e630ad"
+rust = "rustyrian_core::varz::je_setup_explosion_large"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "varz.c::JE_wipeShieldArmorBars"
+c_sha = "6c6022f8a8b9"
+rust = "rustyrian_core::varz::je_wipe_shield_armor_bars"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "varz.c::JE_playerDamage"
+c_sha = "26b46b73513b"
+rust = "rustyrian_core::varz::je_player_damage"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "varz.c::JE_portConfigs"
+c_sha = "600212e381fc"
+rust = "rustyrian_core::varz::je_port_configs"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "varz.c::JE_drawShield"
+c_sha = "df74a725b164"
+rust = "rustyrian_core::varz::je_draw_shield"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "varz.c::JE_drawArmor"
+c_sha = "c00c07e7d805"
+rust = "rustyrian_core::varz::je_draw_armor"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "varz.c::JE_doSP"
+c_sha = "3e8a66da071f"
+rust = "rustyrian_core::varz::je_do_sp"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "varz.c::JE_drawSP"
+c_sha = "d6587f924f05"
+rust = "rustyrian_core::varz::je_draw_sp"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "vga256d.c::JE_pix"
+c_sha = "49a5666f1791"
+rust = "rustyrian_core::vga256d::je_pix"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "vga256d.c::JE_pix3"
+c_sha = "92005e47f066"
+rust = "rustyrian_core::vga256d::je_pix3"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "vga256d.c::JE_rectangle"
+c_sha = "bc5f4a4e6db2"
+rust = "rustyrian_core::vga256d::je_rectangle"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "vga256d.c::fill_rectangle_xy"
+c_sha = "1d678ae3bfb4"
+rust = "rustyrian_core::vga256d::fill_rectangle_xy"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "vga256d.c::JE_barShade"
+c_sha = "e173f39d72c9"
+rust = "rustyrian_core::vga256d::je_bar_shade"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "vga256d.c::JE_barBright"
+c_sha = "6a22413afaf4"
+rust = "rustyrian_core::vga256d::je_bar_bright"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "vga256d.c::draw_segmented_gauge"
+c_sha = "96b9fbb9a980"
+rust = "rustyrian_core::vga256d::draw_segmented_gauge"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "vga256d.h::fill_rectangle_wh"
+c_sha = "fc9866b10501"
+rust = "rustyrian_core::vga256d::fill_rectangle_wh"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video.c::init_video"
+c_sha = "f2d77491568f"
+rust = "rustyrian_core::video::init_video"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video.c::deinit_video"
+c_sha = "302cd8e9b878"
+rust = "rustyrian_core::video::deinit_video"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video.c::init_renderer"
+c_sha = "4c9b8d80d5b7"
+rust = "rustyrian_core::video::init_renderer"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video.c::deinit_renderer"
+c_sha = "2644409e7776"
+rust = "rustyrian_core::video::deinit_renderer"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video.c::init_texture"
+c_sha = "a5dac7606857"
+rust = "rustyrian_core::video::init_texture"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video.c::deinit_texture"
+c_sha = "29481f9399e7"
+rust = "rustyrian_core::video::deinit_texture"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video.c::window_get_display_index"
+c_sha = "8c0fc1ba6f0d"
+rust = "rustyrian_core::video::window_get_display_index"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video.c::window_center_in_display"
+c_sha = "7ca4fa19e6cb"
+rust = "rustyrian_core::video::window_center_in_display"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video.c::reinit_fullscreen"
+c_sha = "ed5d367846c1"
+rust = "rustyrian_core::video::reinit_fullscreen"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video.c::video_on_win_resize"
+c_sha = "13e0146aafdc"
+rust = "rustyrian_core::video::video_on_win_resize"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video.c::toggle_fullscreen"
+c_sha = "dde80d9e41bd"
+rust = "rustyrian_core::video::toggle_fullscreen"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video.c::init_scaler"
+c_sha = "900c35bd384c"
+rust = "rustyrian_core::video::init_scaler"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video.c::set_scaling_mode_by_name"
+c_sha = "8ecd992caff2"
+rust = "rustyrian_core::video::set_scaling_mode_by_name"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video.c::JE_clr256"
+c_sha = "72c0b97f5839"
+rust = "rustyrian_core::video::je_clr256"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video.c::JE_showVGA"
+c_sha = "50fca445d8a3"
+rust = "rustyrian_core::video::je_show_vga"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video.c::calc_dst_render_rect"
+c_sha = "e4dffd68689d"
+rust = "rustyrian_core::video::calc_dst_render_rect"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video.c::scale_and_render_screen"
+c_sha = "f238a62c19bb"
+rust = "rustyrian_core::video::scale_and_render_screen"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video.c::present_screen"
+c_sha = "e5409282db70"
+rust = "rustyrian_core::video::present_screen"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video.c::mapScreenPointToWindow"
+c_sha = "356378dfdabe"
+rust = "rustyrian_core::video::map_screen_point_to_window"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video.c::mapWindowPointToScreen"
+c_sha = "7249532786e4"
+rust = "rustyrian_core::video::map_window_point_to_screen"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video.c::scaleWindowDistanceToScreen"
+c_sha = "a6cc0f0470bd"
+rust = "rustyrian_core::video::scale_window_distance_to_screen"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video_scale.c::set_scaler_by_name"
+c_sha = "0e1ec1565012"
+rust = "rustyrian_core::video_scale::set_scaler_by_name"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video_scale.c::nn_32"
+c_sha = "4c3fe7b43e13"
+rust = "rustyrian_core::video_scale::nn_32"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video_scale.c::nn_16"
+c_sha = "5213a12a152d"
+rust = "rustyrian_core::video_scale::nn_16"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video_scale.c::scale2x_32"
+c_sha = "36162a66fd29"
+rust = "rustyrian_core::video_scale::scale2x_32"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video_scale.c::scale2x_16"
+c_sha = "bb75a5738756"
+rust = "rustyrian_core::video_scale::scale2x_16"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video_scale.c::scale3x_32"
+c_sha = "a77aea34927f"
+rust = "rustyrian_core::video_scale::scale3x_32"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video_scale.c::scale3x_16"
+c_sha = "e4e39512f27b"
+rust = "rustyrian_core::video_scale::scale3x_16"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video_scale_hqNx.c::interp1"
+c_sha = "c188e95183ab"
+rust = "rustyrian_core::video_scale_hqnx::interp1"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video_scale_hqNx.c::interp2"
+c_sha = "1c28f0dcf83a"
+rust = "rustyrian_core::video_scale_hqnx::interp2"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video_scale_hqNx.c::interp3"
+c_sha = "a9ed3b295635"
+rust = "rustyrian_core::video_scale_hqnx::interp3"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video_scale_hqNx.c::interp4"
+c_sha = "19c3ce9daad9"
+rust = "rustyrian_core::video_scale_hqnx::interp4"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video_scale_hqNx.c::interp5"
+c_sha = "93c0b8cb98be"
+rust = "rustyrian_core::video_scale_hqnx::interp5"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video_scale_hqNx.c::interp6"
+c_sha = "fed42e491b1d"
+rust = "rustyrian_core::video_scale_hqnx::interp6"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video_scale_hqNx.c::interp7"
+c_sha = "4bdddfe9db0a"
+rust = "rustyrian_core::video_scale_hqnx::interp7"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video_scale_hqNx.c::interp8"
+c_sha = "5d161bd6937e"
+rust = "rustyrian_core::video_scale_hqnx::interp8"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video_scale_hqNx.c::interp9"
+c_sha = "b01cd9df8bcb"
+rust = "rustyrian_core::video_scale_hqnx::interp9"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video_scale_hqNx.c::interp10"
+c_sha = "a52eff8f7455"
+rust = "rustyrian_core::video_scale_hqnx::interp10"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video_scale_hqNx.c::diff"
+c_sha = "1ca02690ee7c"
+rust = "rustyrian_core::video_scale_hqnx::diff"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video_scale_hqNx.c::hq2x_32"
+c_sha = "28476ccd79f7"
+rust = "rustyrian_core::video_scale_hqnx::hq2x_32"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video_scale_hqNx.c::hq3x_32"
+c_sha = "68a8f57e27a7"
+rust = "rustyrian_core::video_scale_hqnx::hq3x_32"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "video_scale_hqNx.c::hq4x_32"
+c_sha = "d4270ab6d2cd"
+rust = "rustyrian_core::video_scale_hqnx::hq4x_32"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "xmas.c::xmas_time"
+c_sha = "91a99274441b"
+rust = "rustyrian_core::xmas::xmas_time"
+status = "todo"
+verify = []
+notes = ""
+
+[[fn]]
+c = "xmas.c::xmas_prompt"
+c_sha = "e4f0a2988efb"
+rust = "rustyrian_core::xmas::xmas_prompt"
+status = "todo"
+verify = []
+notes = ""
+# Port status per upstream C function. Maintained by `cargo xtask manifest-sync`;
+# see porting/RULES.md for the meaning of each field.

@@ -1,0 +1,10 @@
+/target/
+/data/
+/fuzz/artifacts/
+/fuzz/corpus/
+/fuzz/target/
+
+# Undisclosed security material (plan step 9): never committed until the
+# coordinated disclosure of each advisory completes.
+/porting/advisories/
+/crates/oracle/tests/advisory_*.rs

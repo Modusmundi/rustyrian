@@ -1,0 +1,10 @@
+# Run parameters for each scenario script in this directory (`<name>.ots`).
+# Used by `cargo xtask ref-trace` and `cargo xtask parity`.
+#
+#   until_ms / frames  run limit (at least one)
+#   args               extra game arguments after `--`
+#   clock, net         runner options (defaults: virtual, loopback)
+
+[demo-cycle]
+# Logos, title, 30 s idle, then each of the five demos in turn.
+until_ms = 900000

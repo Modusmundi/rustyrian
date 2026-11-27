@@ -1,0 +1,40 @@
+[package]
+name = "rustyrian-oracle"
+description = "Upstream OpenTyrian C, running on the rustyrian fake platform, for differential testing"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+build = "build.rs"
+links = "otref"
+
+[dependencies]
+rustyrian-core.workspace = true
+rustyrian-harness.workspace = true
+anyhow.workspace = true
+libm.workspace = true
+libc = "0.2"
+serde.workspace = true
+serde_json.workspace = true
+postcard.workspace = true
+xxhash-rust.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+pretty_assertions.workspace = true
+
+[build-dependencies]
+bindgen = "0.73"
+cc = "1"
+pkg-config = "0.3"
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+undocumented_unsafe_blocks = "deny"
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"

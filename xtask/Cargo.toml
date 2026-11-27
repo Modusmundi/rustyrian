@@ -1,0 +1,29 @@
+[package]
+name = "xtask"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json = { workspace = true, features = ["unbounded_depth"] }
+heck.workspace = true
+clap = { version = "4.6", features = ["derive"] }
+sha2 = "0.11"
+zip = { version = "9", default-features = false, features = ["deflate"] }
+toml = "1"
+toml_edit = "0.25"
+syn = { version = "2", features = ["full", "visit"] }
+regex = "1"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
