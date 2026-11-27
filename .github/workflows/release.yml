@@ -78,7 +78,9 @@ jobs:
       # oracle runner does (`cargo xtask shipped-trace`): the packaged data
       # passed with `--data=`, the user directory from XDG_CONFIG_HOME/APPDATA
       # rather than `--userdir`, which skips the base-path lookup the C trace
-      # records (D-PRODUCT-2). The windowed smoke finds the data on its own.
+      # records (D-PRODUCT-2). The windowed smoke (Linux) and a second headless
+      # run without `--data` (Windows, macOS) check that the package finds its
+      # data on its own.
       - name: Smoke, headless, in debian:bookworm-slim without SDL (Linux)
         if: matrix.package && runner.os == 'Linux'
         run: |
@@ -115,9 +117,16 @@ jobs:
           & (Join-Path $pkg rustyrian/rustyrian.exe) --headless "--data=$(Join-Path $pkg rustyrian/data)" `
             --input-script $script --until-ms 60000 --trace-out t.jsonl
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Self-located data: no --data, so the binary must find data\ beside itself.
+          $env:APPDATA = Join-Path $smoke located
+          & (Join-Path $pkg rustyrian/rustyrian.exe) --headless --input-script $script --frames 300 --trace-out located.jsonl
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Pop-Location
           cargo xtask trace-cmp tests/golden/demo-menu.jsonl (Join-Path $smoke t.jsonl)
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $frames = (Select-String -Path (Join-Path $smoke located.jsonl) -Pattern '"frame"').Count
+          Write-Output "self-located run presented $frames frames"
+          if ($frames -lt 300) { exit 1 }
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: matrix.package
         with:
@@ -161,6 +170,12 @@ jobs:
             --data="$pkg/Rustyrian.app/Contents/Resources/data" \
             --input-script "$script" --until-ms 60000 --trace-out t.jsonl)
           cargo xtask trace-cmp tests/golden/demo-menu.jsonl "$smoke/t.jsonl"
+          # Self-located data: no --data, so the app must find Contents/Resources/data.
+          (cd "$smoke" && XDG_CONFIG_HOME="$smoke/located" "$pkg/Rustyrian.app/Contents/MacOS/rustyrian" --headless \
+            --input-script "$script" --frames 300 --trace-out located.jsonl)
+          frames=$(grep -c '"frame"' "$smoke/located.jsonl")
+          echo "self-located run presented $frames frames"
+          test "$frames" -ge 300
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pkg-universal-apple-darwin
