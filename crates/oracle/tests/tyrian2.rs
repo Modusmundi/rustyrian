@@ -1856,7 +1856,9 @@ fn je_load_map_reports_bad_files() {
     let start = vec![vec![level_line(0, "FILES", 3, 1, false, false)]];
     let level = std::fs::read(data_dir().join("tyrian1.lvl")).expect("level file");
     let shapes = std::fs::read(data_dir().join("shapesz.dat")).expect("shape file");
-    let cases: Vec<(&str, Vec<(String, Vec<u8>)>, Option<&str>)> = vec![
+    /// (name, files replaced, file removed)
+    type Case<'a> = (&'a str, Vec<(String, Vec<u8>)>, Option<&'a str>);
+    let cases: Vec<Case> = vec![
         ("no-script", vec![], Some("levels1.dat")),
         ("no-level", vec![], Some("tyrian1.lvl")),
         ("no-shapes", vec![], Some("shapesz.dat")),
@@ -2384,14 +2386,23 @@ fn run_main_on_level(
     script: &str,
     setup: impl FnOnce(&mut Game),
 ) -> (Result<(), i32>, usize, u8) {
+    run_main_on_level_with(name, &[], level, script, setup)
+}
+
+/// [`run_main_on_level`] with script lines `prefix` before the level starts.
+fn run_main_on_level_with(
+    name: &str,
+    prefix: &[&str],
+    level: Vec<u8>,
+    script: &str,
+    setup: impl FnOnce(&mut Game),
+) -> (Result<(), i32>, usize, u8) {
     let mut files: Vec<(String, Vec<u8>)> = (1..=4u8)
         .map(|e| {
             let lines: Vec<String> = if e == 1 {
-                let mut l = vec![
-                    "*".to_owned(),
-                    level_line(2, "PLAY", 2, 1, false, false),
-                    "*".to_owned(),
-                ];
+                let mut l = vec!["*".to_owned()];
+                l.extend(prefix.iter().map(|&p| p.to_owned()));
+                l.extend([level_line(2, "PLAY", 2, 1, false, false), "*".to_owned()]);
                 l.extend(lines(&[
                     "]G[ 01 1 02 001",
                     "]I[",
@@ -2456,6 +2467,9 @@ fn je_main_plays_one_player() {
             (6_000, "P"),
             (9_000, "ESCAPE"),
             (10_000, "ESCAPE"),
+            // In-game help, left again (the frame is skipped).
+            (12_000, "F1"),
+            (13_000, "ESCAPE"),
         ],
     );
     let (r, frames) = run_main_case("main-1p", 1, 1, &script, |_| {});
@@ -2516,7 +2530,7 @@ fn je_main_runs_level_features() {
         (64, 9, 1, 0),
     ];
     let rest: Vec<Event> = vec![
-        (67, 1, 400, 2),
+        (67, 1, 400, 4),
         (68, 1, 0, 0),
         (43, 0, 0, 0),
         (42, 0, 0, 0),
@@ -2524,8 +2538,8 @@ fn je_main_runs_level_features() {
         (29, 0, 0, 0),
         // A return needs an earlier jump (upstream reads `eventRec[-1]` when
         // it returns to location 0, D-UB-TYRIAN2-4): jump to 1 first.
-        (54, 1, 0, 0),
         (76, 0, 0, 0),
+        (54, 1, 0, 0),
     ];
     let script = play_script(9_000, &[]);
     let runs: Vec<(Vec<Event>, u8, bool)> = vec![
@@ -2544,6 +2558,20 @@ fn je_main_runs_level_features() {
         ),
         // The background stopped, events forced on.
         (vec![(2, 0, 0, 0), (53, 0, 0, 0), (4, 2, 0, 0)], 4, false),
+        // Opaque background 2 under and over the enemies, the sky enemies
+        // drawn last with the background stopped for them, and the map
+        // wrapped back from near its top.
+        // (Positions 13: the drawing reads from 12 rows before.)
+        (
+            vec![(43, 0, 0, 0), (48, 0, 0, 0), (77, 26, 26, 0)],
+            4,
+            false,
+        ),
+        (
+            vec![(43, 2, 0, 0), (48, 0, 0, 0), (73, 1, 0, 0), (4, 2, 0, 0)],
+            4,
+            false,
+        ),
     ];
     for (i, (events, processor, super_wild)) in runs.into_iter().enumerate() {
         let (r, frames, _) = run_main_on_level(
@@ -2583,7 +2611,7 @@ fn je_main_runs_level_features() {
 /// fast play, a recorded demo, and galaga mode, on to the next section.
 #[test]
 fn je_main_ends_quiet_levels() {
-    let events = [(4, 1, 0, 0), (36, 0, 0, 0)];
+    let events = [(4, 1, 0, 0), (36, 0, 0, 0), (67, 1, 0, 5)];
     let mut s = String::from("ots 1\n");
     for t in (3_000..40_000).step_by(1_500) {
         s.push_str(&format!(
@@ -2619,6 +2647,32 @@ fn je_main_ends_quiet_levels() {
         assert_eq!(r, Err(0), "setup {i}");
         assert_eq!(section, 2, "setup {i}: the level ended");
     }
+}
+
+/// A galaga level ending (the second ship leaves at the level's end).
+#[test]
+fn je_main_quits_and_ends_bonus_levels() {
+    let mut s = String::from("ots 1\n");
+    for t in (5_000..30_000).step_by(1_000) {
+        s.push_str(&format!(
+            "@{t} key-down RETURN\n@{} key-up RETURN\n",
+            t + 45
+        ));
+    }
+    s.push_str("@35000 quit\n");
+    let quiet = [(4, 1, 0, 0), (36, 0, 0, 0)];
+    let (r, _, section) = run_main_on_level_with(
+        "main-galaga-end",
+        &["]g["],
+        level_with_events(&quiet),
+        &s,
+        |g| {
+            g.config.initial_difficulty = 2;
+            g.config.difficulty_level = 2;
+        },
+    );
+    assert_eq!(r, Err(0));
+    assert_eq!(section, 2, "the galaga level ended");
 }
 
 /// Galaga mode (the `]g[` bonus game): no shields, the second ship, extra
