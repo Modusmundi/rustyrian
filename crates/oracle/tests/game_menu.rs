@@ -1850,8 +1850,13 @@ fn steps(parts: &[&[&str]]) -> Vec<&'static str> {
 
 /// Shops the player can barely afford (the cursor skips to what is
 /// affordable), custom ships in the ship list, and a shop sheet loaded by
-/// the screen itself.
+/// the screen itself. Ship 91 makes C read past `ships` (UF-52), which the
+/// sanitized oracle aborts on by design.
 #[test]
+#[cfg_attr(
+    ot_ref_sanitize,
+    ignore = "custom ship 91 makes C read past `ships` (UF-52); ASan aborts"
+)]
 fn je_item_screen_poor_shop_matches() {
     let s = steps(&[
         &TO_UPGRADES,
