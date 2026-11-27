@@ -160,8 +160,11 @@ jobs:
         with:
           name: c-traces-macOS
           path: macos
+      # journey-destruct is excluded: upstream's terrain height depends on the
+      # CPU (UF-23, destruct.c:959 converts a negative float to unsigned int:
+      # arm64 saturates, x86-64 wraps). Parity still runs it on each OS.
       - name: macOS and Linux C traces are identical
-        run: diff -r linux macos
+        run: diff -r --exclude=journey-destruct linux macos
 
   trace-gate:
     runs-on: ubuntu-24.04
