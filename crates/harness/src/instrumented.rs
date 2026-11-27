@@ -35,6 +35,8 @@ pub struct InstrumentConfig {
     pub until_ms: Option<u32>,
     pub dump_frames: Option<(PathBuf, u64)>,
     pub sim_digest: bool,
+    /// Write `FrameView::snapshot` at this frame to this file.
+    pub snapshot_at: Option<(u64, PathBuf)>,
     /// `(path, placeholder)` pairs replaced in recorded strings, so traces do
     /// not depend on where the user and data directories live.
     pub redact: Vec<(String, String)>,
@@ -721,6 +723,12 @@ impl<P: Platform + PlatformProbe> Platform for Instrumented<P> {
             let _ = t.frame(&line);
         }
         let _ = self.dump_frame(view);
+        if let Some((n, path)) = &self.config.snapshot_at
+            && *n == self.frame
+            && let Some(snap) = view.snapshot
+        {
+            let _ = std::fs::write(path, snap());
+        }
         let now = Instant::now();
         if let Some(p) = self.perf.as_mut() {
             let render_start = self.render_start.unwrap_or(present_start);

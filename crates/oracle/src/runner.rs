@@ -5,6 +5,7 @@
 //! --data DIR --userdir DIR --input FILE --trace-out FILE
 //! [--frames N] [--until-ms T] [--clock virtual|real] [--net loopback|udp]
 //! [--sim-digest] [--dump-frames DIR --dump-every K] [--log-out FILE]
+//! [--snapshot-at N --snapshot-out FILE]
 //! [--echo-logs] -- <game args>
 //! ```
 //!
@@ -30,6 +31,8 @@ pub struct RunArgs {
     pub clock_real: bool,
     pub net_udp: bool,
     pub sim_digest: bool,
+    pub snapshot_at: Option<u64>,
+    pub snapshot_out: Option<PathBuf>,
     pub dump_frames: Option<PathBuf>,
     pub dump_every: u64,
     pub log_out: Option<PathBuf>,
@@ -68,6 +71,8 @@ pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<RunArgs> {
                 }
             }
             "--sim-digest" => a.sim_digest = true,
+            "--snapshot-at" => a.snapshot_at = Some(value("--snapshot-at")?.parse()?),
+            "--snapshot-out" => a.snapshot_out = Some(PathBuf::from(value("--snapshot-out")?)),
             "--dump-frames" => a.dump_frames = Some(PathBuf::from(value("--dump-frames")?)),
             "--dump-every" => a.dump_every = value("--dump-every")?.parse()?,
             "--log-out" => a.log_out = Some(PathBuf::from(value("--log-out")?)),
@@ -143,6 +148,11 @@ pub fn prepare(args: &RunArgs, engine: &str) -> Result<Session> {
             until_ms: args.until_ms,
             dump_frames: args.dump_frames.clone().map(|d| (d, args.dump_every)),
             sim_digest: args.sim_digest,
+            snapshot_at: match (args.snapshot_at, &args.snapshot_out) {
+                (Some(n), Some(p)) => Some((n, p.clone())),
+                (None, None) => None,
+                _ => anyhow::bail!("--snapshot-at and --snapshot-out go together"),
+            },
             redact: vec![
                 (userdir.display().to_string(), "<userdir>".to_owned()),
                 (args.data.display().to_string(), "<data>".to_owned()),

@@ -175,6 +175,8 @@ pub struct FrameView<'a> {
     pub palette: &'a [u32; 256],
     /// Serialised simulation state for `--sim-digest`.
     pub sim: Option<&'a dyn Fn() -> Vec<u8>>,
+    /// Serialised `game::Snapshot` (postcard) for `--snapshot-at`.
+    pub snapshot: Option<&'a dyn Fn() -> Vec<u8>>,
 }
 
 /// One method per intercepted platform function.

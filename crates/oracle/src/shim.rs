@@ -364,6 +364,14 @@ pub extern "C" fn ot_shim_SDL_RenderFlush(renderer: *mut b::SDL_Renderer) -> c_i
     with(|s| s.render_flush(RendererId(id_of(renderer))))
 }
 
+/// The whole C game state as a postcard `game::Snapshot`, for `--snapshot-at`.
+fn snapshot_c_game() -> Vec<u8> {
+    let (p, _) = rustyrian_harness::test_session();
+    let mut g = rustyrian_core::Game::new(Box::new(p));
+    crate::mirror::load_game(&mut g);
+    postcard::to_stdvec(&g.snapshot()).expect("a snapshot always serialises")
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn ot_shim_SDL_RenderPresent(renderer: *mut b::SDL_Renderer) {
     // SAFETY: reading upstream globals on the only thread running C; the
@@ -381,6 +389,7 @@ pub extern "C" fn ot_shim_SDL_RenderPresent(renderer: *mut b::SDL_Renderer) {
         screen,
         palette,
         sim: None,
+        snapshot: Some(&snapshot_c_game),
     };
     with(|s| s.render_present(RendererId(id_of(renderer)), &view));
 }
