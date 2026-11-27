@@ -93,10 +93,16 @@ pub struct Datagram {
     pub data: Vec<u8>,
 }
 
+/// `SDLNET_MAX_UDPCHANNELS`.
+const MAX_UDP_CHANNELS: i32 = 32;
+/// `SDLNET_MAX_UDPADDRESSES`.
+const MAX_UDP_ADDRESSES: usize = 4;
+
 #[derive(Default)]
 struct Sockets {
     udp: BTreeMap<u32, Option<UdpSocket>>,
-    channels: BTreeMap<(u32, i32), IpAddress>,
+    /// Addresses bound to `(socket, channel)`, oldest first.
+    channels: BTreeMap<(u32, i32), Vec<IpAddress>>,
 }
 
 pub struct FakePlatform {
@@ -905,24 +911,35 @@ impl Platform for FakePlatform {
         if self.fails("SDLNet_ResolveHost") {
             return -1;
         }
-        let ip = match host {
-            None => Ipv4Addr::UNSPECIFIED,
-            Some(h) => match (h, port).to_socket_addrs().ok().and_then(|mut it| {
-                it.find_map(|a| match a {
-                    std::net::SocketAddr::V4(v4) => Some(*v4.ip()),
-                    std::net::SocketAddr::V6(_) => None,
-                })
-            }) {
-                Some(ip) => ip,
-                None => {
-                    address.host = u32::MAX;
-                    self.error = format!("Couldn't resolve host {h}");
-                    return -1;
+        // SDL_net 2.2: `inet_addr`, then the resolver; on failure the host is
+        // INADDR_NONE, the port is still stored, and no error text is set.
+        let mut ret = 0;
+        address.host = match host {
+            None => 0,
+            Some(h) => {
+                let ip = h
+                    .parse::<Ipv4Addr>()
+                    .ok()
+                    .filter(|ip| *ip != Ipv4Addr::BROADCAST)
+                    .or_else(|| {
+                        (h, 0u16).to_socket_addrs().ok().and_then(|mut it| {
+                            it.find_map(|a| match a {
+                                std::net::SocketAddr::V4(v4) => Some(*v4.ip()),
+                                std::net::SocketAddr::V6(_) => None,
+                            })
+                        })
+                    });
+                match ip {
+                    Some(ip) => u32::from_ne_bytes(ip.octets()),
+                    None => {
+                        ret = -1;
+                        u32::MAX
+                    }
                 }
-            },
+            }
         };
-        *address = from_socket_addr(SocketAddrV4::new(ip, port));
-        0
+        address.port = u16::from_ne_bytes(port.to_be_bytes());
+        ret
     }
 
     fn net_udp_open(&mut self, port: u16) -> Option<UdpSocketId> {
@@ -937,10 +954,14 @@ impl Platform for FakePlatform {
                         if s.set_nonblocking(true).is_err() {
                             return None;
                         }
+                        // SDL_net enables broadcasts and joins 224.0.0.1,
+                        // ignoring failures.
+                        let _ = s.set_broadcast(true);
+                        let _ = s.join_multicast_v4(&Ipv4Addr::new(224, 0, 0, 1), &Ipv4Addr::UNSPECIFIED);
                         Some(s)
                     }
-                    Err(e) => {
-                        self.error = format!("Couldn't bind to local port: {e}");
+                    Err(_) => {
+                        self.error = "Couldn't bind to local port".into();
                         return None;
                     }
                 }
@@ -952,21 +973,40 @@ impl Platform for FakePlatform {
     }
 
     fn net_udp_bind(&mut self, socket: UdpSocketId, channel: i32, address: &IpAddress) -> i32 {
-        if !self.sockets.udp.contains_key(&socket.0) || self.fails("SDLNet_UDP_Bind") {
+        if !self.sockets.udp.contains_key(&socket.0) {
+            self.error = "Passed a NULL socket".into();
             return -1;
         }
+        if self.fails("SDLNet_UDP_Bind") {
+            return -1;
+        }
+        let bound = |c: i32| self.sockets.channels.get(&(socket.0, c)).map_or(0, Vec::len);
         let channel = if channel == -1 {
-            (0..32)
-                .find(|c| !self.sockets.channels.contains_key(&(socket.0, *c)))
-                .unwrap_or(-1)
-        } else {
+            // The first channel with room (SDL_net leaves `channel` at
+            // SDLNET_MAX_UDPCHANNELS when none has room; that binding is out
+            // of bounds there, so report no room).
+            match (0..MAX_UDP_CHANNELS).find(|c| bound(*c) < MAX_UDP_ADDRESSES) {
+                Some(c) => c,
+                None => {
+                    self.error = "No room for new addresses".into();
+                    return -1;
+                }
+            }
+        } else if (0..MAX_UDP_CHANNELS).contains(&channel) {
             channel
-        };
-        if !(0..32).contains(&channel) {
+        } else {
             self.error = "Invalid channel".into();
             return -1;
+        };
+        if bound(channel) == MAX_UDP_ADDRESSES {
+            self.error = "No room for new addresses".into();
+            return -1;
         }
-        self.sockets.channels.insert((socket.0, channel), *address);
+        self.sockets
+            .channels
+            .entry((socket.0, channel))
+            .or_default()
+            .push(*address);
         channel
     }
 
@@ -974,78 +1014,101 @@ impl Platform for FakePlatform {
         if self.fails("SDLNet_UDP_Send") {
             return 0;
         }
+        packet.channel = channel;
+        if !self.sockets.udp.contains_key(&socket.0) {
+            self.error = "Passed a NULL socket".into();
+            return 0;
+        }
         let len = usize::try_from(packet.len)
             .unwrap_or(0)
             .min(packet.data.len());
-        let dest = if channel < 0 {
-            Some(packet.address)
+        // A channel < 0 sends to the packet's address; otherwise to every
+        // address bound to the channel, most recent first. (A channel >= 32
+        // is out of bounds in SDL_net; it sends nowhere here.)
+        let dests: Vec<IpAddress> = if channel < 0 {
+            vec![packet.address]
         } else {
-            self.sockets.channels.get(&(socket.0, channel)).copied()
+            self.sockets
+                .channels
+                .get(&(socket.0, channel))
+                .map(|v| v.iter().rev().copied().collect())
+                .unwrap_or_default()
         };
-        let Some(dest) = dest else {
-            return 0;
-        };
-        packet.status = packet.len;
-        match self.config.net {
-            NetBackend::Loopback => {
-                self.loopback_outbox.push(Datagram {
-                    socket,
-                    address: dest,
-                    data: packet.data[..len].to_vec(),
-                });
-                1
-            }
-            NetBackend::Udp => {
-                let data = packet.data[..len].to_vec();
-                match self
-                    .udp(socket)
-                    .map(|s| s.send_to(&data, to_socket_addr(&dest)))
-                {
-                    Some(Ok(_)) => 1,
-                    _ => {
-                        packet.status = -1;
-                        0
-                    }
+        let data = packet.data[..len].to_vec();
+        let mut sent = 0;
+        for dest in dests {
+            let status = match self.config.net {
+                NetBackend::Loopback => {
+                    self.loopback_outbox.push(Datagram {
+                        socket,
+                        address: dest,
+                        data: data.clone(),
+                    });
+                    Some(len)
                 }
+                NetBackend::Udp => self
+                    .udp(socket)
+                    .and_then(|s| s.send_to(&data, to_socket_addr(&dest)).ok()),
+            };
+            if let Some(n) = status {
+                packet.status = i32::try_from(n).unwrap_or(i32::MAX);
+                sent += 1;
             }
         }
+        sent
     }
 
     fn net_udp_recv(&mut self, socket: UdpSocketId, packet: &mut UdpPacket) -> i32 {
         if self.fails("SDLNet_UDP_Recv") {
             return -1;
         }
+        let maxlen = usize::try_from(packet.maxlen)
+            .unwrap_or(0)
+            .min(packet.data.len());
         let received = match self.config.net {
             NetBackend::Loopback => {
                 let pos = self.loopback_inbox.iter().position(|d| d.socket == socket);
                 pos.and_then(|p| self.loopback_inbox.remove(p))
-                    .map(|d| (d.address, d.data))
+                    .map(|d| Ok((d.address, d.data)))
             }
             NetBackend::Udp => {
-                let mut buf = vec![0u8; packet.data.len().max(1)];
+                let mut buf = vec![0u8; maxlen.max(1)];
                 match self.udp(socket).map(|s| s.recv_from(&mut buf)) {
                     Some(Ok((n, std::net::SocketAddr::V4(from)))) => {
-                        buf.truncate(n);
-                        Some((from_socket_addr(from), buf))
+                        buf.truncate(n.min(maxlen));
+                        Some(Ok((from_socket_addr(from), buf)))
                     }
+                    Some(Err(e)) if e.kind() != std::io::ErrorKind::WouldBlock => Some(Err(())),
                     _ => None,
                 }
             }
         };
-        let Some((from, data)) = received else {
-            return 0;
+        let (from, data) = match received {
+            None => return 0,
+            // A ready socket whose recvfrom fails (e.g. ICMP port unreachable):
+            // SDL_net sets status -1 and len 0 and receives nothing.
+            Some(Err(())) => {
+                packet.status = -1;
+                packet.len = 0;
+                return 0;
+            }
+            Some(Ok(r)) => r,
         };
-        let n = data.len().min(packet.data.len());
+        let n = data.len().min(maxlen);
         packet.data[..n].copy_from_slice(&data[..n]);
-        packet.len = i32::try_from(n).unwrap_or(i32::MAX);
-        packet.status = packet.len;
+        packet.status = i32::try_from(n).unwrap_or(i32::MAX);
+        packet.len = packet.status;
         packet.address = from;
-        packet.channel = self
-            .sockets
-            .channels
-            .iter()
-            .find(|((s, _), a)| *s == socket.0 && **a == from)
-            .map_or(-1, |((_, c), _)| *c);
+        // Highest channel, most recent address first, as SDL_net searches.
+        packet.channel = (0..MAX_UDP_CHANNELS)
+            .rev()
+            .find(|c| {
+                self.sockets
+                    .channels
+                    .get(&(socket.0, *c))
+                    .is_some_and(|v| v.contains(&from))
+            })
+            .unwrap_or(-1);
         1
     }
 
@@ -1124,5 +1187,51 @@ mod tests {
             samples,
             [256, 256, 256, 256, -32768, -32768, -32768, -32768]
         );
+    }
+
+    #[test]
+    fn udp_channels_follow_sdl_net_2_2() {
+        let mut p = FakePlatform::new(FakeConfig::default());
+        let s = p.net_udp_open(1333).expect("socket");
+        let addr = |n: u8| IpAddress {
+            host: u32::from_ne_bytes([10, 0, 0, n]),
+            port: 1333u16.to_be(),
+        };
+        // Channel -1 fills channel 0 with up to four addresses, then moves on.
+        for n in 1..=4 {
+            assert_eq!(p.net_udp_bind(s, -1, &addr(n)), 0);
+        }
+        assert_eq!(p.net_udp_bind(s, -1, &addr(5)), 1);
+        assert_eq!(p.net_udp_bind(s, 0, &addr(6)), -1);
+        assert_eq!(p.net_get_error(), "No room for new addresses");
+        assert_eq!(p.net_udp_bind(s, 32, &addr(6)), -1);
+        assert_eq!(p.net_get_error(), "Invalid channel");
+
+        // Sending on a channel reaches every bound address, most recent first.
+        let mut pkt = p.net_alloc_packet(16).expect("packet");
+        pkt.data[..3].copy_from_slice(b"abc");
+        pkt.len = 3;
+        pkt.channel = 7;
+        assert_eq!(p.net_udp_send(s, 0, &mut pkt), 4);
+        assert_eq!((pkt.channel, pkt.status), (0, 3));
+        let order: Vec<IpAddress> = p.loopback_outbox.iter().map(|d| d.address).collect();
+        assert_eq!(order, [addr(4), addr(3), addr(2), addr(1)]);
+
+        // A sender bound on several channels is reported on the highest one.
+        assert_eq!(p.net_udp_bind(s, 1, &addr(2)), 1);
+        p.loopback_inbox.push_back(Datagram {
+            socket: s,
+            address: addr(2),
+            data: b"xy".to_vec(),
+        });
+        let mut rx = p.net_alloc_packet(16).expect("packet");
+        assert_eq!(p.net_udp_recv(s, &mut rx), 1);
+        assert_eq!((rx.channel, rx.len, rx.status), (1, 2, 2));
+        assert_eq!(&rx.data[..2], b"xy");
+
+        // A failed resolve still stores the port and sets the host to INADDR_NONE.
+        let mut a = IpAddress::default();
+        assert_eq!(p.net_resolve_host(&mut a, Some("no.such.host.invalid"), 1333), -1);
+        assert_eq!((a.host, a.port), (u32::MAX, 1333u16.to_be()));
     }
 }

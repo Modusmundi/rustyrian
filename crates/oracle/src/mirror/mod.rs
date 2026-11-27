@@ -149,6 +149,8 @@ pub fn load_game(g: &mut Game) {
 /// Stores every module state of `g` (not the platform) into C.
 pub fn store_game(g: &Game) {
     crate::session::set_crand_state(g.crand.lock().unwrap_or_else(|e| e.into_inner()).clone());
+    // First: it creates the C surfaces that other mirrors map ScreenIds onto.
+    g.video.store_to_c();
     g.animlib.store_to_c();
     g.arg_parse.store_to_c();
     g.backgrnd.store_to_c();
@@ -198,7 +200,6 @@ pub fn store_game(g: &Game) {
     g.varz.store_to_c();
     g.vga256d.store_to_c();
     g.vga_palette.store_to_c();
-    g.video.store_to_c();
     g.video_scale.store_to_c();
     g.video_scale_hqnx.store_to_c();
     g.xmas.store_to_c();
