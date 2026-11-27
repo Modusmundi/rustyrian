@@ -17,6 +17,8 @@ mod net_support;
 use net_support::{Rig, data_dir, taps};
 mod menus_support;
 use menus_support::{Act, output_rect, script as menu_script};
+mod mainint_support;
+use mainint_support::Rig as ScriptRig;
 
 /// Mid-level fixture frames of `demo-cycle` (run `cargo xtask fixtures`).
 const FRAMES: [u64; 2] = [500, 2000];
@@ -1533,6 +1535,589 @@ fn title_screen_matches() {
         let started = run_title(&acts, false);
         assert_eq!(started, i != 1, "name {i} {name}");
     }
+}
+
+// ---------------------------------------------------------------------------
+// JE_loadMap
+// ---------------------------------------------------------------------------
+
+/// One episode-script line as `readEncryptedString` reads it: the length,
+/// then the bytes encrypted with the help-text key (the inverse of
+/// `decrypt_string`).
+fn encrypted_line(plain: &[u8]) -> Vec<u8> {
+    const KEY: [u8; 10] = [204, 129, 63, 255, 71, 19, 25, 62, 1, 99];
+    let mut out = vec![plain.len() as u8];
+    let mut prev = 0u8;
+    for (i, &p) in plain.iter().enumerate() {
+        let e = if i == 0 {
+            p ^ KEY[0]
+        } else {
+            p ^ KEY[i % KEY.len()] ^ prev
+        };
+        out.push(e);
+        prev = e;
+    }
+    out
+}
+
+/// An episode script of `lines`.
+fn episode_script(lines: &[String]) -> Vec<u8> {
+    lines
+        .iter()
+        .flat_map(|l| encrypted_line(l.as_bytes()))
+        .collect()
+}
+
+/// A `]L[` line: next section, name, song, level number in the level file,
+/// and the bonus-level marks at columns 27 and 28.
+fn level_line(next: u8, name: &str, song: u8, lvl: u8, normal_bonus: bool, bonus: bool) -> String {
+    let mut s = format!("]L[      {next:03} {name:<9}{song:02} {lvl:02}");
+    s.push(if normal_bonus { '$' } else { ' ' });
+    s.push(if bonus { '$' } else { ' ' });
+    s
+}
+
+/// A data directory with every freeware file plus `files` replacing or
+/// adding some.
+fn crafted_data(name: &str, files: &[(String, Vec<u8>)]) -> std::path::PathBuf {
+    let dir = net_support::tmp(name);
+    for entry in std::fs::read_dir(data_dir()).expect("data dir") {
+        let entry = entry.expect("data entry");
+        let file = entry.file_name();
+        if !files.iter().any(|(n, _)| std::ffi::OsStr::new(n) == file) {
+            std::os::unix::fs::symlink(entry.path(), dir.join(&file)).expect("symlink");
+        }
+    }
+    for (n, bytes) in files {
+        std::fs::write(dir.join(n), bytes).expect("crafted file");
+    }
+    dir
+}
+
+/// Both engines from the 500 fixture on input `script`, with game data from
+/// `data` and episode `ep` initialized.
+fn load_map_rig(script: &str, data: &std::path::Path, ep: u8) -> ScriptRig {
+    let mut rig = ScriptRig::from_fixture(script, 500);
+    let f = &mut rig.g.file;
+    f.custom_data_dir_path = Some(data.as_os_str().as_bytes().to_vec());
+    f.data_dir_path = None;
+    f.data_dir_path_len = 0;
+    rig.g.demo.play_demo = false;
+    rig.g.demo.record_demo = false;
+    rig.store();
+    // SAFETY: plain C call inside the guard.
+    let r = rig.run(
+        || unsafe { b::JE_initEpisode(ep) },
+        |g| episodes::je_init_episode(g, ep),
+    );
+    assert_eq!(r, Ok(()));
+    rig.clear();
+    rig
+}
+
+/// Runs `JE_loadMap` on both engines and compares outcome, calls, state,
+/// saved files and every frame; returns the outcome.
+fn run_load_map(mut rig: ScriptRig) -> Result<(), i32> {
+    rig.store();
+    rig.clear();
+    // SAFETY: plain C call inside the guard; the level data is valid.
+    let r = rig.run(|| unsafe { b::JE_loadMap() }, t2::je_load_map);
+    match r {
+        Ok(()) => rig.check(),
+        Err(_) => {
+            net_support::forget_freed_c();
+            rig.check_halted();
+        }
+    }
+    rig.check_frames();
+    r
+}
+
+/// The number of levels in `tyrian{ep}.lvl`.
+fn level_count(ep: u8) -> u8 {
+    let bytes = std::fs::read(data_dir().join(format!("tyrian{ep}.lvl"))).expect("level file");
+    (u16::from_le_bytes([bytes[0], bytes[1]]) / 2) as u8
+}
+
+/// Every level of `ep` through `JE_loadMap`: a crafted episode script whose
+/// section k starts level k, so each level's events, shapes and maps load
+/// with no menus in between.
+fn load_every_level(ep: u8) {
+    let n = level_count(ep);
+    let mut lines = Vec::new();
+    for k in 1..=n {
+        lines.push("*".to_owned());
+        lines.push(level_line(
+            0,
+            &format!("LEVEL {k}"),
+            k % 30 + 1,
+            k,
+            k % 5 == 1,
+            k % 7 == 2,
+        ));
+    }
+    let data = crafted_data(
+        &format!("levels-{ep}"),
+        &[(format!("levels{ep}.dat"), episode_script(&lines))],
+    );
+    for k in 1..=n {
+        let mut rig = load_map_rig("ots 1\n", &data, ep);
+        rig.g.config.main_level = k;
+        assert_eq!(run_load_map(rig), Ok(()), "episode {ep} level {k}");
+    }
+}
+
+// Each level load presents the 50-step fade and compares every frame (about
+// 0.5 s per level), so each episode is its own test.
+
+#[test]
+fn je_load_map_loads_every_level_of_episode_1() {
+    load_every_level(1);
+}
+
+#[test]
+fn je_load_map_loads_every_level_of_episode_2() {
+    load_every_level(2);
+}
+
+#[test]
+fn je_load_map_loads_every_level_of_episode_3() {
+    load_every_level(3);
+}
+
+#[test]
+fn je_load_map_loads_every_level_of_episode_4() {
+    load_every_level(4);
+}
+
+/// Crafted episode scripts: `sections` for episode `ep`, and for every other
+/// episode one section starting its first level (`JE_nextEpisode` moves on
+/// to one).
+fn crafted_scripts(name: &str, ep: u8, sections: &[Vec<String>]) -> std::path::PathBuf {
+    let files: Vec<(String, Vec<u8>)> = (1..=4u8)
+        .map(|e| {
+            let lines: Vec<String> = if e == ep {
+                sections
+                    .iter()
+                    .flat_map(|s| std::iter::once("*".to_owned()).chain(s.iter().cloned()))
+                    .collect()
+            } else {
+                vec!["*".to_owned(), level_line(0, "NEXT", 3, 1, false, false)]
+            };
+            (format!("levels{e}.dat"), episode_script(&lines))
+        })
+        .collect();
+    crafted_data(name, &files)
+}
+
+/// Runs `JE_loadMap` from section 1 of crafted episode `ep` on input
+/// `script`, after `setup`; returns the outcome.
+fn run_script_case(
+    name: &str,
+    ep: u8,
+    sections: &[Vec<String>],
+    script: &str,
+    setup: impl FnOnce(&mut Game),
+) -> Result<(), i32> {
+    let data = crafted_scripts(name, ep, sections);
+    let mut rig = load_map_rig(script, &data, ep);
+    rig.g.config.main_level = 1;
+    rig.g.config.game_has_repeated = true;
+    setup(&mut rig.g);
+    run_load_map(rig)
+}
+
+fn lines(ls: &[&str]) -> Vec<String> {
+    ls.iter().map(|&l| l.to_owned()).collect()
+}
+
+/// RETURN taps every `gap` ms from 1 s to 120 s.
+fn returns_every(gap: u32) -> String {
+    let mut s = String::from("ots 1\n");
+    let mut t = 1_000;
+    while t < 120_000 {
+        s.push_str(&format!(
+            "@{t} key-down RETURN\n@{} key-up RETURN\n",
+            t + 45
+        ));
+        t += gap;
+    }
+    s
+}
+
+/// Script commands that need no input: next-level choices, data cubes,
+/// modes, saves, music, palettes and pictures, difficulty skips and every
+/// kind of section jump, under the modes each jump tests.
+#[test]
+fn je_load_map_runs_script_commands() {
+    let first = lines(&[
+        "]G[ 01 2 02 005  03 006",
+        "]?[ 06 001 002 023 024 025",
+        "]![ 09",
+        "]+[ 02",
+        "]?[ 02 007 008",
+        "]@[",
+        "]x[",
+        "]s[",
+        "]i 038[",
+        "]M 016[",
+        "]n[",
+        "]S[",
+        "]B[",
+        "]C[",
+        "]F[",
+        "]P 005[",
+        "]P 907[",
+        "]P 000[ Load TSHP2.PCX",
+        "]h[",
+        "]x[",
+        "]H[ 02",
+        "]J[ 03",
+    ]);
+    let second = lines(&["]g[", "]b[", "]e[", "]J[ 03"]);
+    let jumps = lines(&["]2[ 04", "]w[ 05", "]t[ 06", "]l[ 07", "]J[ 08"]);
+    let mut sections = vec![first, second, jumps];
+    for k in 4..=8u8 {
+        sections.push(vec![level_line(k, &format!("SEC {k}"), k, k, false, false)]);
+    }
+    let setups: [fn(&mut Game); 6] = [
+        |_| {},
+        |g| g.config.initial_difficulty = 4,
+        |g| g.config.two_player_mode = true,
+        |g| g.player.player[0].items.ship = 13,
+        |g| {
+            g.varz.level_timer = true;
+            g.varz.level_timer_countdown = 0;
+        },
+        |g| {
+            g.config.initial_difficulty = 3;
+            g.player.player[0].is_alive = false;
+        },
+    ];
+    for (i, setup) in setups.into_iter().enumerate() {
+        assert_eq!(
+            run_script_case(&format!("commands-{i}"), 1, &sections, "ots 1\n", setup),
+            Ok(()),
+            "setup {i}"
+        );
+    }
+    // The galaga, auto-save and engage section on its own.
+    let r = run_script_case(
+        "commands-modes",
+        1,
+        &[
+            sections[1].clone(),
+            vec![],
+            vec![level_line(0, "MODES", 4, 2, true, false)],
+        ],
+        "ots 1\n",
+        |_| {},
+    );
+    assert_eq!(r, Ok(()));
+}
+
+/// Text windows (with and without the warning, too many lines), the three
+/// picture pans (cut short by input or run to the end, or skipped by ESC),
+/// the ending animation, and all of it skipped by `constantPlay`.
+#[test]
+fn je_load_map_shows_texts_and_pictures() {
+    let mut text = vec!["]Wy 13[".to_owned()];
+    text.extend((0..11).map(|i| format!("Line {i} of a long warning")));
+    text.push("#".to_owned());
+    text.extend(lines(&["]Wn 02[", "Short text", "#"]));
+    text.extend(lines(&[
+        "]U 008[", "]V 005[", "]R 009[", "]A[", "]n[", "]W 01[", "Shown", "#",
+    ]));
+    text.push(level_line(0, "TEXTS", 5, 3, false, false));
+    let sections = [text];
+    let scripts = [
+        returns_every(1_500),
+        returns_every(9_000),
+        // ESC first (skips the warning texts and pans), then taps for the
+        // animation and the text shown after `]n[` clears ESC.
+        format!(
+            "ots 1\n@600 key-down ESCAPE\n@650 key-up ESCAPE\n{}",
+            returns_every(1_500)
+                .trim_start_matches("ots 1\n")
+                .lines()
+                .skip(40)
+                .map(|l| format!("{l}\n"))
+                .collect::<String>()
+        ),
+    ];
+    for (i, script) in scripts.iter().enumerate() {
+        assert_eq!(
+            run_script_case(&format!("texts-{i}"), 1, &sections, script, |_| {}),
+            Ok(()),
+            "script {i}"
+        );
+    }
+    let r = run_script_case("texts-constant", 1, &sections, "ots 1\n", |g| {
+        g.params.constant_play = true;
+    });
+    assert_eq!(r, Ok(()));
+}
+
+/// The shop: item lists (short and long lines), then the item screen left
+/// for the next level, or quit (back to the title screen).
+#[test]
+fn je_load_map_enters_the_item_screen() {
+    let mut shop = lines(&["]G[ 01 2 02 002  03 003", "]I["]);
+    shop.extend(lines(&[
+        "         1 2 3 4 5",
+        "         1 2 3 4 13",
+        "         9 10 11 12 14",
+        "         1 2",
+        "short",
+        "         1 2 3 4 5 6 7 8 9 10",
+        "         1",
+        "         1 2 3",
+        "         1 2 3 4 5",
+    ]));
+    shop.push(level_line(0, "SHOP", 6, 4, false, false));
+    let sections = [
+        shop,
+        vec![level_line(0, "PLANET A", 8, 5, false, false)],
+        vec![level_line(0, "PLANET B", 9, 6, false, false)],
+    ];
+    let keys = |steps: &[&str]| {
+        let mut s = String::from("ots 1\n");
+        let mut t = 2_000;
+        for k in steps {
+            s.push_str(&format!("@{t} key-down {k}\n@{} key-up {k}\n", t + 45));
+            t += 400;
+        }
+        s.push_str(&format!("@{} quit\n", t + 30_000));
+        s
+    };
+    let next = run_script_case(
+        "shop-next",
+        1,
+        &sections,
+        &keys(&["DOWN", "DOWN", "DOWN", "DOWN", "RETURN", "RETURN"]),
+        |g| g.player.player[0].cash = 100_000,
+    );
+    assert_eq!(next, Ok(()));
+    let quit = run_script_case(
+        "shop-quit",
+        1,
+        &sections,
+        &keys(&["ESCAPE", "RETURN"]),
+        |_| {},
+    );
+    assert_eq!(quit, Ok(()));
+}
+
+/// The end of an episode: score lines for one or two players, a hint chosen
+/// at random, the next episode, and after the last one the super-arcade
+/// screen for each kind of next ship (or SuperTyrian's return to the title).
+#[test]
+fn je_load_map_ends_an_episode() {
+    let mut end = vec!["]Q[".to_owned()];
+    for h in 0..12 {
+        end.push(format!("Hint {h}"));
+        if h == 4 {
+            end.extend((0..11).map(|i| format!("Hint line {i}")));
+        }
+        end.push("#".to_owned());
+    }
+    end.push(level_line(0, "AFTER", 7, 5, false, false));
+    let sections = [end];
+    type Setup = fn(&mut Game);
+    let cases: [(u8, Setup); 7] = [
+        (1, |_| {}),
+        (1, |g| g.config.two_player_mode = true),
+        (4, |g| g.config.super_arcade_mode = 0),
+        (4, |g| g.config.super_arcade_mode = 2),
+        (4, |g| g.config.super_arcade_mode = 7),
+        (4, |g| {
+            g.config.super_tyrian = true;
+            g.config.initial_difficulty = rustyrian_core::config::DIFFICULTY_ZINGLON;
+        }),
+        (4, |g| g.config.super_tyrian = true),
+    ];
+    for (i, (ep, setup)) in cases.into_iter().enumerate() {
+        let r = run_script_case(
+            &format!("end-{i}"),
+            ep,
+            &sections,
+            &returns_every(700),
+            |g| {
+                g.config.secret_hint = (i % 3 + 1) as u8;
+                g.episodes.episode_avail = [true, true, true, true, false];
+                setup(g);
+            },
+        );
+        assert_eq!(r, Ok(()), "case {i}");
+    }
+}
+
+// Rust-only guard tests: these inputs make upstream read or write outside
+// its arrays, so the oracle cannot run them (D-UB-TYRIAN2-1..3).
+
+/// Runs only the Rust `JE_loadMap` from section 1 of a crafted script for
+/// episode 1, with `level_file` as `tyrian1.lvl`; returns the outcome and the
+/// Rust game.
+fn rust_load_map(
+    name: &str,
+    sections: &[Vec<String>],
+    level_file: Option<Vec<u8>>,
+    script: &str,
+) -> (Result<(), i32>, Box<Game>) {
+    let mut files: Vec<(String, Vec<u8>)> = (1..=4u8)
+        .map(|e| {
+            let lines: Vec<String> = if e == 1 {
+                sections
+                    .iter()
+                    .flat_map(|s| std::iter::once("*".to_owned()).chain(s.iter().cloned()))
+                    .collect()
+            } else {
+                vec!["*".to_owned(), level_line(0, "NEXT", 3, 1, false, false)]
+            };
+            (format!("levels{e}.dat"), episode_script(&lines))
+        })
+        .collect();
+    if let Some(bytes) = level_file {
+        files.push(("tyrian1.lvl".to_owned(), bytes));
+    }
+    let data = crafted_data(name, &files);
+    let mut rig = load_map_rig(script, &data, 1);
+    rig.g.config.main_level = 1;
+    let r = t2::je_load_map(&mut rig.g).map_err(|h| h.code);
+    let ScriptRig { g, .. } = rig;
+    (r, g)
+}
+
+/// The byte offset of level `k` (0-based) in a level file.
+fn level_offset(bytes: &[u8], k: usize) -> usize {
+    u32::from_le_bytes(bytes[2 + 8 * k..6 + 8 * k].try_into().expect("4 bytes")) as usize
+}
+
+/// `tyrian1.lvl` with level 1 changed by `f` (given the level's offset).
+fn crafted_level(f: impl FnOnce(&mut Vec<u8>, usize)) -> Vec<u8> {
+    let mut bytes = std::fs::read(data_dir().join("tyrian1.lvl")).expect("level file");
+    let at = level_offset(&bytes, 0);
+    f(&mut bytes, at);
+    bytes
+}
+
+/// The offset of level 1's first event record, given the level's offset.
+fn first_event(bytes: &[u8], at: usize) -> usize {
+    let enemies = usize::from(u16::from_le_bytes([bytes[at + 8], bytes[at + 9]]));
+    at + 10 + 2 * enemies + 2
+}
+
+/// D-UB-TYRIAN2-1: level files whose enemy count, events or map bytes would
+/// index outside upstream's tables are refused with a fatal error.
+#[test]
+fn je_load_map_refuses_invalid_level_data() {
+    let start = vec![vec![level_line(0, "BAD", 3, 1, false, false)]];
+    let cases: Vec<(&str, Vec<u8>)> = vec![
+        (
+            "Level has an invalid number of enemies.",
+            crafted_level(|b, at| b[at + 8..at + 10].copy_from_slice(&41u16.to_le_bytes())),
+        ),
+        (
+            "Level has an invalid number of enemies.",
+            crafted_level(|b, at| b[at + 8..at + 10].copy_from_slice(&0u16.to_le_bytes())),
+        ),
+        (
+            "Level has an invalid event.",
+            crafted_level(|b, at| b[at + 10..at + 12].copy_from_slice(&900u16.to_le_bytes())),
+        ),
+        (
+            "Level has an invalid event.",
+            crafted_level(|b, at| {
+                let e = first_event(b, at);
+                b[e + 2] = 61; // global flag 0
+                b[e + 3..e + 5].copy_from_slice(&0i16.to_le_bytes());
+            }),
+        ),
+        (
+            "Level has an invalid event.",
+            crafted_level(|b, at| {
+                let e = first_event(b, at);
+                b[e + 2] = 5; // shape bank 40
+                b[e + 3..e + 5].copy_from_slice(&40i16.to_le_bytes());
+            }),
+        ),
+        (
+            "Level has an invalid event.",
+            crafted_level(|b, at| {
+                let e = first_event(b, at);
+                b[e + 2] = 75; // newPL index 20
+                b[e + 7] = 100;
+            }),
+        ),
+        (
+            "Level has an invalid event.",
+            crafted_level(|b, at| {
+                let e = first_event(b, at);
+                b[e + 2] = 54; // a jump past the 65500 sentinel, not a return
+                b[e + 3..e + 5].copy_from_slice(&(-20i16).to_le_bytes());
+            }),
+        ),
+        (
+            "Level map has an invalid shape.",
+            crafted_level(|b, at| {
+                // the last byte of map 3 (each level ends with its maps)
+                let end = level_offset(b, 1);
+                let _ = at;
+                b[end - 1] = 200;
+            }),
+        ),
+    ];
+    for (i, (message, level)) in cases.into_iter().enumerate() {
+        let (r, g) = rust_load_map(&format!("bad-level-{i}"), &start, Some(level), "ots 1\n");
+        assert_eq!(r, Err(1), "case {i}");
+        let _ = (g, message);
+    }
+    // A script naming level 0, or a level the file does not have.
+    for (i, lvl) in [0u8, 40].into_iter().enumerate() {
+        let sections = vec![vec![level_line(0, "NONE", 3, lvl, false, false)]];
+        let (r, _) = rust_load_map(&format!("bad-lvl-{i}"), &sections, None, "ots 1\n");
+        assert_eq!(r, Err(1), "level {lvl}");
+    }
+}
+
+/// D-UB-TYRIAN2-2: script commands with more next-level choices or shop
+/// items than the tables hold are cut to size, and a palette number past
+/// `pcxpal` is ignored.
+#[test]
+fn je_load_map_bounds_script_tables() {
+    let sections = vec![lines(&[
+        "]G[ 01 7 02 002  03 003  04 004  05 005  06 006  07 007  08 008",
+        "]P 950[",
+        "]I[",
+        "         1 2 3 4 5 6 7 8 9 10 11 12",
+        "         1",
+        "         1",
+        "         1",
+        "         1",
+        "         1",
+        "         1",
+        "         1",
+        "         1 2 3 4 5 6 7 8 9 10 11 12 13",
+        "]L[      000 BOUNDS   03 02",
+    ])];
+    let script = "ots 1\n@2000 key-down ESCAPE\n@2045 key-up ESCAPE\n@2400 key-down RETURN\n@2445 key-up RETURN\n";
+    let (r, g) = rust_load_map("bounds", &sections, None, script);
+    assert_eq!(r, Ok(()));
+    assert_eq!(g.varz.map_p_num, 5);
+    assert_eq!(g.varz.map_planet, [2, 3, 4, 5, 6]);
+    assert_eq!(g.tyrian2.item_avail_max[0], 10);
+    assert_eq!(g.tyrian2.item_avail_max[8], 10);
+    assert_eq!(g.tyrian2.item_avail[0], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+}
+
+/// D-UB-TYRIAN2-3: the pan to the right ends one byte short of upstream's
+/// last row, which writes past the screen.
+#[test]
+fn je_load_map_pans_right_within_the_screen() {
+    let sections = vec![lines(&["]R 009[", "]L[      000 PAN      03 02"])];
+    let (r, g) = rust_load_map("pan-right", &sections, None, "ots 1\n");
+    assert_eq!(r, Ok(()));
+    assert_eq!(g.varz.lvl_file_num, 2);
 }
 
 #[test]
