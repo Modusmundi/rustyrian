@@ -64,7 +64,7 @@ unsafe fn free_packet(p: *mut b::UDPpacket) {
 /// Makes `*slot` a C packet equal to `r`.
 ///
 /// # Safety
-/// `*slot` is NULL or a packet as in [`free_packet`].
+/// `*slot` is NULL or a packet as in `free_packet`.
 pub unsafe fn packet_to_c(r: Option<&UdpPacket>, slot: &mut *mut b::UDPpacket) {
     let Some(r) = r else {
         // SAFETY: per the caller.

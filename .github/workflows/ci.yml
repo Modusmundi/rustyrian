@@ -33,7 +33,7 @@ jobs:
           submodules: true
           persist-credentials: false
       - name: Oracle build dependencies
-        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libclang-18-dev clang-18
+        run: sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list && sudo apt-get update && sudo apt-get install -y libsdl2-dev libclang-18-dev clang-18
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - run: cargo clippy --workspace --all-targets -- -D warnings
         env:
@@ -47,7 +47,7 @@ jobs:
           submodules: true
           persist-credentials: false
       - name: Oracle build dependencies
-        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libclang-18-dev clang-18
+        run: sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list && sudo apt-get update && sudo apt-get install -y libsdl2-dev libclang-18-dev clang-18
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - run: cargo doc --workspace --no-deps
         env:
@@ -117,7 +117,7 @@ jobs:
           persist-credentials: false
       - name: Oracle build dependencies (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libclang-18-dev clang-18
+        run: sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list && sudo apt-get update && sudo apt-get install -y libsdl2-dev libclang-18-dev clang-18
       - name: Oracle build dependencies (macOS)
         if: runner.os == 'macOS'
         run: brew install sdl2-compat pkg-config
@@ -171,7 +171,7 @@ jobs:
           submodules: true
           persist-credentials: false
       - name: Oracle build dependencies
-        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libclang-18-dev clang-18
+        run: sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list && sudo apt-get update && sudo apt-get install -y libsdl2-dev libclang-18-dev clang-18
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - uses: taiki-e/install-action@073e1fd0bc889c9aee68dbaaa927cde1b5653a83 # v2.90.11
         with:
