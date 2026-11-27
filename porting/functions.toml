@@ -4413,7 +4413,7 @@ c_sha = "d766dc5b8203"
 rust = "rustyrian_core::tyrian2::network_start_screen"
 status = "verified"
 verify = ["diff:tyrian2::network_start_screen_matches"]
-waived_lines = [{ line = 3178, reason = "unreachable: network_connect returns only once network_is_sync holds, and the only queued packet sent afterwards (DETAILS) leaves the sync counters unchanged; an acknowledgment on an empty queue keeps them in sync" }, { line = 3180, reason = "unreachable: network_connect returns only once network_is_sync holds, and the only queued packet sent afterwards (DETAILS) leaves the sync counters unchanged; an acknowledgment on an empty queue keeps them in sync" }]
+waived_lines = [{ line = 3178, reason = "network_connect returns in sync; the sync wait runs only if the opponent acknowledges a later packet before the handshake's final queued CONNECT (out-of-order delivery), which the in-order loopback backend never produces" }, { line = 3180, reason = "network_connect returns in sync; the sync wait runs only if the opponent acknowledges a later packet before the handshake's final queued CONNECT (out-of-order delivery), which the in-order loopback backend never produces" }]
 notes = ""
 
 [[fn]]

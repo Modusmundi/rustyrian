@@ -1139,7 +1139,7 @@ fn je_event_system_matches_on_synthetic_events() {
         let max_event = usize::from(d.game.varz.max_event);
         assert!(max_event > 10);
         let mut rng = Rng(0x9E37_79B9_7F4A_7C15 ^ frame);
-        for pass in 0..4 {
+        for pass in 0..16 {
             for ty in 0..=90u8 {
                 let what = format!("frame {frame} pass {pass} type {ty}");
                 if rng.one_in(4) {
