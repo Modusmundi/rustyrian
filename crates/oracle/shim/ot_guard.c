@@ -15,6 +15,7 @@
 #undef free
 
 #include <setjmp.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -45,10 +46,25 @@ void ot_shim_exit(int code)
 }
 
 /* Allocations are zero-filled so upstream reads of unwritten memory are
- * deterministic (destruct.c:1460-1467 reads before writing). */
+ * deterministic (destruct.c:1460-1467 reads before writing). Each block is
+ * also followed by OT_SLACK zero bytes, so upstream's small over-reads
+ * (UF-4: song 8 reads one SoundBank past `soundbank`) read zero in every run,
+ * the value the port's guards use. Sanitized builds get no slack, so ASan
+ * still reports every overflow. */
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define OT_SLACK 0
+#endif
+#endif
+#ifndef OT_SLACK
+#define OT_SLACK 256
+#endif
+
 void *ot_shim_malloc(size_t size)
 {
-	void *p = calloc(1, size);
+	if (size > SIZE_MAX - OT_SLACK)
+		return NULL;
+	void *p = calloc(1, size + OT_SLACK);
 	if (p != NULL)
 		ot_shim_rs_alloc(p, size);
 	return p;
@@ -56,7 +72,9 @@ void *ot_shim_malloc(size_t size)
 
 void *ot_shim_calloc(size_t count, size_t size)
 {
-	void *p = calloc(count, size);
+	if (size != 0 && count > (SIZE_MAX - OT_SLACK) / size)
+		return NULL;
+	void *p = calloc(1, count * size + OT_SLACK);
 	if (p != NULL)
 		ot_shim_rs_alloc(p, count * size);
 	return p;
@@ -64,17 +82,21 @@ void *ot_shim_calloc(size_t count, size_t size)
 
 void *ot_shim_realloc(void *old, size_t size)
 {
+	if (size > SIZE_MAX - OT_SLACK)
+		return NULL;
 	size_t old_size = old != NULL ? ot_shim_rs_forget(old) : 0;
-	void *p = realloc(old, size);
+	void *p = realloc(old, size + OT_SLACK);
 	if (p == NULL)
 	{
-		/* failed: the old block is still live */
-		if (old != NULL && size != 0 && old_size != OT_UNKNOWN_SIZE)
+		/* failed: the old block is still live (a zero-size realloc may
+		 * instead have freed it) */
+		if (old != NULL && size + OT_SLACK != 0 && old_size != OT_UNKNOWN_SIZE)
 			ot_shim_rs_alloc(old, old_size);
 		return NULL;
 	}
 	if (old_size != OT_UNKNOWN_SIZE && size > old_size)
 		memset((char *)p + old_size, 0, size - old_size);
+	memset((char *)p + size, 0, OT_SLACK);
 	ot_shim_rs_alloc(p, size);
 	return p;
 }

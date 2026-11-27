@@ -269,8 +269,10 @@ impl Stream {
         Ok(())
     }
 
-    /// Passes the pending writes to the OS. On failure the unwritten rest
-    /// stays pending and `Err(errno)` is returned.
+    /// Passes the pending writes to the OS; `Err(errno)` on failure. After
+    /// a failure Apple/BSD stdio keeps the unwritten rest buffered, while
+    /// glibc and the MSVC CRT discard it (so `ftell` drops back to the OS
+    /// offset).
     fn write_out(&mut self) -> Result<(), i32> {
         let mut n = 0;
         let result = loop {

@@ -53,6 +53,18 @@ fn assert_same(lds: &LdsState, opl: Option<&OplState>) -> Result<(), TestCaseErr
     Ok(())
 }
 
+/// Gives both engines the same zero-padded 64-entry instrument table, so C's
+/// read past `numpatch` (UF-4: a freeware song plays instrument 23 of 23)
+/// stays inside its allocation, also under ASan, and reads the zero the
+/// port's `D-UB-LDS-1` guard uses.
+fn pad_soundbanks(lds: &mut LdsState) {
+    let sb = lds.soundbank.as_mut().expect("a loaded song");
+    sb.resize(64.max(sb.len()), Default::default());
+    let mut c_state = lds_from_c();
+    c_state.soundbank = lds.soundbank.clone();
+    lds_to_c(&c_state);
+}
+
 #[test]
 fn initial_state_matches_c() {
     let _d = Diff::new();
@@ -111,6 +123,7 @@ fn lds_update_matches_every_song() {
         let (_d, mut lds, mut opl) = fresh();
         assert!(c_load(song));
         assert!(l::lds_load(&mut lds, &mut opl, RATE, song));
+        pad_soundbanks(&mut lds);
         for k in 0..20_000 {
             // SAFETY: plain C call on the test thread.
             let c = unsafe { b::lds_update() };
