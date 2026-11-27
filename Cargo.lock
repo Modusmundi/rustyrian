@@ -892,6 +892,7 @@ dependencies = [
  "libc",
  "libm",
  "pkg-config",
+ "png",
  "postcard",
  "pretty_assertions",
  "proptest",

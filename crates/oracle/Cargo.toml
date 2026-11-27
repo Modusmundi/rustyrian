@@ -23,6 +23,7 @@ xxhash-rust.workspace = true
 [dev-dependencies]
 proptest.workspace = true
 pretty_assertions.workspace = true
+png.workspace = true
 
 [build-dependencies]
 bindgen = "0.73"
