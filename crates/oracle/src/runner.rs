@@ -153,7 +153,11 @@ pub fn prepare(args: &RunArgs, engine: &str) -> Result<Session> {
                 (None, None) => None,
                 _ => anyhow::bail!("--snapshot-at and --snapshot-out go together"),
             },
+            // `<base>` first: the base path lies inside the user directory.
+            // The shipped binary records its own base path (the executable's
+            // directory) as `<base>` too, so its traces compare with these.
             redact: vec![
+                (base.display().to_string(), "<base>".to_owned()),
                 (userdir.display().to_string(), "<userdir>".to_owned()),
                 (args.data.display().to_string(), "<data>".to_owned()),
             ],

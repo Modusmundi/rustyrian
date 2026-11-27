@@ -54,13 +54,14 @@ cargo xtask parity journey-save-load          # C vs Rust: traces, user dirs, fi
 cargo xtask bench-ratio                       # Rust/C headless throughput, fails below 0.90
 cargo xtask crossplay                         # a C and a Rust peer play netplay over 127.0.0.1
 cargo xtask coverage && cargo xtask check-trace
+cargo xtask shipped-trace demo-menu --binary target/release/rustyrian  # shipped binary, headless, as the runners run
+cargo xtask trace-cmp target/parity/demo-menu/c.jsonl target/shipped/demo-menu/rust.jsonl
 cargo run -p rustyrian-oracle --example contact_sheet -- target/contact   # C|Rust image pairs
 cargo xtask fuzz-seed && (cd fuzz && cargo +nightly fuzz run net_session)
 ```
 
-Until the Rust main loop lands (milestone M4), `parity`, `bench-ratio` and
-`crossplay` take `--rust-runner PATH`; pointing it at `ot-ref-run` checks the
-tooling C against C.
+`parity`, `bench-ratio` and `crossplay` take `--rust-runner PATH`; pointing it
+at `ot-ref-run` checks the tooling C against C.
 
 ## Releasing
 
