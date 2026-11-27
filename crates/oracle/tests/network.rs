@@ -527,7 +527,7 @@ fn network_send_reaches_loopback_peer() {
         b::network_send(6)
     };
     assert!(c);
-    let sent = session::with(|s| std::mem::take(&mut s.inner_mut().loopback_outbox));
+    let sent = session::with(|s| s.inner().handle().take_sent());
     assert_eq!(sent.len(), 1);
     assert_eq!(sent[0].address, PEER);
     assert_eq!(sent[0].data[..4], [0x00, 0x11, 0x12, 0x34]);
