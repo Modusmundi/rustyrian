@@ -140,7 +140,9 @@ impl Demo {
         let mut c = self.d.c_game_state();
         c.file.user_dir_path = self.d.game.file.user_dir_path.clone();
         c.file.user_dir_path_len = self.d.game.file.user_dir_path_len;
-        assert!(c == self.d.game.snapshot(), "states differ");
+        if let Some(d) = diff::first_difference(&c, &self.d.game.snapshot()) {
+            panic!("states differ at {d}");
+        }
     }
 }
 
