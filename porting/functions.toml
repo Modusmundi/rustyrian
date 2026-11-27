@@ -4409,33 +4409,35 @@ notes = "blocked on demo.c::beginPlayDemo, demo.c::beginRecordDemo, game_menu.c:
 c = "tyrian2.c::networkStartScreen"
 c_sha = "d766dc5b8203"
 rust = "rustyrian_core::tyrian2::network_start_screen"
-status = "todo"
-verify = []
-notes = "blocked on menus.c::difficultySelect, menus.c::episodeSelect"
+status = "verified"
+verify = ["diff:tyrian2::network_start_screen_matches"]
+waived_lines = [{ line = 3178, reason = "unreachable: network_connect returns only once network_is_sync holds, and the only queued packet sent afterwards (DETAILS) leaves the sync counters unchanged; an acknowledgment on an empty queue keeps them in sync" }, { line = 3180, reason = "unreachable: network_connect returns only once network_is_sync holds, and the only queued packet sent afterwards (DETAILS) leaves the sync counters unchanged; an acknowledgment on an empty queue keeps them in sync" }]
+notes = ""
 
 [[fn]]
 c = "tyrian2.c::titleScreen"
 c_sha = "b847f645294c"
 rust = "rustyrian_core::tyrian2::title_screen"
-status = "todo"
-verify = []
-notes = "blocked on mainint.c::JE_helpSystem, mainint.c::JE_highScoreScreen, mainint.c::JE_loadScreen, opentyr.c::setupMenu, tyrian2.c::newGame, tyrian2.c::newSuperArcadeGame"
+status = "verified"
+verify = ["diff:tyrian2::title_screen_matches"]
+waived_lines = [{ line = 3510, reason = "default case of the menu-item switch: selectedIndex is always one of the seven items" }]
+notes = ""
 
 [[fn]]
 c = "tyrian2.c::newGame"
 c_sha = "36d34f3771ea"
 rust = "rustyrian_core::tyrian2::new_game"
-status = "todo"
-verify = []
-notes = "blocked on menus.c::difficultySelect, menus.c::episodeSelect, menus.c::gameplaySelect"
+status = "verified"
+verify = ["diff:tyrian2::new_game_matches"]
+notes = ""
 
 [[fn]]
 c = "tyrian2.c::newSuperArcadeGame"
 c_sha = "6bf32b4f7389"
 rust = "rustyrian_core::tyrian2::new_super_arcade_game"
-status = "todo"
-verify = []
-notes = "blocked on menus.c::difficultySelect, menus.c::episodeSelect"
+status = "verified"
+verify = ["diff:tyrian2::new_super_arcade_game_matches"]
+notes = ""
 
 [[fn]]
 c = "tyrian2.c::newSuperTyrianGame"
@@ -4465,9 +4467,9 @@ notes = ""
 c = "tyrian2.c::JE_displayText"
 c_sha = "50f54ee0aec2"
 rust = "rustyrian_core::tyrian2::je_display_text"
-status = "todo"
-verify = []
-notes = "blocked on mainint.c::JE_outCharGlow"
+status = "verified"
+verify = ["diff:tyrian2::je_display_text_matches"]
+notes = ""
 
 [[fn]]
 c = "tyrian2.c::JE_newEnemy"
@@ -4490,7 +4492,7 @@ c = "tyrian2.c::JE_createNewEventEnemy"
 c_sha = "6ebb456d48a6"
 rust = "rustyrian_core::tyrian2::je_create_new_event_enemy"
 status = "verified"
-verify = ["diff:tyrian2::je_create_new_event_enemy_matches"]
+verify = ["diff:tyrian2::je_create_new_event_enemy_matches", "diff:tyrian2::je_create_new_event_enemy_every_branch"]
 notes = ""
 
 [[fn]]
@@ -4513,9 +4515,9 @@ notes = ""
 c = "tyrian2.c::JE_eventSystem"
 c_sha = "00d9b3b2c71b"
 rust = "rustyrian_core::tyrian2::je_event_system"
-status = "todo"
-verify = []
-notes = "blocked on mainint.c::JE_drawTextWindow"
+status = "verified"
+verify = ["diff:tyrian2::je_event_system_matches_on_synthetic_events", "diff:tyrian2::je_event_system_runs_every_shipped_event"]
+notes = "Level event data indexes fixed tables unchecked, as in C (shapeFile via event 5, globalFlags via 61, smoothies/smoothie_data via 64, newPL via 19/20/27/55/75, eventRec via 75's skip); every shipped level's values are in range (je_event_system_runs_every_shipped_event). The R10 checks belong at the input boundary, JE_loadMap"
 
 [[fn]]
 c = "tyrian2.c::JE_whoa"
