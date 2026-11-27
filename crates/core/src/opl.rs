@@ -152,28 +152,6 @@ pub enum VibvalTable {
     Var2,
 }
 
-/// `optype_fptr` targets (rule R8).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum OpFunc {
-    OperatorAttack,
-    OperatorDecay,
-    OperatorRelease,
-    OperatorSustain,
-    OperatorOff,
-}
-
-/// `opfuncs`, indexed by `op_state`.
-pub const OPFUNCS: [OpFunc; 6] = [
-    OpFunc::OperatorAttack,
-    OpFunc::OperatorDecay,
-    OpFunc::OperatorRelease,
-    // sustain phase (keeping level)
-    OpFunc::OperatorSustain,
-    // sustain_nokeep phase (release-style)
-    OpFunc::OperatorRelease,
-    OpFunc::OperatorOff,
-];
-
 /// Key scale level lookup table (-> 0, 3, 1.5, 6 dB/oct).
 pub const KSLMUL: [Fltype; 4] = [0.0, 0.5, 0.25, 1.0];
 
@@ -318,15 +296,19 @@ impl Default for OplState {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct State {}
 
-/// Runs the envelope function `opfuncs[op_pt.op_state]`.
+/// Runs the envelope function `opfuncs[op_pt.op_state]` (rule R8: upstream's
+/// `opfuncs` table, one arm per entry).
 #[inline(always)]
 fn run_opfunc(op_pt: &mut OpType) {
-    match OPFUNCS[op_pt.op_state as usize] {
-        OpFunc::OperatorAttack => operator_attack(op_pt),
-        OpFunc::OperatorDecay => operator_decay(op_pt),
-        OpFunc::OperatorRelease => operator_release(op_pt),
-        OpFunc::OperatorSustain => operator_sustain(op_pt),
-        OpFunc::OperatorOff => operator_off(op_pt),
+    match op_pt.op_state {
+        OF_TYPE_ATT => operator_attack(op_pt),
+        OF_TYPE_DEC => operator_decay(op_pt),
+        // sustain_nokeep phase (release-style)
+        OF_TYPE_REL | OF_TYPE_SUS_NOKEEP => operator_release(op_pt),
+        // sustain phase (keeping level)
+        OF_TYPE_SUS => operator_sustain(op_pt),
+        OF_TYPE_OFF => operator_off(op_pt),
+        state => panic!("opfuncs has no entry {state}"),
     }
 }
 
@@ -426,7 +408,11 @@ fn output(o: &mut OpType, wavtable: &Wavtable, modulator: i32, trem: i32) {
 
         let wform = o.cur_wform.expect("adlib_init selects a waveform");
         let w = wavtable[wform + (i & o.cur_wmask) as usize];
-        o.cval = (o.step_amp * o.vol * f64::from(w) * f64::from(trem) / 16.0) as i32;
+        // C's `(Bit32s)` of a value far inside `i32` (at most 2^26 in
+        // magnitude). Converting through `i64` gives the same truncation;
+        // on x86-64 its saturation is a compare beside `cvttsd2si`, where
+        // `as i32` clamps the double first, on this sample's critical path.
+        o.cval = (o.step_amp * o.vol * f64::from(w) * f64::from(trem) / 16.0) as i64 as i32;
     }
 }
 
