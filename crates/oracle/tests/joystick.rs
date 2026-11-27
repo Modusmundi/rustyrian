@@ -328,7 +328,8 @@ proptest! {
         if let Some(v) = d.game.joystick.joystick.as_mut() {
             for (i, j) in v.iter_mut().enumerate() {
                 j.analog = i % 2 == 0;
-                j.sensitivity += i as i32;
+                // Configured sensitivities span the whole `int` range.
+                j.sensitivity = j.sensitivity.wrapping_add(i as i32);
             }
         }
         d.store();
