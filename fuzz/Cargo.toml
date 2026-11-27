@@ -13,6 +13,22 @@ libfuzzer-sys = "0.4"
 rustyrian-core = { path = "../crates/core" }
 rustyrian-harness = { path = "../crates/harness" }
 
+# `differential`: the C oracle and what the forked C side needs. Linux only:
+# elsewhere the oracle is never built (and `src/lib.rs` refuses the feature).
+[target.'cfg(target_os = "linux")'.dependencies]
+rustyrian-oracle = { path = "../crates/oracle", optional = true }
+libc = { version = "0.2", optional = true }
+postcard = { version = "1", features = ["use-std"], optional = true }
+serde = { version = "1", optional = true }
+serde_json = { version = "1", optional = true }
+
+[features]
+# The `diff_*` targets (`diff_targets/`): each input through the C oracle as
+# well, outputs compared. Linux only (CI and the amd64 container); needs the
+# oracle's build dependencies (clang, libclang, SDL2 headers). See
+# `src/differential.rs` for how to run them.
+differential = ["dep:rustyrian-oracle", "dep:libc", "dep:postcard", "dep:serde", "dep:serde_json"]
+
 # Not part of the main workspace (cargo-fuzz needs nightly and its own profile).
 [workspace]
 members = ["."]
@@ -38,6 +54,145 @@ bench = false
 [[bin]]
 name = "net_session"
 path = "fuzz_targets/net_session.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "cfg_binary"
+path = "fuzz_targets/cfg_binary.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "save"
+path = "fuzz_targets/save.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "demo"
+path = "fuzz_targets/demo.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "level_index"
+path = "fuzz_targets/level_index.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "episode_items"
+path = "fuzz_targets/episode_items.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "shapes"
+path = "fuzz_targets/shapes.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sprite2_blit"
+path = "fuzz_targets/sprite2_blit.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "extra_shapes"
+path = "fuzz_targets/extra_shapes.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pcx"
+path = "fuzz_targets/pcx.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pic"
+path = "fuzz_targets/pic.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "anm"
+path = "fuzz_targets/anm.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "lds_song"
+path = "fuzz_targets/lds_song.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "snd"
+path = "fuzz_targets/snd.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "diff_cfg_text"
+path = "diff_targets/cfg_text.rs"
+required-features = ["differential"]
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "diff_save"
+path = "diff_targets/save.rs"
+required-features = ["differential"]
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "diff_level_index"
+path = "diff_targets/level_index.rs"
+required-features = ["differential"]
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "diff_pcx"
+path = "diff_targets/pcx.rs"
+required-features = ["differential"]
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "diff_pic"
+path = "diff_targets/pic.rs"
+required-features = ["differential"]
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "diff_anm"
+path = "diff_targets/anm.rs"
+required-features = ["differential"]
 test = false
 doc = false
 bench = false
