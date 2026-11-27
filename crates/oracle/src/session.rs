@@ -55,6 +55,11 @@ pub(crate) fn register_atexit(f: unsafe extern "C" fn()) {
     ATEXIT.with(|a| a.borrow_mut().push(f));
 }
 
+/// Number of handlers C registered with `atexit` (only `SDL_Quit` upstream).
+pub fn atexit_len() -> usize {
+    ATEXIT.with(|a| a.borrow().len())
+}
+
 pub(crate) fn crand_next() -> i32 {
     CRAND.with(|c| crand::rand(&mut c.borrow_mut()))
 }

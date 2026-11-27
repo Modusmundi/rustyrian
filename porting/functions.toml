@@ -3666,14 +3666,16 @@ c_sha = "2403ee7222a6"
 rust = "rustyrian_core::opentyr::setup_menu"
 status = "verified"
 verify = ["diff:opentyr::setup_menu_graphics_pickers_match", "diff:opentyr::setup_menu_sound_matches", "diff:opentyr::setup_menu_jukebox_matches", "diff:opentyr::setup_menu_mouse_matches", "diff:opentyr::setup_menu_matches"]
+waived_lines = [{ line = 557, reason = "unreachable: the Destruct entry is commented out of the setup menu table (opentyr.c:149)" }, { line = 559, reason = "as line 557" }, { line = 561, reason = "as line 557" }, { line = 563, reason = "as line 557" }, { line = 564, reason = "as line 557" }, { line = 509, reason = "unreachable default arm: every scancode reaching it is ignored" }, { line = 607, reason = "unreachable default arm: every menu item id is handled above" }, { line = 742, reason = "unreachable default arm: only picker items open a picker" }, { line = 729, reason = "needs init_scaler to fail for both the new and the old scaler; the fake platform never fails it" }, { line = 731, reason = "as line 729" }]
 notes = ""
 
 [[fn]]
 c = "opentyr.c::main"
 c_sha = "cfb081131cf0"
 rust = "rustyrian_core::opentyr::main"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:opentyr::main_help_matches", "diff:opentyr::main_bad_argument_matches", "diff:opentyr::main_missing_data_matches", "diff:opentyr::main_logos_title_quit_matches", "diff:opentyr::main_sdl_init_failure_matches", "diff:opentyr::main_old_data_versions_match", "diff:opentyr::main_options_logos_title_quit_match", "diff:opentyr::main_xmas_missing_matches", "diff:opentyr::main_network_init_failure_matches"]
+waived_lines = [{ line = 918, reason = "needs a game played to the end of SuperTyrian (trentWin); the parity journeys cover JE_main, not this ending" }]
 notes = ""
 
 [[fn]]
