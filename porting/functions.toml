@@ -82,168 +82,168 @@ notes = ""
 c = "backgrnd.c::JE_darkenBackground"
 c_sha = "444879c72853"
 rust = "rustyrian_core::backgrnd::je_darken_background"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:backgrnd::je_darken_background_matches"]
 notes = ""
 
 [[fn]]
 c = "backgrnd.c::blitBackground1Row"
 c_sha = "778155aaf85a"
 rust = "rustyrian_core::backgrnd::blit_background1_row"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:backgrnd::draw_background_1_matches"]
 notes = ""
 
 [[fn]]
 c = "backgrnd.c::blitBackgroundRow"
 c_sha = "ced68febc0a9"
 rust = "rustyrian_core::backgrnd::blit_background_row"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:backgrnd::draw_background_2_matches", "diff:backgrnd::draw_background_3_matches"]
 notes = ""
 
 [[fn]]
 c = "backgrnd.c::blitBackgroundRowBlend"
 c_sha = "d52ae28d1c60"
 rust = "rustyrian_core::backgrnd::blit_background_row_blend"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:backgrnd::draw_background_2_matches"]
 notes = ""
 
 [[fn]]
 c = "backgrnd.c::draw_background_1"
 c_sha = "f21b73804932"
 rust = "rustyrian_core::backgrnd::draw_background_1"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:backgrnd::draw_background_1_matches"]
 notes = ""
 
 [[fn]]
 c = "backgrnd.c::draw_background_2"
 c_sha = "cc42917c1b40"
 rust = "rustyrian_core::backgrnd::draw_background_2"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:backgrnd::draw_background_2_matches"]
 notes = ""
 
 [[fn]]
 c = "backgrnd.c::draw_background_2_blend"
 c_sha = "65adbe8f53af"
 rust = "rustyrian_core::backgrnd::draw_background_2_blend"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:backgrnd::draw_background_2_matches"]
 notes = ""
 
 [[fn]]
 c = "backgrnd.c::draw_background_3"
 c_sha = "3f137b07b38f"
 rust = "rustyrian_core::backgrnd::draw_background_3"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:backgrnd::draw_background_3_matches"]
 notes = ""
 
 [[fn]]
 c = "backgrnd.c::filterScreenHue"
 c_sha = "4b0cb0f5e375"
 rust = "rustyrian_core::backgrnd::filter_screen_hue"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:backgrnd::filter_screen_hue_and_value_match_for_every_argument", "diff:backgrnd::je_filter_screen_matches"]
 notes = ""
 
 [[fn]]
 c = "backgrnd.c::filterScreenValue"
 c_sha = "f2369b6aa155"
 rust = "rustyrian_core::backgrnd::filter_screen_value"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:backgrnd::filter_screen_hue_and_value_match_for_every_argument", "diff:backgrnd::je_filter_screen_matches"]
 notes = ""
 
 [[fn]]
 c = "backgrnd.c::JE_filterScreen"
 c_sha = "c21fb82de3a2"
 rust = "rustyrian_core::backgrnd::je_filter_screen"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:backgrnd::je_filter_screen_matches"]
 notes = ""
 
 [[fn]]
 c = "backgrnd.c::JE_checkSmoothies"
 c_sha = "fe9d9e5018c3"
 rust = "rustyrian_core::backgrnd::je_check_smoothies"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:backgrnd::je_check_smoothies_matches"]
 notes = ""
 
 [[fn]]
 c = "backgrnd.c::lava_filter"
 c_sha = "345e1b99d034"
 rust = "rustyrian_core::backgrnd::lava_filter"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:backgrnd::filters_match"]
 notes = ""
 
 [[fn]]
 c = "backgrnd.c::water_filter"
 c_sha = "70ce939e5999"
 rust = "rustyrian_core::backgrnd::water_filter"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:backgrnd::filters_match"]
 notes = ""
 
 [[fn]]
 c = "backgrnd.c::iced_blur_filter"
 c_sha = "665083150fba"
 rust = "rustyrian_core::backgrnd::iced_blur_filter"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:backgrnd::filters_match"]
 notes = ""
 
 [[fn]]
 c = "backgrnd.c::blur_filter"
 c_sha = "bf32283390b5"
 rust = "rustyrian_core::backgrnd::blur_filter"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:backgrnd::filters_match"]
 notes = ""
 
 [[fn]]
 c = "backgrnd.c::showHeadlight"
 c_sha = "562f770b22a6"
 rust = "rustyrian_core::backgrnd::show_headlight"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:backgrnd::show_functions_match"]
 notes = ""
 
 [[fn]]
 c = "backgrnd.c::showFlipped"
 c_sha = "f739323e4a3d"
 rust = "rustyrian_core::backgrnd::show_flipped"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:backgrnd::show_functions_match"]
 notes = ""
 
 [[fn]]
 c = "backgrnd.c::showNormal"
 c_sha = "6e9d07a7c550"
 rust = "rustyrian_core::backgrnd::show_normal"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:backgrnd::show_functions_match"]
 notes = ""
 
 [[fn]]
 c = "backgrnd.c::initialize_starfield"
 c_sha = "b81efeacf4b3"
 rust = "rustyrian_core::backgrnd::initialize_starfield"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:backgrnd::starfield_matches"]
 notes = ""
 
 [[fn]]
 c = "backgrnd.c::update_and_draw_starfield"
 c_sha = "4ba20b5dfccc"
 rust = "rustyrian_core::backgrnd::update_and_draw_starfield"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:backgrnd::starfield_matches"]
 notes = ""
 
 [[fn]]
@@ -252,54 +252,55 @@ c_sha = "a70b46effbe3"
 rust = "rustyrian_core::config::load_open_tyrian_config"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked on video_scale.c::set_scaler_by_name and video.c::set_scaling_mode_by_name (not verified on main)"
 
 [[fn]]
 c = "config.c::saveOpenTyrianConfig"
 c_sha = "23ea1a316955"
 rust = "rustyrian_core::config::save_open_tyrian_config"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:config::save_configuration_matches", "diff:config::save_files_unwritable_dir_matches", "diff:config::save_files_write_errors_match"]
+waived_lines = [{ line = 317, reason = "out of memory adding a config section (allocation failure aborts in Rust)" }, { line = 327, reason = "out of memory adding a config section (allocation failure aborts in Rust)" }]
 notes = ""
 
 [[fn]]
 c = "config.c::playeritems_to_pitems"
 c_sha = "7b3d1603ed55"
 rust = "rustyrian_core::config::playeritems_to_pitems"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:config::playeritems_to_pitems_matches", "diff:config::je_save_game_and_je_load_game_match"]
 notes = ""
 
 [[fn]]
 c = "config.c::pitems_to_playeritems"
 c_sha = "108510ed5dee"
 rust = "rustyrian_core::config::pitems_to_playeritems"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:config::pitems_to_playeritems_matches", "diff:config::je_save_game_and_je_load_game_match"]
 notes = ""
 
 [[fn]]
 c = "config.c::JE_saveGame"
 c_sha = "57ef99469ed8"
 rust = "rustyrian_core::config::je_save_game"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:config::je_save_game_and_je_load_game_match"]
 notes = ""
 
 [[fn]]
 c = "config.c::JE_loadGame"
 c_sha = "0b1f5dd71fc1"
 rust = "rustyrian_core::config::je_load_game"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:config::je_save_game_and_je_load_game_match"]
 notes = ""
 
 [[fn]]
 c = "config.c::JE_initProcessorType"
 c_sha = "7f1d6f5f2c1d"
 rust = "rustyrian_core::config::je_init_processor_type"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:config::je_init_processor_type_matches"]
 notes = ""
 
 [[fn]]
@@ -308,7 +309,7 @@ c_sha = "dddc846424a8"
 rust = "rustyrian_core::config::je_set_new_game_speed"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked on nortsong.c::setFrameSpeed and nortsong.c::setFrameCount (not verified on main)"
 
 [[fn]]
 c = "config.c::loadConfiguration"
@@ -316,46 +317,46 @@ c_sha = "5dc24cedaefc"
 rust = "rustyrian_core::config::load_configuration"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked on loudness.c::set_volume (not verified on main) and config.c::loadOpenTyrianConfig"
 
 [[fn]]
 c = "config.c::saveConfiguration"
 c_sha = "54325d0ae63e"
 rust = "rustyrian_core::config::save_configuration"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:config::save_configuration_matches", "diff:config::save_files_unwritable_dir_matches", "diff:config::save_files_write_errors_match"]
 notes = ""
 
 [[fn]]
 c = "config.c::loadSaves"
 c_sha = "ea7b687f0d52"
 rust = "rustyrian_core::config::load_saves"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:config::save_saves_and_load_saves_round_trip", "diff:config::load_saves_damaged_files_match", "diff:config::load_saves_missing_file_matches", "diff:config::load_saves_each_checksum_failure_matches"]
 notes = ""
 
 [[fn]]
 c = "config.c::saveSaves"
 c_sha = "d50a4fcbd363"
 rust = "rustyrian_core::config::save_saves"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:config::save_saves_and_load_saves_round_trip", "diff:config::save_files_unwritable_dir_matches", "diff:config::save_files_write_errors_match"]
 notes = ""
 
 [[fn]]
 c = "config.c::encryptSaveData"
 c_sha = "7805c75500b3"
 rust = "rustyrian_core::config::encrypt_save_data"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:config::save_saves_and_load_saves_round_trip"]
 notes = ""
 
 [[fn]]
 c = "config.c::decryptSaveData"
 c_sha = "d423fd353f3b"
 rust = "rustyrian_core::config::decrypt_save_data"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:config::load_saves_damaged_files_match", "diff:config::load_saves_each_checksum_failure_matches"]
 notes = ""
 
 [[fn]]
@@ -1356,32 +1357,32 @@ notes = ""
 c = "episodes.c::JE_loadItemDat"
 c_sha = "71012a02aa72"
 rust = "rustyrian_core::episodes::je_load_item_dat"
-status = "todo"
-verify = []
-notes = ""
+status = "verified"
+verify = ["diff:episodes::je_init_episode_loads_every_episode", "diff:episodes::je_load_item_dat_truncated_files_match", "diff:episodes::je_load_item_dat_episode4_missing_level_file_matches", "diff:episodes::je_load_item_dat_rejects_level_file_without_levels"]
+notes = "R10 guard: an episode-4 level file without levels halts (UF-5, D-UB-EPISODES-1)"
 
 [[fn]]
 c = "episodes.c::JE_initEpisode"
 c_sha = "4e64bd69e18d"
 rust = "rustyrian_core::episodes::je_init_episode"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:episodes::je_init_episode_loads_every_episode", "diff:episodes::je_init_episode_missing_files_match"]
 notes = ""
 
 [[fn]]
 c = "episodes.c::JE_scanForEpisodes"
 c_sha = "87f6c57988ed"
 rust = "rustyrian_core::episodes::je_scan_for_episodes"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:episodes::je_scan_for_episodes_matches"]
 notes = ""
 
 [[fn]]
 c = "episodes.c::JE_findNextEpisode"
 c_sha = "38a5de99614f"
 rust = "rustyrian_core::episodes::je_find_next_episode"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:episodes::je_find_next_episode_matches"]
 notes = ""
 
 [[fn]]
@@ -2564,8 +2565,8 @@ notes = ""
 c = "lvllib.c::analyzeLevel"
 c_sha = "1cc869ccc0e4"
 rust = "rustyrian_core::lvllib::analyze_level"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:lvllib::analyze_level_matches_on_every_episode", "diff:lvllib::analyze_level_missing_file_matches", "diff:lvllib::analyze_level_crafted_files_match"]
 notes = ""
 
 [[fn]]
@@ -3983,24 +3984,24 @@ notes = ""
 c = "player.c::calc_purple_balls_needed"
 c_sha = "703ed2007d34"
 rust = "rustyrian_core::player::calc_purple_balls_needed"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:player::calc_purple_balls_needed_matches"]
 notes = ""
 
 [[fn]]
 c = "player.c::power_up_weapon"
 c_sha = "40a09889cb27"
 rust = "rustyrian_core::player::power_up_weapon"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:player::power_up_weapon_matches"]
 notes = ""
 
 [[fn]]
 c = "player.c::handle_got_purple_ball"
 c_sha = "990a9de1332d"
 rust = "rustyrian_core::player::handle_got_purple_ball"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:player::handle_got_purple_ball_matches"]
 notes = ""
 
 [[fn]]
@@ -4025,14 +4026,14 @@ c_sha = "996feb306dcc"
 rust = "rustyrian_core::shots::simulate_player_shots"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked on sprite.c::blit_sprite2 (not verified on main)"
 
 [[fn]]
 c = "shots.c::player_shot_set_direction"
 c_sha = "11d4a325dc63"
 rust = "rustyrian_core::shots::player_shot_set_direction"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:shots::player_shot_set_direction_matches"]
 notes = ""
 
 [[fn]]
@@ -4041,15 +4042,15 @@ c_sha = "de1d09ee601d"
 rust = "rustyrian_core::shots::player_shot_move_and_draw"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked on sprite.c::blit_sprite2, sprite.c::blit_sprite2_darken, sprite.c::blit_sprite_blend, sprite.h::sprite, varz.c::JE_doSP, varz.c::JE_setupExplosion (not verified on main)"
 
 [[fn]]
 c = "shots.c::player_shot_create"
 c_sha = "ea7914075221"
 rust = "rustyrian_core::shots::player_shot_create"
-status = "todo"
-verify = []
-notes = ""
+status = "verified"
+verify = ["diff:shots::player_shot_create_matches"]
+notes = "multi positions past 8 reproduce C's adjacent-field reads (D-UB-SHOTS-1)"
 
 [[fn]]
 c = "sprite.c::load_sprites_file"
@@ -4297,62 +4298,62 @@ c_sha = "c2e0525812df"
 rust = "rustyrian_core::starlib::star_lib_main"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked on keyboard.c::handleSdlEvents, keyboard.c::keyboardGetInput, keyboard.c::waitUntilGetInput, joystick.c::push_joysticks_as_keyboard (not verified on main)"
 
 [[fn]]
 c = "starlib.c::JE_wackyCol"
 c_sha = "aff44893c5aa"
 rust = "rustyrian_core::starlib::je_wacky_col"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:starlib::je_reset_values_and_wacky_col_match"]
 notes = ""
 
 [[fn]]
 c = "starlib.c::JE_starlib_init"
 c_sha = "f6381da63942"
 rust = "rustyrian_core::starlib::je_starlib_init"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:starlib::je_starlib_init_matches"]
 notes = ""
 
 [[fn]]
 c = "starlib.c::JE_resetValues"
 c_sha = "a9102368349d"
 rust = "rustyrian_core::starlib::je_reset_values"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:starlib::je_reset_values_and_wacky_col_match"]
 notes = ""
 
 [[fn]]
 c = "starlib.c::JE_changeSetup"
 c_sha = "092d24bf21e4"
 rust = "rustyrian_core::starlib::je_change_setup"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:starlib::je_change_setup_matches"]
 notes = ""
 
 [[fn]]
 c = "starlib.c::JE_newStar"
 c_sha = "47a3e5af7e1a"
 rust = "rustyrian_core::starlib::je_new_star"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:starlib::je_new_star_matches"]
 notes = ""
 
 [[fn]]
 c = "swar.h::swar8Read"
 c_sha = "6f0e1f64e26d"
 rust = "rustyrian_core::swar::swar8_read"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:swar::swar8_read_matches", "diff:backgrnd::filters_match"]
 notes = ""
 
 [[fn]]
 c = "swar.h::swar8Write"
 c_sha = "b1317e9e0da1"
 rust = "rustyrian_core::swar::swar8_write"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:swar::swar8_write_matches", "diff:backgrnd::filters_match"]
 notes = ""
 
 [[fn]]

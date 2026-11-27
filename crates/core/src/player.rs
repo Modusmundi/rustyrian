@@ -4,6 +4,7 @@
 
 //! Port of upstream `player.c` / `player.h`.
 
+use crate::Game;
 use serde::{Deserialize, Serialize};
 
 pub const FRONT_WEAPON: usize = 0;
@@ -124,4 +125,48 @@ impl Player {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct State {
     pub player: [Player; 2],
+}
+
+/// `purple_balls_required` (function-local constant of
+/// `calc_purple_balls_needed`).
+const PURPLE_BALLS_REQUIRED: [u32; 12] = [1, 1, 2, 4, 8, 12, 16, 20, 25, 30, 40, 50];
+
+/// `calc_purple_balls_needed(&player[p])`.
+pub fn calc_purple_balls_needed(g: &mut Game, p: usize) {
+    let this_player = &mut g.player.player[p];
+    this_player.purple_balls_needed = PURPLE_BALLS_REQUIRED[usize::from(this_player.lives())];
+}
+
+/// `power_up_weapon(&player[p], port)`.
+pub fn power_up_weapon(g: &mut Game, p: usize, port: u32) -> bool {
+    let port = port as usize;
+    let this_player = &mut g.player.player[p];
+    let can_power_up =
+        this_player.items.weapon[port].id != 0 && this_player.items.weapon[port].power < 11;
+    if can_power_up {
+        this_player.items.weapon[port].power += 1;
+        g.config.shot_multi_pos[port] = 0;
+
+        calc_purple_balls_needed(g, p);
+    } else {
+        // cash consolation prize
+        this_player.cash = this_player.cash.wrapping_add(1000);
+    }
+
+    can_power_up
+}
+
+/// `handle_got_purple_ball(&player[p])`.
+pub fn handle_got_purple_ball(g: &mut Game, p: usize) {
+    let this_player = &mut g.player.player[p];
+    if this_player.purple_balls_needed > 1 {
+        this_player.purple_balls_needed -= 1;
+    } else {
+        let port = if this_player.is_dragonwing {
+            REAR_WEAPON
+        } else {
+            FRONT_WEAPON
+        };
+        power_up_weapon(g, p, port as u32);
+    }
 }
