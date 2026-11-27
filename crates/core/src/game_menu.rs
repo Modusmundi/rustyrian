@@ -15,10 +15,10 @@ use crate::sdl::upper_blit;
 use crate::shots::{player_shot_create, simulate_player_shots};
 use crate::sndmast::{S_CLICK, S_CURSOR, S_SPRING};
 use crate::sprite::{
-    self, FONT_SHAPES, OPTION_SHAPES, PLANET_SHAPES, SMALL_FONT_SHAPES, TINY_FONT, blit_sprite,
-    blit_sprite_dark,
+    self, FONT_SHAPES, OPTION_SHAPES, PLANET_SHAPES, SMALL_FONT_SHAPES, TINY_FONT, WEAPON_SHAPES,
+    blit_sprite, blit_sprite_dark, blit_sprite_hv, blit_sprite2x2,
 };
-use crate::varz::{P_ANI, PGR};
+use crate::varz::{P_ANI, PGR, Sprite2Ref, je_s_gr};
 use crate::vga256d::{fill_rectangle_xy, je_bar_shade, je_pix, je_pix3, je_rectangle};
 use crate::video::{self, ScreenId};
 use crate::{joystick, mouse, network, nortsong, picload};
@@ -1116,4 +1116,229 @@ pub fn je_weapon_view_frame(g: &mut Game) {
     fill_rectangle_xy(g, screen, 145, t - 1, 149, t - 1, t2 as u8);
 
     g.config.last_power = u32::from(g.varz.temp);
+}
+
+/// The item graphic of `item_num` in the table of `item_type`, or 0 for a
+/// type without one. An item number past its table (only from damaged saves
+/// or demos; upstream reads outside the table) has none (`D-UB-GAMEMENU-2`).
+fn item_graphic(g: &Game, item_type: u8, item_num: u16) -> u16 {
+    let e = &g.episodes;
+    let i = usize::from(item_num);
+    match item_type {
+        2 | 3 => e.weapon_port.get(i).map(|w| w.itemgraphic),
+        5 => e.power_sys.get(i).map(|p| p.itemgraphic),
+        6 | 7 => e.options.get(i).map(|o| o.itemgraphic),
+        4 => e.shields.get(i).map(|s| s.itemgraphic),
+        _ => Some(0),
+    }
+    .unwrap_or(0)
+}
+
+/// Draws item `item_num` of upgrade row `item_type` (1 = ship) at (`x`, `y`).
+#[doc(alias = "JE_drawItem")]
+pub fn je_draw_item(g: &mut Game, item_type: u8, item_num: u16, x: u16, y: u16) {
+    if item_num == 0 {
+        return;
+    }
+    let temp_w = item_graphic(g, item_type, item_num);
+    let screen = g.video.vga_screen_id();
+    let (x, y) = (i32::from(x), i32::from(y));
+
+    if item_type == 1 {
+        if item_num > 90 {
+            let mut ptr = Some(Sprite2Ref::SpriteSheet9);
+            let gr = je_s_gr(g, item_num - 90, &mut ptr);
+            g.varz.ship_gr_ptr = ptr;
+            g.varz.ship_gr = gr;
+            let sheet = ptr.unwrap_or(Sprite2Ref::SpriteSheet9);
+            blit_sprite2x2(g, screen, x, y, sheet, u32::from(gr));
+        } else if let Some(ship) = g.episodes.ships.get(usize::from(item_num)) {
+            // ship numbers past the table: `D-UB-GAMEMENU-2`
+            let gr = ship.shipgraphic;
+            blit_sprite2x2(g, screen, x, y, Sprite2Ref::SpriteSheet9, u32::from(gr));
+        }
+    } else if temp_w > 0 {
+        blit_sprite2x2(
+            g,
+            screen,
+            x,
+            y,
+            Sprite2Ref::ShopSpriteSheet,
+            u32::from(temp_w),
+        );
+    }
+}
+
+/// `weapon_sprites`: the illustration sprite of each weapon port.
+const WEAPON_SPRITES: [i32; 43] = [
+    -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 21, 5, 13, -1, 14, 15, 0, 14, 9, 8, 2, 15, 0, 13, 0,
+    8, 8, 11, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1,
+];
+/// `front_weapon_xy_list`: position slot of each weapon in the front port.
+const FRONT_WEAPON_XY_LIST: [i32; 43] = [
+    -1, 4, 9, 3, 8, 2, 5, 10, 1, -1, -1, -1, -1, 7, 8, -1, -1, 0, -1, 4, 0, -1, -1, 3, -1, 4, -1,
+    4, -1, -1, -1, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 9,
+];
+const FRONT_WEAPON_X: [i32; 12] = [59, 66, 66, 54, 61, 51, 58, 51, 61, 52, 53, 58];
+const FRONT_WEAPON_Y: [i32; 12] = [38, 53, 41, 36, 48, 35, 41, 35, 53, 41, 39, 31];
+/// `rear_weapon_xy_list`: position slot of each weapon in the rear port.
+const REAR_WEAPON_XY_LIST: [i32; 43] = [
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 1, 2, 3, -1, 4, 5, -1, -1, 6, -1, -1, 1, 0, -1, 6, -1,
+    5, -1, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1,
+];
+const REAR_WEAPON_X: [i32; 7] = [41, 27, 49, 43, 51, 39, 41];
+const REAR_WEAPON_Y: [i32; 7] = [92, 92, 113, 102, 97, 96, 76];
+
+/// The weapon illustration at slot `list[id]` of the position tables, if
+/// upstream reads inside them (`D-UB-GAMEMENU-2` otherwise).
+fn weapon_spot(list: &[i32; 43], xs: &[i32], ys: &[i32], id: u8) -> Option<(i32, i32, u32)> {
+    let id = usize::from(id);
+    let slot = usize::try_from(*list.get(id)?).ok()?;
+    Some((*xs.get(slot)?, *ys.get(slot)?, WEAPON_SPRITES[id] as u32))
+}
+
+/// The upgrade screen's picture of the player's ship with its generator,
+/// weapons, sidekicks and shield. Parts whose item numbers lie outside the
+/// illustration tables (only from damaged saves or demos, where upstream
+/// reads outside them) are not drawn (`D-UB-GAMEMENU-2`).
+pub fn draw_ship_illustration(g: &mut Game) {
+    let seg = vga_seg(g);
+    let items = g.player.player[0].items;
+
+    // ship
+    {
+        let sprite_id = match g.episodes.ships.get(usize::from(items.ship)) {
+            Some(s) => i32::from(s.bigshipgraphic) - 1,
+            None => 31, // custom ships get a default
+        };
+
+        const SHIP_X: [i32; 6] = [31, 0, 0, 0, 35, 31];
+        const SHIP_Y: [i32; 6] = [36, 0, 0, 0, 33, 35];
+
+        if let Ok(k) = usize::try_from(sprite_id - 27)
+            && k < SHIP_X.len()
+        {
+            blit_sprite(
+                g,
+                seg,
+                SHIP_X[k],
+                SHIP_Y[k],
+                OPTION_SHAPES as u32,
+                sprite_id as u32,
+            );
+        }
+    }
+
+    // generator
+    {
+        let gen_ = i32::from(items.generator);
+        // generators 1 and 2 share a sprite
+        let sprite_id = if gen_ == 1 { gen_ + 15 } else { gen_ + 14 };
+
+        const GENERATOR_X: [i32; 5] = [62, 64, 67, 66, 63];
+        const GENERATOR_Y: [i32; 5] = [84, 85, 86, 84, 97];
+        if let Ok(k) = usize::try_from(sprite_id - 16)
+            && k < GENERATOR_X.len()
+        {
+            let (x, y) = (GENERATOR_X[k], GENERATOR_Y[k]);
+            blit_sprite(g, seg, x, y, WEAPON_SHAPES as u32, sprite_id as u32);
+        }
+    }
+
+    // front weapon
+    let front = items.weapon[FRONT_WEAPON].id;
+    if front > 0
+        && let Some((x, y, s)) = weapon_spot(
+            &FRONT_WEAPON_XY_LIST,
+            &FRONT_WEAPON_X,
+            &FRONT_WEAPON_Y,
+            front,
+        )
+    {
+        blit_sprite(g, seg, x, y, WEAPON_SHAPES as u32, s); // ship illustration: front weapon
+    }
+
+    // rear weapon
+    let rear = items.weapon[REAR_WEAPON].id;
+    if rear > 0
+        && let Some((x, y, s)) =
+            weapon_spot(&REAR_WEAPON_XY_LIST, &REAR_WEAPON_X, &REAR_WEAPON_Y, rear)
+    {
+        blit_sprite(g, seg, x, y, WEAPON_SHAPES as u32, s);
+    }
+
+    // sidekicks
+    je_draw_item(g, 6, u16::from(items.sidekick[LEFT_SIDEKICK]), 3, 84);
+    je_draw_item(g, 7, u16::from(items.sidekick[RIGHT_SIDEKICK]), 129, 84);
+
+    // shield
+    if let Some(s) = g.episodes.shields.get(usize::from(items.shield)) {
+        let value = (i32::from(s.mpwr) - 10) as i8;
+        blit_sprite_hv(g, seg, 28, 23, OPTION_SHAPES as u32, 26, 15, value);
+    }
+}
+
+/// One frame of the weapon simulator with the power-level controls and the
+/// player's ship.
+#[doc(alias = "JE_weaponSimUpdate")]
+pub fn je_weapon_sim_update(g: &mut Game) {
+    je_weapon_view_frame(g);
+
+    let screen = g.video.vga_screen_id();
+    let seg = vga_seg(g);
+    let gm = &g.game_menu;
+    let upgrades = gm.cur_sel[usize::from(MENU_UPGRADES)];
+    let sub = gm.cur_sel[usize::from(MENU_UPGRADE_SUB)];
+    // front or rear weapon, not "Done", not "None"
+    let weapon_row = (upgrades == 3 || upgrades == 4)
+        && sub < gm.menu_choices[usize::from(MENU_UPGRADE_SUB)]
+        && {
+            let slot = usize::from(ITEM_AVAIL_MAP[usize::from(upgrades) - 2]) - 1;
+            // a selection before the list: `D-UB-GAMEMENU-2`
+            usize::from(sub)
+                .checked_sub(2)
+                .and_then(|i| g.tyrian2.item_avail[slot].get(i))
+                .is_some_and(|&a| a != 0)
+        };
+
+    if weapon_row {
+        if gm.left_power {
+            let buf = format!("{}\0", g.mainint.downgrade_cost);
+            fonthand::je_out_text(g, screen, 26, 137, buf.as_bytes(), 1, 4);
+        } else {
+            blit_sprite(g, seg, 24, 149, OPTION_SHAPES as u32, 13); // downgrade disabled
+        }
+
+        if g.game_menu.right_power {
+            let buf = format!("{}\0", g.mainint.upgrade_cost);
+            if !g.game_menu.right_power_afford {
+                fonthand::je_out_text(g, screen, 108, 137, buf.as_bytes(), 7, 4);
+                blit_sprite(g, seg, 119, 149, OPTION_SHAPES as u32, 14); // upgrade disabled
+            } else {
+                fonthand::je_out_text(g, screen, 108, 137, buf.as_bytes(), 1, 4);
+            }
+        } else {
+            blit_sprite(g, seg, 119, 149, OPTION_SHAPES as u32, 14); // upgrade disabled
+        }
+
+        g.varz.temp = g.player.player[0].items.weapon[usize::from(upgrades) - 3].power;
+
+        for x in 1..=i32::from(g.varz.temp) {
+            fill_rectangle_xy(g, screen, 39 + x * 6, 151, 39 + x * 6 + 4, 151, 251);
+            je_pix(g, screen, 39 + x * 6, 151, 252);
+            fill_rectangle_xy(g, screen, 39 + x * 6, 152, 39 + x * 6 + 4, 164, 250);
+            fill_rectangle_xy(g, screen, 39 + x * 6, 165, 39 + x * 6 + 4, 165, 249);
+        }
+
+        let buf = format!("POWER: {}\0", g.varz.temp);
+        fonthand::je_out_text(g, screen, 58, 137, buf.as_bytes(), 15, 4);
+    } else {
+        g.game_menu.left_power = false;
+        g.game_menu.right_power = false;
+        blit_sprite(g, seg, 20, 146, OPTION_SHAPES as u32, 17); // hide power level interface
+    }
+
+    let p = &g.player.player[0];
+    let (ship, x, y) = (p.items.ship, (p.x - 5) as u16, (p.y - 7) as u16);
+    je_draw_item(g, 1, u16::from(ship), x, y);
 }

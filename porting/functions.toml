@@ -1886,9 +1886,9 @@ notes = "blocked: calls mainint.c::JE_getCost/JE_drawCube/JE_helpSystem, varz.c:
 c = "game_menu.c::draw_ship_illustration"
 c_sha = "10dce864108e"
 rust = "rustyrian_core::game_menu::draw_ship_illustration"
-status = "todo"
-verify = []
-notes = "blocked: calls game_menu.c::JE_drawItem (blocked on varz.c::JE_SGr)"
+status = "verified"
+verify = ["diff:game_menu::draw_ship_illustration_matches"]
+notes = ""
 
 [[fn]]
 c = "game_menu.c::load_cubes"
@@ -1910,9 +1910,9 @@ notes = "blocked: calls mainint.c::str_pop_int (not verified on main)"
 c = "game_menu.c::JE_drawItem"
 c_sha = "65d7d6aa4621"
 rust = "rustyrian_core::game_menu::je_draw_item"
-status = "todo"
-verify = []
-notes = "blocked: calls varz.c::JE_SGr (not verified on main)"
+status = "verified"
+verify = ["diff:game_menu::je_draw_item_matches", "diff:game_menu::draw_ship_illustration_matches", "diff:game_menu::je_weapon_sim_update_matches"]
+notes = ""
 
 [[fn]]
 c = "game_menu.c::JE_drawMenuHeader"
@@ -2071,9 +2071,9 @@ notes = ""
 c = "game_menu.c::JE_weaponSimUpdate"
 c_sha = "a658e66e5b3b"
 rust = "rustyrian_core::game_menu::je_weapon_sim_update"
-status = "todo"
-verify = []
-notes = "blocked: calls game_menu.c::JE_drawItem (blocked on varz.c::JE_SGr)"
+status = "verified"
+verify = ["diff:game_menu::je_weapon_sim_update_matches"]
+notes = ""
 
 [[fn]]
 c = "game_menu.c::JE_weaponViewFrame"

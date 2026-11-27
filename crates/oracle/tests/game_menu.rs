@@ -96,14 +96,10 @@ fn fixture(frame: u64) -> rustyrian_core::game::Snapshot {
     s
 }
 
-/// Cases for the proptests that set up a whole game per case: a fifth of
-/// `PROPTEST_CASES` (default 256).
-fn heavy_cases() -> u32 {
-    std::env::var("PROPTEST_CASES")
-        .ok()
-        .and_then(|v| v.parse::<u32>().ok())
-        .map_or(48, |n| (n / 5).max(1))
-}
+/// Case count of the proptests that set up a whole game per case (fixture,
+/// `init_video`, full store and full-state comparison): a hard cap, since
+/// nightly runs `PROPTEST_CASES=10000`.
+const HEAVY_CASES: u32 = 48;
 
 /// Both engines with live video (`init_video`) in the `demo-cycle` fixture
 /// state at `frame`: items, shapes, help text and screens as in a game.
@@ -291,7 +287,7 @@ impl NavState {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig { cases: heavy_cases(), ..ProptestConfig::default() })]
+    #![proptest_config(ProptestConfig { cases: HEAVY_CASES, ..ProptestConfig::default() })]
 
     #[test]
     fn je_update_nav_screen_matches(s in nav_state()) {
@@ -707,4 +703,188 @@ fn je_draw_menu_choices_every_menu_matches() {
             );
         }
     }
+}
+
+/// Item numbers whose illustration tables upstream reads inside: front and
+/// rear weapons with a position slot (or none).
+fn front_ids() -> Vec<u8> {
+    let list = [
+        -1, 4, 9, 3, 8, 2, 5, 10, 1, -1, -1, -1, -1, 7, 8, -1, -1, 0, -1, 4, 0, -1, -1, 3, -1, 4,
+        -1, 4, -1, -1, -1, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 9,
+    ];
+    (0..43u8)
+        .filter(|&i| i == 0 || list[usize::from(i)] >= 0)
+        .collect()
+}
+
+fn rear_ids() -> Vec<u8> {
+    let list = [
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 1, 2, 3, -1, 4, 5, -1, -1, 6, -1, -1, 1, 0, -1, 6,
+        -1, 5, -1, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1,
+    ];
+    (0..43u8)
+        .filter(|&i| i == 0 || list[usize::from(i)] >= 0)
+        .collect()
+}
+
+/// A ship number: one of the table's ships, or a custom ship (91..=100)
+/// whose graphic number `graphic` (1..=15) is set in `extraShips`; graphics
+/// above 7 come from `extraShapes`, filled here with the player-ship sheet.
+fn set_ship(g: &mut Game, ship: u8, graphic: u8) {
+    if ship > 90 {
+        g.editship.extra_ships[usize::from(ship - 91) * 15] = graphic;
+        g.editship.extra_shapes = g.sprite.sprite_sheet9.clone();
+    }
+}
+
+/// Custom-ship graphic numbers upstream can draw: number 6 maps to sprite 0,
+/// which makes `blit_sprite2` read before the sheet (varz.c:381 then
+/// sprite.c:550; guarded in the port by D-UB-SPRITE-1).
+fn custom_graphic() -> impl Strategy<Value = u8> {
+    prop::sample::select((1u8..=15).filter(|&n| n != 6).collect::<Vec<_>>())
+}
+
+fn ship_strategy() -> impl Strategy<Value = (u8, u8)> {
+    (
+        prop_oneof![1u8..=SHIP_NUM as u8, 91u8..=100],
+        custom_graphic(),
+    )
+}
+
+proptest! {
+    // whole game per case (see HEAVY_CASES)
+    #![proptest_config(ProptestConfig { cases: HEAVY_CASES, ..ProptestConfig::default() })]
+
+    /// Every upgrade row's items (real table entries, custom ships) at any
+    /// position.
+    #[test]
+    fn je_draw_item_matches(
+        (item_type, item_num) in (0u8..9).prop_flat_map(|t| {
+            let max = match t {
+                1 => SHIP_NUM,
+                2 | 3 => PORT_NUM,
+                4 => SHIELD_NUM,
+                5 => POWER_NUM,
+                6 | 7 => OPTION_NUM,
+                _ => 300,
+            } as u16;
+            let nums: BoxedStrategy<u16> = if t == 1 {
+                prop_oneof![0..=max, 91u16..=100].boxed()
+            } else {
+                (0..=max).boxed()
+            };
+            (Just(t), nums)
+        }),
+        graphic in custom_graphic(),
+        x in any::<u16>(),
+        y in any::<u16>(),
+    ) {
+        let mut d = setup(500);
+        let f = |g: &mut Game| {
+            if item_type == 1 && item_num > 90 {
+                set_ship(g, item_num as u8, graphic);
+            }
+            g.varz.ship_gr_ptr = None;
+        };
+        let (x, y) = (x % 400, y % 260);
+        // SAFETY: plain C call; table indices in range per the strategy.
+        run(&mut d, f, || unsafe { b::JE_drawItem(item_type, item_num, x, y) },
+            |g| gm::je_draw_item(g, item_type, item_num, x, y));
+    }
+
+    /// Any equipment the illustration tables cover.
+    #[test]
+    fn draw_ship_illustration_matches(
+        (ship, graphic) in ship_strategy(),
+        generator in 1u8..=6,
+        front in prop::sample::select(front_ids()),
+        rear in prop::sample::select(rear_ids()),
+        sidekicks in (0u8..=OPTION_NUM as u8, 0u8..=OPTION_NUM as u8),
+        shield in 0u8..=SHIELD_NUM as u8,
+    ) {
+        let mut d = setup(500);
+        let f = |g: &mut Game| {
+            set_ship(g, ship, graphic);
+            let it = &mut g.player.player[0].items;
+            it.ship = ship;
+            it.generator = generator;
+            it.weapon[0].id = front;
+            it.weapon[1].id = rear;
+            it.sidekick = [sidekicks.0, sidekicks.1];
+            it.shield = shield;
+        };
+        // SAFETY: plain C call; every index is in range per the strategy.
+        run(&mut d, f, || unsafe { b::draw_ship_illustration() }, gm::draw_ship_illustration);
+    }
+
+    /// The simulator frame with every power-control state: weapon rows with
+    /// and without a selected item, affordable or not, any costs and powers.
+    #[test]
+    fn je_weapon_sim_update_matches(
+        upgrades in 2u8..=8,
+        (choices, sub) in (2u8..=12).prop_flat_map(|c| (Just(c), 2u8..=12)),
+        avail in prop::array::uniform10(0u8..=PORT_NUM as u8),
+        power in (any::<bool>(), any::<bool>(), any::<bool>()),
+        costs in any::<(u16, u16)>(),
+        powers in (1u8..=11, 1u8..=11),
+        (ship, graphic) in ship_strategy(),
+        pos in (-20i32..200, -20i32..220),
+    ) {
+        let mut d = setup(2000);
+        let f = |g: &mut Game| {
+            set_ship(g, ship, graphic);
+            let m = &mut g.game_menu;
+            m.cur_sel[usize::from(gm::MENU_UPGRADES)] = upgrades;
+            m.cur_sel[usize::from(gm::MENU_UPGRADE_SUB)] = sub;
+            m.menu_choices[usize::from(gm::MENU_UPGRADE_SUB)] = choices;
+            (m.left_power, m.right_power, m.right_power_afford) = power;
+            let slot = usize::from(gm::ITEM_AVAIL_MAP[usize::from(upgrades) - 2]) - 1;
+            g.tyrian2.item_avail[slot] = avail;
+            (g.mainint.upgrade_cost, g.mainint.downgrade_cost) = costs;
+            let p = &mut g.player.player[0];
+            p.items.ship = ship;
+            p.items.weapon[0].power = powers.0;
+            p.items.weapon[1].power = powers.1;
+            (p.x, p.y) = pos;
+        };
+        // SAFETY: plain C call; every index is in range per the strategy.
+        run(&mut d, f, || unsafe { b::JE_weaponSimUpdate() }, gm::je_weapon_sim_update);
+    }
+}
+
+/// Rust only (upstream reads outside its tables for these): items past the
+/// item tables and the illustration tables draw nothing for that part, and
+/// selections before the item list count as "None" (`D-UB-GAMEMENU-2`).
+#[test]
+fn items_outside_the_tables_draw_nothing() {
+    let mut d = setup(500);
+    let g = &mut d.game;
+    for (t, n) in [(1u8, 50u16), (2, 200), (4, 99), (5, 99), (6, 99), (3, 43)] {
+        gm::je_draw_item(g, t, n, 10, 10);
+    }
+    // custom ship graphic 6: sprite 0 (D-UB-SPRITE-1)
+    set_ship(g, 91, 6);
+    gm::je_draw_item(g, 1, 91, 10, 10);
+    for (ship, generator, front, rear, shield) in [
+        (0u8, 0u8, 9u8, 1u8, 200u8),
+        (14, 7, 60, 60, 11),
+        (50, 2, 16, 13, 0),
+    ] {
+        let it = &mut g.player.player[0].items;
+        (
+            it.ship,
+            it.generator,
+            it.weapon[0].id,
+            it.weapon[1].id,
+            it.shield,
+        ) = (ship, generator, front, rear, shield);
+        it.sidekick = [200, 40];
+        gm::draw_ship_illustration(g);
+    }
+    g.player.player[0].items.sidekick = [0, 0];
+    g.game_menu.cur_sel[usize::from(gm::MENU_UPGRADES)] = 3;
+    g.game_menu.cur_sel[usize::from(gm::MENU_UPGRADE_SUB)] = 1;
+    g.game_menu.menu_choices[usize::from(gm::MENU_UPGRADE_SUB)] = 5;
+    g.player.player[0].items.ship = 1;
+    gm::je_weapon_sim_update(g);
 }
