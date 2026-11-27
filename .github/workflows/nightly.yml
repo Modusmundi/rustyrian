@@ -72,7 +72,13 @@ jobs:
           path: porting/coverage.json
           if-no-files-found: warn
 
+  # One runner took 4.5 h, close to the 6 h job limit; four hash partitions
+  # of the same test set keep each well under it.
   proptest-deep:
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [1, 2, 3, 4]
     runs-on: ubuntu-24.04
     env:
       CC: clang-18
@@ -93,7 +99,7 @@ jobs:
           key: tyrian21-7790d09a2a3addcd33c66ef063d5900eb81cc9c342f4807eb8356364dd1d9277
       - run: cargo xtask fetch-data
       - run: cargo xtask fixtures
-      - run: cargo nextest run --workspace --no-fail-fast --run-ignored all
+      - run: cargo nextest run --workspace --no-fail-fast --run-ignored all --partition "hash:${{ matrix.part }}/4"
 
   fuzz-targets:
     runs-on: ubuntu-24.04
