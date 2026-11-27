@@ -1109,7 +1109,7 @@ dependencies = [
 
 [[package]]
 name = "rustyrian"
-version = "0.4.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "rustyrian-core",
  "rustyrian-harness",
@@ -1118,7 +1118,7 @@ dependencies = [
 
 [[package]]
 name = "rustyrian-core"
-version = "0.4.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "criterion",
  "libm",
@@ -1129,7 +1129,7 @@ dependencies = [
 
 [[package]]
 name = "rustyrian-harness"
-version = "0.4.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "png",
  "rustyrian-core",
@@ -1140,7 +1140,7 @@ dependencies = [
 
 [[package]]
 name = "rustyrian-oracle"
-version = "0.4.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "anyhow",
  "bindgen",
@@ -1161,7 +1161,7 @@ dependencies = [
 
 [[package]]
 name = "rustyrian-sdl"
-version = "0.4.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "libc",
  "rustyrian-core",
@@ -1608,7 +1608,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.4.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "anyhow",
  "clap",
