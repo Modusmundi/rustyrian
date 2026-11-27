@@ -164,6 +164,12 @@ __typeof__(localtime) ot_shim_localtime;
 #define localtime ot_shim_localtime
 __typeof__(malloc) ot_shim_malloc;
 #define malloc ot_shim_malloc
+__typeof__(calloc) ot_shim_calloc;
+#define calloc ot_shim_calloc
+__typeof__(realloc) ot_shim_realloc;
+#define realloc ot_shim_realloc
+__typeof__(free) ot_shim_free;
+#define free ot_shim_free
 __typeof__(exit) ot_shim_exit;
 #define exit ot_shim_exit
 __typeof__(atexit) ot_shim_atexit;

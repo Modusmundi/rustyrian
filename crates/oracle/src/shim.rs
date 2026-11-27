@@ -1035,6 +1035,31 @@ pub unsafe extern "C" fn ot_shim_SDLNet_FreePacket(packet: *mut b::UDPpacket) {
 
 // --- libc ---
 
+static ALLOCS: std::sync::Mutex<BTreeMap<usize, usize>> = std::sync::Mutex::new(BTreeMap::new());
+
+fn allocs() -> std::sync::MutexGuard<'static, BTreeMap<usize, usize>> {
+    ALLOCS.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// Called by the C allocator shims (`shim/ot_guard.c`).
+#[unsafe(no_mangle)]
+pub extern "C" fn ot_shim_rs_alloc(ptr: *mut c_void, size: usize) {
+    allocs().insert(ptr as usize, size);
+}
+
+/// Called by the C allocator shims; `usize::MAX` for an unknown block.
+#[unsafe(no_mangle)]
+pub extern "C" fn ot_shim_rs_forget(ptr: *mut c_void) -> usize {
+    allocs().remove(&(ptr as usize)).unwrap_or(usize::MAX)
+}
+
+/// Requested size of a live block upstream obtained from `malloc`, `calloc`
+/// or `realloc`; `None` for anything else (static data, SDL memory, freed
+/// blocks, interior pointers).
+pub fn alloc_size(ptr: *const c_void) -> Option<usize> {
+    allocs().get(&(ptr as usize)).copied()
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn ot_shim_rand() -> c_int {
     session::crand_next()

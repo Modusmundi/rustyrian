@@ -48,11 +48,12 @@ macro_rules! game_states {
             }
         }
 
-        /// Every module state except the platform and audio, for snapshots
-        /// and `--sim-digest`.
+        /// Every module state, including the audio-shared state, but not the
+        /// platform: fixtures (`--snapshot-at`) and state comparisons.
         #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
         pub struct Snapshot {
             pub crand: crand::State,
+            pub audio: loudness::AudioState,
             $(pub $m: $m::State,)*
         }
 
@@ -60,8 +61,16 @@ macro_rules! game_states {
             pub fn snapshot(&self) -> Snapshot {
                 Snapshot {
                     crand: self.crand.clone(),
+                    audio: self.audio.lock().unwrap_or_else(|e| e.into_inner()).clone(),
                     $($m: self.$m.clone(),)*
                 }
+            }
+
+            /// Replaces every module state with `s` (the platform is kept).
+            pub fn restore(&mut self, s: Snapshot) {
+                self.crand = s.crand;
+                *self.audio.lock().unwrap_or_else(|e| e.into_inner()) = s.audio;
+                $(self.$m = s.$m;)*
             }
         }
     };

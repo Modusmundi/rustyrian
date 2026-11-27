@@ -76,6 +76,9 @@ rand
 time
 localtime
 malloc
+calloc
+realloc
+free
 exit
 atexit
 sinf

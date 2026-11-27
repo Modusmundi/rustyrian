@@ -30,6 +30,9 @@ pub const LIBC_INTERCEPTED: &[&str] = &[
     "time",
     "localtime",
     "malloc",
+    "calloc",
+    "realloc",
+    "free",
     "exit",
     "atexit",
     "sinf",
@@ -41,9 +44,10 @@ pub const LIBC_INTERCEPTED: &[&str] = &[
 ];
 
 /// Intercepted functions whose shim is written in C (`crates/oracle/shim/*.c`)
-/// rather than Rust: `exit` must `longjmp`, `malloc` is `calloc`, and Rust
-/// cannot define C-variadic functions.
-const C_IMPLEMENTED_LIBC: &[&str] = &["exit", "malloc"];
+/// rather than Rust: `exit` must `longjmp`, the allocators record block sizes
+/// for mirrors (`malloc` is `calloc`), and Rust cannot define C-variadic
+/// functions.
+const C_IMPLEMENTED_LIBC: &[&str] = &["exit", "malloc", "calloc", "realloc", "free"];
 
 /// libm functions whose results are exact or correctly rounded on every
 /// platform (rule R6); all other libm functions must be intercepted.

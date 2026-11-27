@@ -2,7 +2,7 @@
 /* Copyright (C) rustyrian contributors */
 
 /*
- * `exit` and `malloc` shims, and `ot_guard_call`, which lets an in-process
+ * `exit` and allocator shims, and `ot_guard_call`, which lets an in-process
  * differential test call a C function that may `exit`.
  */
 
@@ -10,10 +10,20 @@
 
 #undef exit
 #undef malloc
+#undef calloc
+#undef realloc
+#undef free
 
 #include <setjmp.h>
 #include <stdlib.h>
+#include <string.h>
 
+/* Implemented in Rust (`shim.rs`): the size of every live block allocated by
+ * upstream, so mirrors can copy heap arrays whose length no global records.
+ * `ot_shim_rs_forget` returns (size_t)-1 for a block it does not know. */
+void ot_shim_rs_alloc(void *ptr, size_t size);
+size_t ot_shim_rs_forget(void *ptr);
+#define OT_UNKNOWN_SIZE ((size_t)-1)
 /* Implemented in Rust: records the exit; in a runner, runs the registered
  * atexit handlers and finishes the trace. */
 void ot_shim_rs_on_exit(int code, int guarded);
@@ -34,10 +44,46 @@ void ot_shim_exit(int code)
 	exit(code);
 }
 
-/* Upstream reads some allocations before writing them (destruct.c:1460-1467). */
+/* Allocations are zero-filled so upstream reads of unwritten memory are
+ * deterministic (destruct.c:1460-1467 reads before writing). */
 void *ot_shim_malloc(size_t size)
 {
-	return calloc(1, size);
+	void *p = calloc(1, size);
+	if (p != NULL)
+		ot_shim_rs_alloc(p, size);
+	return p;
+}
+
+void *ot_shim_calloc(size_t count, size_t size)
+{
+	void *p = calloc(count, size);
+	if (p != NULL)
+		ot_shim_rs_alloc(p, count * size);
+	return p;
+}
+
+void *ot_shim_realloc(void *old, size_t size)
+{
+	size_t old_size = old != NULL ? ot_shim_rs_forget(old) : 0;
+	void *p = realloc(old, size);
+	if (p == NULL)
+	{
+		/* failed: the old block is still live */
+		if (old != NULL && size != 0 && old_size != OT_UNKNOWN_SIZE)
+			ot_shim_rs_alloc(old, old_size);
+		return NULL;
+	}
+	if (old_size != OT_UNKNOWN_SIZE && size > old_size)
+		memset((char *)p + old_size, 0, size - old_size);
+	ot_shim_rs_alloc(p, size);
+	return p;
+}
+
+void ot_shim_free(void *ptr)
+{
+	if (ptr != NULL)
+		ot_shim_rs_forget(ptr);
+	free(ptr);
 }
 
 /*
