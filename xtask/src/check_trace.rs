@@ -10,9 +10,9 @@ use std::path::Path;
 use std::process::Command;
 
 /// Trait methods that are not a 1:1 SDL/SDL_net function: libc `time` and
-/// `localtime`, and the invocation of the function pointer returned by
-/// `SDL_LogGetOutputFunction`.
-pub const EXTRA_PLATFORM_METHODS: &[&str] = &["time", "localtime", "log_output"];
+/// `localtime`, the invocation of the function pointer returned by
+/// `SDL_LogGetOutputFunction`, and `exit` (intercepted, not recorded).
+pub const EXTRA_PLATFORM_METHODS: &[&str] = &["time", "localtime", "log_output", "exit"];
 
 /// Rule: `SDL_GetWindowSize` -> `get_window_size`, `SDLNet_UDP_Send` -> `net_udp_send`.
 pub fn platform_method_name(c: &str) -> String {

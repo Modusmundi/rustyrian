@@ -1563,4 +1563,6 @@ impl Platform for SdlPlatform {
         }
         tm_from(&out)
     }
+
+    fn exit(&mut self, _code: i32) {}
 }

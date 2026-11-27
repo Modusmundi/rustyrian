@@ -1188,4 +1188,9 @@ impl<P: Platform + PlatformProbe> Platform for Instrumented<P> {
         self.rec("localtime", vec![t.into()], tm(&r));
         r
     }
+
+    fn exit(&mut self, code: i32) {
+        self.inner.exit(code);
+        self.finish(End::Exit(code));
+    }
 }

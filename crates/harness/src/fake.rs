@@ -1207,6 +1207,8 @@ impl Platform for FakePlatform {
     fn localtime(&mut self, t: i64) -> Tm {
         utc_tm(t)
     }
+
+    fn exit(&mut self, _code: i32) {}
 }
 
 #[cfg(test)]

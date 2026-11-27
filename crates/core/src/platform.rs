@@ -338,6 +338,12 @@ pub trait Platform {
     // --- libc ---
     fn time(&mut self) -> i64;
     fn localtime(&mut self, t: i64) -> Tm;
+    /// `exit(code)` reached: upstream's `exit` calls end the run as a
+    /// [`crate::game::Halt`] that the entry point passes here once the
+    /// `atexit` handlers have run. Platforms that record a run finish it;
+    /// the caller then ends the process. Not a recorded call (the C side
+    /// intercepts `exit` the same way).
+    fn exit(&mut self, code: i32);
 }
 
 /// Unrecorded hooks the instrumentation layer needs from a platform.
