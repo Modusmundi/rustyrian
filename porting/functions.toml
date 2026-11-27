@@ -1019,7 +1019,7 @@ c = "destruct.c::JE_makeExplosion"
 c_sha = "2d155797dbdf"
 rust = "rustyrian_core::destruct::je_make_explosion"
 status = "verified"
-verify = ["diff:destruct::explosions_match_c", "diff:destruct::run_tick_matches_c"]
+verify = ["diff:destruct::explosions_match_c", "diff:destruct::explosion_sweep_matches_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
@@ -1171,7 +1171,8 @@ c = "destruct.c::DE_RunTickExplosions"
 c_sha = "87124370e47a"
 rust = "rustyrian_core::destruct::de_run_tick_explosions"
 status = "verified"
-verify = ["diff:destruct::explosions_match_c", "diff:destruct::run_tick_matches_c"]
+verify = ["diff:destruct::explosions_match_c", "diff:destruct::explosion_sweep_matches_c", "diff:destruct::run_tick_matches_c"]
+waived_lines = [{ line = 1873, reason = "unreachable: explosions are only made with dirt or flare types (no shot of another type is ever fired)" }]
 notes = ""
 
 [[fn]]
@@ -1195,7 +1196,7 @@ c = "destruct.c::DE_RunTickShots"
 c_sha = "59ce92e0cb41"
 rust = "rustyrian_core::destruct::de_run_tick_shots"
 status = "verified"
-verify = ["diff:destruct::shots_match_c", "diff:destruct::edge_cases_match_c", "diff:destruct::run_tick_matches_c"]
+verify = ["diff:destruct::shots_match_c", "diff:destruct::shot_walls_match_c", "diff:destruct::edge_cases_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
@@ -1211,7 +1212,7 @@ c = "destruct.c::DE_RunTickAI"
 c_sha = "95472241b220"
 rust = "rustyrian_core::destruct::de_run_tick_ai"
 status = "verified"
-verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::edge_cases_match_c", "diff:destruct::run_tick_matches_c"]
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::ai_sweep_matches_c", "diff:destruct::edge_cases_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
@@ -1243,7 +1244,8 @@ c = "destruct.c::DE_ProcessInput"
 c_sha = "84c1eca55547"
 rust = "rustyrian_core::destruct::de_process_input"
 status = "verified"
-verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::run_tick_matches_c"]
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::process_input_sweep_matches_c", "diff:destruct::run_tick_matches_c"]
+waived_lines = [{ line = 2533, reason = "unreachable: every shotDirt value is one of the four handled cases" }]
 notes = ""
 
 [[fn]]
@@ -1323,7 +1325,7 @@ c = "destruct.c::DE_RunTickCheckEndgame"
 c_sha = "e4469ec5a3c6"
 rust = "rustyrian_core::destruct::de_run_tick_check_endgame"
 status = "verified"
-verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::run_tick_matches_c"]
+verify = ["diff:destruct::tick_parts_match_c", "diff:destruct::endgame_branches_match_c", "diff:destruct::run_tick_matches_c"]
 notes = ""
 
 [[fn]]
