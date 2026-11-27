@@ -15,6 +15,9 @@ pub type JeShipsType = [u8; 154];
 /// `extraCryptKey`.
 pub const EXTRA_CRYPT_KEY: [u8; 10] = [58, 23, 16, 192, 254, 82, 113, 147, 62, 99];
 
+/// `ENOMEM` (12 on every platform the port supports).
+const ENOMEM: i32 = 12;
+
 /// `EXTRA_SHIPS_FILE_SIZE`: the ship data before its four checksums.
 pub const EXTRA_SHIPS_FILE_SIZE: usize = 154 - 4;
 
@@ -58,9 +61,18 @@ pub fn load_extra_shapes(g: &mut Game) {
         let size = len - ships_size;
         let e = &mut g.editship;
         e.extra_shapes.size = size;
-        let mut data = vec![0u8; size];
-        file::file_read_exactly(&mut file, &mut data);
-        e.extra_shapes.data = Some(data);
+        // D-UB-EDITSHIP-1: upstream does not check `malloc` (a directory's
+        // length can be huge); an allocation failure becomes a read error
+        // with ENOMEM and the sheet stays unloaded.
+        let mut data = Vec::new();
+        if data.try_reserve_exact(size).is_ok() {
+            data.resize(size, 0);
+            file::file_read_exactly(&mut file, &mut data);
+            e.extra_shapes.data = Some(data);
+        } else {
+            file.error = true;
+            file.errnum = ENOMEM;
+        }
         file::file_read_exactly(&mut file, &mut e.extra_ships);
 
         e.extra_avail = !file.error;

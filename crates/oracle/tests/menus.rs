@@ -54,8 +54,8 @@ fn menu_keys() -> Vec<Act> {
 
 /// Runs menu `which` (0 gameplay, 1 episode, 2 difficulty) on both engines
 /// with the given interactions and names; compares the outcome, every call
-/// and the whole state.
-fn run_menu(which: u8, acts: &[(Act, u32)], names: &State, avail: [bool; 5]) {
+/// and the whole state. Returns the game's `difficultyLevel` afterwards.
+fn run_menu(which: u8, acts: &[(Act, u32)], names: &State, avail: [bool; 5]) -> i8 {
     let mut rig = Rig::new(&script(output_rect(), 300, acts));
     rig.video();
     rig.g.menus = names.clone();
@@ -75,6 +75,7 @@ fn run_menu(which: u8, acts: &[(Act, u32)], names: &State, avail: [bool; 5]) {
     };
     assert!(r.is_ok(), "menu {which} exited");
     rig.check();
+    rig.g.config.difficulty_level
 }
 
 fn any_names() -> impl Strategy<Value = State> {
@@ -152,8 +153,20 @@ proptest! {
 /// in order).
 #[test]
 fn difficulty_select_every_level_matches() {
+    use rustyrian_core::config::{
+        DIFFICULTY_EASY, DIFFICULTY_HARD, DIFFICULTY_IMPOSSIBLE, DIFFICULTY_NORMAL,
+        DIFFICULTY_SUICIDE, DIFFICULTY_ZINGLON,
+    };
+    let expected = [
+        DIFFICULTY_EASY,
+        DIFFICULTY_NORMAL,
+        DIFFICULTY_HARD,
+        DIFFICULTY_IMPOSSIBLE,
+        DIFFICULTY_SUICIDE,
+        DIFFICULTY_ZINGLON,
+    ];
     let names = State::default();
-    for level in 0..6usize {
+    for (level, want) in expected.into_iter().enumerate() {
         let mut acts = vec![
             (Act::Shift("G"), 20),
             (Act::Shift("RIGHTBRACKET"), 20),
@@ -166,7 +179,7 @@ fn difficulty_select_every_level_matches() {
         // From "normal" (1), UP lands on 0; step down to `level`.
         acts.extend((0..level).map(|_| (Act::Key("DOWN"), 20)));
         acts.push((Act::Key("RETURN"), 20));
-        run_menu(2, &acts, &names, [true; 5]);
+        assert_eq!(run_menu(2, &acts, &names, [true; 5]), want, "level {level}");
     }
 }
 

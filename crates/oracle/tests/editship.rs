@@ -177,3 +177,30 @@ fn load_extra_shapes_rejects_unsafe_sheet() {
     assert!(!d.game.editship.extra_avail);
     assert_eq!(d.game.editship.extra_shapes.size, 6);
 }
+
+/// D-UB-EDITSHIP-1 (Rust only): a `newsh$.shp` whose length no allocation can
+/// hold (on Linux a directory: ext4 reports LLONG_MAX as its SEEK_END length;
+/// elsewhere a sparse file of 2^60 bytes, or 2^52 where the file system caps
+/// file sizes lower, as APFS does) loads no sheet and leaves the custom ships
+/// unavailable.
+#[test]
+fn load_extra_shapes_allocation_failure_is_a_read_error() {
+    let dir = tmp("huge");
+    let path = dir.join("newsh$.shp");
+    if cfg!(target_os = "linux") {
+        std::fs::create_dir(&path).expect("mkdir");
+    } else {
+        let f = std::fs::File::create(&path).expect("create");
+        let sized = [1u64 << 60, 1 << 52]
+            .into_iter()
+            .any(|n| f.set_len(n).is_ok());
+        assert!(sized, "the file system refuses a 2^52-byte sparse file");
+    }
+    let mut d = Diff::new();
+    let p = dir.as_os_str().as_bytes().to_vec();
+    d.game.file.user_dir_path_len = p.len();
+    d.game.file.user_dir_path = Some(p);
+    editship::load_extra_shapes(&mut d.game);
+    assert!(!d.game.editship.extra_avail);
+    assert_eq!(d.game.editship.extra_shapes.data, None);
+}

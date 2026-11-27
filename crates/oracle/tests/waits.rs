@@ -113,30 +113,68 @@ proptest! {
     }
 }
 
-/// The two "or elapsed" loops when input is already waiting: both return true
-/// before the frame period ends.
+/// Every wait loop, fixed cases: input already waiting or arriving only after
+/// the frame period (a tap at 1 s), with and without the network polled. The
+/// "or elapsed" loops return true in the first case and false in the second.
 #[test]
-fn wait_loops_return_on_pending_input() {
-    for which in 0..2 {
-        let mut rig = Rig::new("ots 1\n@0 key-down SPACE\n@40 key-up SPACE\n");
-        rig.video();
-        set_frame_count(&mut rig, 5);
-        rig.clear();
-        let r = if which == 0 {
-            // SAFETY: plain C call inside the guard.
-            rig.run(
-                || unsafe { b::waitUntilHasInputOrElapsed() },
-                kb::wait_until_has_input_or_elapsed,
-            )
-        } else {
-            // SAFETY: plain C call inside the guard.
-            rig.run(
-                || unsafe { b::waitUntilGetInputOrElapsed() },
-                kb::wait_until_get_input_or_elapsed,
-            )
-        };
-        assert_eq!(r, Ok(true));
-        rig.check();
+fn wait_loops_fixed_cases_match() {
+    for which in 0u8..5 {
+        for pending in [true, false] {
+            for network in [false, true] {
+                let script = if pending {
+                    "ots 1\n@0 key-down SPACE\n@40 key-up SPACE\n".to_owned()
+                } else {
+                    format!("ots 1\n{}", tap_events(1000, 30_000))
+                };
+                let mut rig = Rig::new(&script);
+                rig.video();
+                if network {
+                    with_network(&mut rig);
+                }
+                set_frame_count(&mut rig, 5);
+                rig.clear();
+                let r = match which {
+                    // SAFETY: plain C call inside the guard.
+                    0 => rig
+                        .run(|| unsafe { b::waitUntilElapsed() }, kb::wait_until_elapsed)
+                        .map(|()| None),
+                    // SAFETY: plain C call inside the guard.
+                    1 => rig
+                        .run(
+                            || unsafe { b::waitUntilGetInput() },
+                            kb::wait_until_get_input,
+                        )
+                        .map(|()| None),
+                    2 => rig
+                        .run(
+                            // SAFETY: plain C call inside the guard.
+                            || unsafe { b::waitUntilHasInput(kb::INPUT_ANY as _) },
+                            |g| kb::wait_until_has_input(g, kb::INPUT_ANY),
+                        )
+                        .map(|()| None),
+                    3 => rig
+                        .run(
+                            // SAFETY: plain C call inside the guard.
+                            || unsafe { b::waitUntilHasInputOrElapsed() },
+                            kb::wait_until_has_input_or_elapsed,
+                        )
+                        .map(Some),
+                    _ => rig
+                        .run(
+                            // SAFETY: plain C call inside the guard.
+                            || unsafe { b::waitUntilGetInputOrElapsed() },
+                            kb::wait_until_get_input_or_elapsed,
+                        )
+                        .map(Some),
+                };
+                match r {
+                    Ok(Some(got)) => assert_eq!(got, pending, "loop {which}"),
+                    Ok(None) => {}
+                    Err(code) => panic!("loop {which} exited with {code}"),
+                }
+                rig.check();
+            }
+        }
     }
 }
 

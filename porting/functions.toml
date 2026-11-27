@@ -2376,7 +2376,7 @@ c = "keyboard.c::waitUntilHasInput"
 c_sha = "84642df9d8a7"
 rust = "rustyrian_core::keyboard::wait_until_has_input"
 status = "verified"
-verify = ["diff:waits::wait_loops_match"]
+verify = ["diff:waits::wait_loops_match", "diff:waits::wait_loops_fixed_cases_match"]
 notes = ""
 
 [[fn]]
@@ -2384,7 +2384,7 @@ c = "keyboard.c::waitUntilGetInput"
 c_sha = "5644b8ea6ad7"
 rust = "rustyrian_core::keyboard::wait_until_get_input"
 status = "verified"
-verify = ["diff:waits::wait_loops_match", "diff:network::network_tyrian_halt_matches"]
+verify = ["diff:waits::wait_loops_match", "diff:network::network_tyrian_halt_matches", "diff:waits::wait_loops_fixed_cases_match"]
 notes = ""
 
 [[fn]]
@@ -2392,7 +2392,7 @@ c = "keyboard.c::waitUntilElapsed"
 c_sha = "e90222542789"
 rust = "rustyrian_core::keyboard::wait_until_elapsed"
 status = "verified"
-verify = ["diff:waits::wait_loops_match", "diff:waits::fades_match", "diff:network::network_connect_matches"]
+verify = ["diff:waits::wait_loops_match", "diff:waits::fades_match", "diff:network::network_connect_matches", "diff:waits::wait_loops_fixed_cases_match"]
 notes = ""
 
 [[fn]]
@@ -2400,7 +2400,7 @@ c = "keyboard.c::waitUntilHasInputOrElapsed"
 c_sha = "b75f2957c21b"
 rust = "rustyrian_core::keyboard::wait_until_has_input_or_elapsed"
 status = "verified"
-verify = ["diff:waits::wait_loops_match", "diff:waits::wait_loops_return_on_pending_input"]
+verify = ["diff:waits::wait_loops_match", "diff:waits::wait_loops_fixed_cases_match"]
 notes = ""
 
 [[fn]]
@@ -2408,7 +2408,7 @@ c = "keyboard.c::waitUntilGetInputOrElapsed"
 c_sha = "ed2bf1df4819"
 rust = "rustyrian_core::keyboard::wait_until_get_input_or_elapsed"
 status = "verified"
-verify = ["diff:waits::wait_loops_match", "diff:waits::je_out_text_glow_matches", "diff:waits::wait_loops_return_on_pending_input"]
+verify = ["diff:waits::wait_loops_match", "diff:waits::je_out_text_glow_matches", "diff:waits::wait_loops_fixed_cases_match"]
 notes = ""
 
 [[fn]]
