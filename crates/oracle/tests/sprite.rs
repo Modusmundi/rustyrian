@@ -802,6 +802,25 @@ fn sheet_from_streams(streams: &[Vec<u8>]) -> Sprite2Array {
     }
 }
 
+/// Whether a sprite stream ends on a transparent-run marker (255) whose
+/// count byte is past the data: upstream's blitters then read one byte past
+/// the block (UF-3). The plain oracle reads its zeroed allocation slack there;
+/// the sanitized oracle has no slack and aborts.
+fn has_dangling_run_marker(data: &[u8]) -> bool {
+    let mut i = 0;
+    while i < data.len() {
+        if data[i] == 255 {
+            if i + 1 == data.len() {
+                return true;
+            }
+            i += 2;
+        } else {
+            i += 1;
+        }
+    }
+    false
+}
+
 proptest! {
     /// Random sprites (any bytes) blitted with every table function at any
     /// position.
@@ -817,6 +836,7 @@ proptest! {
         exists in any::<bool>(),
         salt in any::<u32>(),
     ) {
+        prop_assume!(!(cfg!(ot_ref_sanitize) && exists && has_dangling_run_marker(&data)));
         let mut d = setup(&data_dir());
         d.game.video.screens[0] = Some(pattern(salt));
         let t = &mut d.game.sprite.sprite_table[4];
