@@ -2916,7 +2916,7 @@ fn script_command(g: &mut Game, episode_file: &mut File, s: &mut [u8; 256]) -> F
             g.config.galaga_mode = true;
 
             let p = &mut g.player.player;
-            p[1].items = p[0].items.clone();
+            p[1].items = p[0].items;
             p[1].items.weapon[crate::player::REAR_WEAPON].id = 15; // Vulcan Cannon
             p[1].items.sidekick = [0; 2]; // None
         }
@@ -3559,7 +3559,7 @@ fn load_level_file(g: &mut Game) -> Flow {
         .mega_data1
         .mainmap
         .iter_mut()
-        .zip(map_buf.chunks_exact(14))
+        .zip(map_buf.as_chunks::<14>().0)
     {
         for (cell, &b) in row.iter_mut().zip(chunk) {
             *cell = refs[0][usize::from(b)];
@@ -3575,7 +3575,7 @@ fn load_level_file(g: &mut Game) -> Flow {
         .mega_data2
         .mainmap
         .iter_mut()
-        .zip(map_buf.chunks_exact(14))
+        .zip(map_buf.as_chunks::<14>().0)
     {
         for (cell, &b) in row.iter_mut().zip(chunk) {
             *cell = refs[1][usize::from(b)];
@@ -3591,7 +3591,7 @@ fn load_level_file(g: &mut Game) -> Flow {
         .mega_data3
         .mainmap
         .iter_mut()
-        .zip(map_buf.chunks_exact(15))
+        .zip(map_buf.as_chunks::<15>().0)
     {
         for (cell, &b) in row.iter_mut().zip(chunk) {
             *cell = refs[2][usize::from(b)];
@@ -4198,7 +4198,7 @@ fn main_level_loop(g: &mut Game, old_weapon_bar: &mut [u32; 2]) -> Flow<MainLabe
     // -----------------------BACKGROUND 2------------------------
     let c = &g.config;
     if !(c.smoothies[2 - 1] && c.processor_type < 4)
-        && !(c.smoothies[1 - 1] && c.processor_type == 3)
+        && !(c.smoothies[0] && c.processor_type == 3)
         && c.background2over == 2
     {
         draw_background_2_maybe_blended(g);
@@ -4448,11 +4448,11 @@ fn draw_hud(g: &mut Game, old_weapon_bar: &mut [u32; 2]) {
 
     // ---------------------Weapon Display-------------------------
     let two = g.config.two_player_mode;
-    for i in 0..2 {
+    for (i, old) in old_weapon_bar.iter_mut().enumerate() {
         let item_power = u32::from(g.player.player[if two { i } else { 0 }].items.weapon[i].power);
 
-        if old_weapon_bar[i] != item_power {
-            old_weapon_bar[i] = item_power;
+        if *old != item_power {
+            *old = item_power;
 
             let mut x = if two { 286 } else { 289 };
             let y = if i == 0 {
@@ -4583,7 +4583,7 @@ fn draw_backgrounds_and_enemies(g: &mut Game) -> Flow {
     let c = &g.config;
     if c.background2over == 0
         && !(c.smoothies[2 - 1] && c.processor_type < 4)
-        && !(c.smoothies[1 - 1] && c.processor_type == 3)
+        && !(c.smoothies[0] && c.processor_type == 3)
     {
         draw_background_2_maybe_blended(g);
     }
@@ -4626,7 +4626,7 @@ fn draw_backgrounds_and_enemies(g: &mut Game) -> Flow {
     // -----------------------BACKGROUND 2------------------------
     let c = &g.config;
     if !(c.smoothies[2 - 1] && c.processor_type < 4)
-        && !(c.smoothies[1 - 1] && c.processor_type == 3)
+        && !(c.smoothies[0] && c.processor_type == 3)
         && c.background2over == 1
     {
         draw_background_2_maybe_blended(g);
@@ -4901,7 +4901,7 @@ fn damage_linked_enemies(g: &mut Game, b: usize, temp: u8) {
                     e.animin = e.edgr as u8;
                     e.enemycycle = e.animin.wrapping_sub(1);
                 } else if e.edgr > 0 {
-                    e.egr[1 - 1] = e.edgr;
+                    e.egr[0] = e.edgr;
                     e.ani = 1;
                     e.aniactive = 0;
                     e.animax = 0;
@@ -4986,7 +4986,7 @@ fn kill_linked_enemies(g: &mut Game, b: usize, temp: u8, player_num: u8) {
                                 c.super_arcade_power_up = 1;
                             }
                             let up = c.super_arcade_power_up;
-                            g.varz.enemy[nb].egr[1 - 1] = 5 + u16::from(up) * 2;
+                            g.varz.enemy[nb].egr[0] = 5 + u16::from(up) * 2;
                             g.varz.enemy[nb].evalue = 30000 + i16::from(up);
                         }
 
@@ -5025,7 +5025,7 @@ fn kill_linked_enemies(g: &mut Game, b: usize, temp: u8, player_num: u8) {
                     e.edlevel = 0;
                     v.enemy_avail[t2] = 2;
                     let e = &mut v.enemy[t2];
-                    e.egr[1 - 1] = e.edgr;
+                    e.egr[0] = e.edgr;
                     e.ani = 1;
                     e.aniactive = 0;
                     e.animax = 0;
@@ -5401,14 +5401,14 @@ fn level_timer_tick(g: &mut Game) {
 
     let count = g.varz.level_timer_countdown;
     if count > 200 {
-        if count % 100 == 0 {
+        if count.is_multiple_of(100) {
             g.varz.sound_queue[7] = crate::sndmast::S_WARNING;
         }
 
-        if count % 10 == 0 {
+        if count.is_multiple_of(10) {
             g.varz.sound_queue[6] = crate::sndmast::S_CLICK;
         }
-    } else if count % 20 == 0 {
+    } else if count.is_multiple_of(20) {
         g.varz.sound_queue[7] = crate::sndmast::S_WARNING;
     }
 
