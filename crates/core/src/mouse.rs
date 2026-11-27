@@ -4,6 +4,8 @@
 
 //! Port of upstream `mouse.c` / `mouse.h`.
 
+use crate::Game;
+use crate::sdl::Surface;
 use serde::{Deserialize, Serialize};
 
 /// `MOUSE_POINTER_NORMAL`.
@@ -45,4 +47,74 @@ impl Default for State {
             mouse_grab_shape: [0; MOUSE_GRAB_SHAPE_LEN],
         }
     }
+}
+
+/// `JE_drawShapeTypeOne(x, y, shape)` on `*VGAScreen` (passed as `screen`).
+#[doc(alias = "JE_drawShapeTypeOne")]
+pub fn je_draw_shape_type_one(
+    screen: &mut Surface,
+    x: u16,
+    y: u16,
+    shape: &[u8; MOUSE_GRAB_SHAPE_LEN],
+) {
+    let pitch = screen.pitch as usize;
+    let mut s = usize::from(y) * pitch + usize::from(x);
+    let s_limit = screen.h as usize * pitch;
+    let mut p = 0;
+
+    for _yloop in 0..28 {
+        for _xloop in 0..24 {
+            if s >= s_limit {
+                return;
+            }
+            screen.pixels[s] = shape[p];
+            s += 1;
+            p += 1;
+        }
+        s -= 24;
+        s += pitch;
+    }
+}
+
+/// `JE_grabShapeTypeOne(x, y, shape)` from `*VGAScreen` (passed as `screen`).
+#[doc(alias = "JE_grabShapeTypeOne")]
+pub fn je_grab_shape_type_one(
+    screen: &Surface,
+    x: u16,
+    y: u16,
+    shape: &mut [u8; MOUSE_GRAB_SHAPE_LEN],
+) {
+    let pitch = screen.pitch as usize;
+    let mut s = usize::from(y) * pitch + usize::from(x);
+    let s_limit = screen.h as usize * pitch;
+    let mut p = 0;
+
+    for _yloop in 0..28 {
+        for _xloop in 0..24 {
+            if s >= s_limit {
+                return;
+            }
+            shape[p] = screen.pixels[s];
+            s += 1;
+            p += 1;
+        }
+        s -= 24;
+        s += pitch;
+    }
+}
+
+/// `JE_mouseReplace` (FKA NewShape.MouseReplace).
+#[doc(alias = "JE_mouseReplace")]
+pub fn je_mouse_replace(g: &mut Game) {
+    if !g.mouse.has_mouse {
+        return;
+    }
+
+    let m = &g.mouse;
+    je_draw_shape_type_one(
+        g.video.vga_mut(),
+        m.mouse_grab_x,
+        m.mouse_grab_y,
+        &m.mouse_grab_shape,
+    );
 }

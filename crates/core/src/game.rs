@@ -61,13 +61,45 @@ macro_rules! game_states {
             $(pub $m: $m::State,)*
         }
 
-        impl Game {
+        /// Every module state, borrowed apart from the platform (see
+        /// [`Game::split`]): lets a `FrameView` snapshot closure read the
+        /// states while the platform is called.
+        pub struct States<'a> {
+            pub crand: &'a Arc<Mutex<crand::State>>,
+            pub audio: &'a Arc<Mutex<loudness::AudioState>>,
+            $(pub $m: &'a $m::State,)*
+        }
+
+        impl States<'_> {
             pub fn snapshot(&self) -> Snapshot {
                 Snapshot {
                     crand: self.crand.lock().unwrap_or_else(|e| e.into_inner()).clone(),
                     audio: self.audio.lock().unwrap_or_else(|e| e.into_inner()).clone(),
                     $($m: self.$m.clone(),)*
                 }
+            }
+        }
+
+        impl Game {
+            /// The platform and every other state, borrowed disjointly.
+            pub fn split(&mut self) -> (&mut dyn Platform, States<'_>) {
+                (
+                    &mut *self.platform,
+                    States {
+                        crand: &self.crand,
+                        audio: &self.audio,
+                        $($m: &self.$m,)*
+                    },
+                )
+            }
+
+            pub fn snapshot(&self) -> Snapshot {
+                States {
+                    crand: &self.crand,
+                    audio: &self.audio,
+                    $($m: &self.$m,)*
+                }
+                .snapshot()
             }
 
             /// Replaces every module state with `s` (the platform is kept).

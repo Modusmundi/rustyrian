@@ -2120,128 +2120,129 @@ notes = ""
 c = "joystick.c::joystick_axis_threshold"
 c_sha = "ce1c40c2309b"
 rust = "rustyrian_core::joystick::joystick_axis_threshold"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:joystick::axis_helpers_match_c"]
 notes = ""
 
 [[fn]]
 c = "joystick.c::joystick_axis_reduce"
 c_sha = "1c4a823e63b8"
 rust = "rustyrian_core::joystick::joystick_axis_reduce"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:joystick::axis_helpers_match_c", "diff:joystick::axis_reduce_with_zero_divisor_is_zero"]
 notes = ""
 
 [[fn]]
 c = "joystick.c::joystick_analog_angle"
 c_sha = "316e73d837a8"
 rust = "rustyrian_core::joystick::joystick_analog_angle"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:joystick::axis_helpers_match_c"]
 notes = ""
 
 [[fn]]
 c = "joystick.c::check_assigned"
 c_sha = "a807461eebfd"
 rust = "rustyrian_core::joystick::check_assigned"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:joystick::check_assigned_matches_c", "diff:joystick::poll_and_push_joysticks_match_c"]
 notes = ""
 
 [[fn]]
 c = "joystick.c::poll_joystick"
 c_sha = "17b2a465cbbf"
 rust = "rustyrian_core::joystick::poll_joystick"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:joystick::poll_and_push_joysticks_match_c"]
 notes = ""
 
 [[fn]]
 c = "joystick.c::poll_joysticks"
 c_sha = "acb1b5e79f24"
 rust = "rustyrian_core::joystick::poll_joysticks"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:joystick::poll_and_push_joysticks_match_c"]
 notes = ""
 
 [[fn]]
 c = "joystick.c::push_key"
 c_sha = "ea8e4e7a8fa2"
 rust = "rustyrian_core::joystick::push_key"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:joystick::poll_and_push_joysticks_match_c"]
 notes = ""
 
 [[fn]]
 c = "joystick.c::push_joysticks_as_keyboard"
 c_sha = "7182b05b9798"
 rust = "rustyrian_core::joystick::push_joysticks_as_keyboard"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:joystick::poll_and_push_joysticks_match_c"]
 notes = ""
 
 [[fn]]
 c = "joystick.c::init_joysticks"
 c_sha = "a0b60482102a"
 rust = "rustyrian_core::joystick::init_joysticks"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:joystick::init_and_deinit_joysticks_match_c"]
 notes = ""
 
 [[fn]]
 c = "joystick.c::deinit_joysticks"
 c_sha = "8c7664588d9f"
 rust = "rustyrian_core::joystick::deinit_joysticks"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:joystick::init_and_deinit_joysticks_match_c"]
 notes = ""
 
 [[fn]]
 c = "joystick.c::reset_joystick_assignments"
 c_sha = "476693fb23a2"
 rust = "rustyrian_core::joystick::reset_joystick_assignments"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:joystick::reset_and_load_assignments_match_c", "diff:joystick::init_and_deinit_joysticks_match_c"]
 notes = ""
 
 [[fn]]
 c = "joystick.c::load_joystick_assignments"
 c_sha = "3b3df39a1fcf"
 rust = "rustyrian_core::joystick::load_joystick_assignments"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:joystick::reset_and_load_assignments_match_c", "diff:joystick::init_and_deinit_joysticks_match_c"]
 notes = ""
 
 [[fn]]
 c = "joystick.c::save_joystick_assignments"
 c_sha = "f955bafbd399"
 rust = "rustyrian_core::joystick::save_joystick_assignments"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:joystick::reset_and_load_assignments_match_c", "diff:joystick::init_and_deinit_joysticks_match_c"]
+waived_lines = [{ line = 413, reason = "unreachable: out of memory (the Rust config cannot fail to allocate)" }, { line = 425, reason = "unreachable: out of memory (the Rust config cannot fail to allocate)" }, { line = 429, reason = "unreachable: out of memory (the Rust config cannot fail to allocate)" }, { line = 438, reason = "unreachable: out of memory (the Rust config cannot fail to allocate)" }]
 notes = ""
 
 [[fn]]
 c = "joystick.c::joystick_assignments_to_string"
 c_sha = "cd6df062e4df"
 rust = "rustyrian_core::joystick::joystick_assignments_to_string"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:joystick::joystick_assignments_to_string_matches_c"]
 notes = ""
 
 [[fn]]
 c = "joystick.c::code_to_assignment"
 c_sha = "32878b8a5abc"
 rust = "rustyrian_core::joystick::code_to_assignment"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:joystick::code_to_assignment_matches_c", "diff:joystick::reset_and_load_assignments_match_c"]
 notes = ""
 
 [[fn]]
 c = "joystick.c::assignment_to_code"
 c_sha = "00cadcff7041"
 rust = "rustyrian_core::joystick::assignment_to_code"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:joystick::assignment_to_code_matches_c", "diff:joystick::init_and_deinit_joysticks_match_c"]
 notes = ""
 
 [[fn]]
@@ -2250,14 +2251,15 @@ c_sha = "598d2f0778dd"
 rust = "rustyrian_core::joystick::detect_joystick_assignment"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: calls nortsong.c::setFrameCount, nortsong.c::delayUntilElapsed, network.c::network_check (not verified on main)"
 
 [[fn]]
 c = "joystick.c::joystick_assignment_cmp"
 c_sha = "669023961da3"
 rust = "rustyrian_core::joystick::joystick_assignment_cmp"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:joystick::joystick_assignment_cmp_matches_c"]
+waived_lines = [{ line = 647, reason = "unreachable: the switch covers every Joystick_assignment_types value" }]
 notes = ""
 
 [[fn]]
@@ -2272,96 +2274,97 @@ notes = ""
 c = "keyboard.c::init_keyboard"
 c_sha = "6b2f5ac994f3"
 rust = "rustyrian_core::keyboard::init_keyboard"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:keyboard::init_keyboard_matches_c"]
 notes = ""
 
 [[fn]]
 c = "keyboard.c::keyboardHasInput"
 c_sha = "ad884e427331"
 rust = "rustyrian_core::keyboard::keyboard_has_input"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:keyboard::input_queues_match_c"]
 notes = ""
 
 [[fn]]
 c = "keyboard.c::keyboardGetInput"
 c_sha = "c58f97aa10ab"
 rust = "rustyrian_core::keyboard::keyboard_get_input"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:keyboard::input_queues_match_c"]
 notes = ""
 
 [[fn]]
 c = "keyboard.c::keyboardClearInput"
 c_sha = "a9598a14ba18"
 rust = "rustyrian_core::keyboard::keyboard_clear_input"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:keyboard::input_queues_match_c"]
 notes = ""
 
 [[fn]]
 c = "keyboard.c::mouseHasInput"
 c_sha = "1ce9c60aff5b"
 rust = "rustyrian_core::keyboard::mouse_has_input"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:keyboard::input_queues_match_c"]
 notes = ""
 
 [[fn]]
 c = "keyboard.c::mouseGetInput"
 c_sha = "40182031a309"
 rust = "rustyrian_core::keyboard::mouse_get_input"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:keyboard::input_queues_match_c"]
 notes = ""
 
 [[fn]]
 c = "keyboard.c::mouseClearInput"
 c_sha = "887dcec3832b"
 rust = "rustyrian_core::keyboard::mouse_clear_input"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:keyboard::input_queues_match_c"]
 notes = ""
 
 [[fn]]
 c = "keyboard.c::mouseSetRelative"
 c_sha = "423c86dd06da"
 rust = "rustyrian_core::keyboard::mouse_set_relative"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:keyboard::mouse_relative_matches_c", "diff:keyboard::handle_sdl_events_matches_c"]
 notes = ""
 
 [[fn]]
 c = "keyboard.c::mouseGetRelativePosition"
 c_sha = "0122c35766f4"
 rust = "rustyrian_core::keyboard::mouse_get_relative_position"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:keyboard::mouse_relative_matches_c"]
 notes = ""
 
 [[fn]]
 c = "keyboard.c::handleSdlEvents"
 c_sha = "211b22b6bd1f"
 rust = "rustyrian_core::keyboard::handle_sdl_events"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:keyboard::handle_sdl_events_matches_c", "diff:keyboard::out_of_range_scancodes_are_ignored"]
+waived_lines = [{ line = 262, reason = "unreachable: SDL's 32-byte text field is NUL at index 31, so a 2-byte lead never sits at the last index" }]
 notes = ""
 
 [[fn]]
 c = "keyboard.c::hasInput"
 c_sha = "9a69b6a58b6a"
 rust = "rustyrian_core::keyboard::has_input"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:keyboard::input_queues_match_c"]
 notes = ""
 
 [[fn]]
 c = "keyboard.c::getInput"
 c_sha = "ad67a1808253"
 rust = "rustyrian_core::keyboard::get_input"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:keyboard::input_queues_match_c"]
 notes = ""
 
 [[fn]]
@@ -2370,7 +2373,7 @@ c_sha = "84642df9d8a7"
 rust = "rustyrian_core::keyboard::wait_until_has_input"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: calls network.c::network_check (not verified on main)"
 
 [[fn]]
 c = "keyboard.c::waitUntilGetInput"
@@ -2378,7 +2381,7 @@ c_sha = "5644b8ea6ad7"
 rust = "rustyrian_core::keyboard::wait_until_get_input"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: calls network.c::network_check (not verified on main)"
 
 [[fn]]
 c = "keyboard.c::waitUntilElapsed"
@@ -2386,7 +2389,7 @@ c_sha = "e90222542789"
 rust = "rustyrian_core::keyboard::wait_until_elapsed"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: calls network.c::network_check, nortsong.c::getFrameCountTicks (not verified on main)"
 
 [[fn]]
 c = "keyboard.c::waitUntilHasInputOrElapsed"
@@ -2394,7 +2397,7 @@ c_sha = "b75f2957c21b"
 rust = "rustyrian_core::keyboard::wait_until_has_input_or_elapsed"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: calls network.c::network_check, nortsong.c::getFrameCountTicks (not verified on main)"
 
 [[fn]]
 c = "keyboard.c::waitUntilGetInputOrElapsed"
@@ -2402,7 +2405,7 @@ c_sha = "ed2bf1df4819"
 rust = "rustyrian_core::keyboard::wait_until_get_input_or_elapsed"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: calls network.c::network_check, nortsong.c::getFrameCountTicks (not verified on main)"
 
 [[fn]]
 c = "lds_play.c::lds_load"
@@ -3241,16 +3244,16 @@ notes = ""
 c = "mouse.c::JE_drawShapeTypeOne"
 c_sha = "34c3f16dca6b"
 rust = "rustyrian_core::mouse::je_draw_shape_type_one"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mouse::shape_grab_and_draw_match_c", "diff:mouse::mouse_replace_matches_c"]
 notes = ""
 
 [[fn]]
 c = "mouse.c::JE_grabShapeTypeOne"
 c_sha = "70245b488cda"
 rust = "rustyrian_core::mouse::je_grab_shape_type_one"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mouse::shape_grab_and_draw_match_c"]
 notes = ""
 
 [[fn]]
@@ -3259,7 +3262,7 @@ c_sha = "49793a4f68f0"
 rust = "rustyrian_core::mouse::je_mouse_start"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: calls sprite.c::blit_sprite2x2_clip (not verified on main)"
 
 [[fn]]
 c = "mouse.c::JE_mouseStartFilter"
@@ -3267,14 +3270,14 @@ c_sha = "0489027a0607"
 rust = "rustyrian_core::mouse::je_mouse_start_filter"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: calls sprite.c::blit_sprite2x2_filter_clip (not verified on main)"
 
 [[fn]]
 c = "mouse.c::JE_mouseReplace"
 c_sha = "083b3a25fbde"
 rust = "rustyrian_core::mouse::je_mouse_replace"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:mouse::mouse_replace_matches_c"]
 notes = ""
 
 [[fn]]
@@ -4722,112 +4725,112 @@ notes = ""
 c = "video.c::init_video"
 c_sha = "f2d77491568f"
 rust = "rustyrian_core::video::init_video"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video::init_video_matches_c"]
 notes = ""
 
 [[fn]]
 c = "video.c::deinit_video"
 c_sha = "302cd8e9b878"
 rust = "rustyrian_core::video::deinit_video"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video::present_screen_and_deinit_video_match_c"]
 notes = ""
 
 [[fn]]
 c = "video.c::init_renderer"
 c_sha = "4c9b8d80d5b7"
 rust = "rustyrian_core::video::init_renderer"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video::texture_and_renderer_helpers_match_c", "diff:video::init_video_matches_c"]
 notes = ""
 
 [[fn]]
 c = "video.c::deinit_renderer"
 c_sha = "2644409e7776"
 rust = "rustyrian_core::video::deinit_renderer"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video::texture_and_renderer_helpers_match_c", "diff:video::present_screen_and_deinit_video_match_c"]
 notes = ""
 
 [[fn]]
 c = "video.c::init_texture"
 c_sha = "a5dac7606857"
 rust = "rustyrian_core::video::init_texture"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video::texture_and_renderer_helpers_match_c", "diff:video::init_video_matches_c"]
 notes = ""
 
 [[fn]]
 c = "video.c::deinit_texture"
 c_sha = "29481f9399e7"
 rust = "rustyrian_core::video::deinit_texture"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video::texture_and_renderer_helpers_match_c", "diff:video::init_scaler_matches_c"]
 notes = ""
 
 [[fn]]
 c = "video.c::window_get_display_index"
 c_sha = "8c0fc1ba6f0d"
 rust = "rustyrian_core::video::window_get_display_index"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video::window_center_in_display_matches_c"]
 notes = ""
 
 [[fn]]
 c = "video.c::window_center_in_display"
 c_sha = "7ca4fa19e6cb"
 rust = "rustyrian_core::video::window_center_in_display"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video::window_center_in_display_matches_c", "diff:video::init_video_matches_c"]
 notes = ""
 
 [[fn]]
 c = "video.c::reinit_fullscreen"
 c_sha = "ed5d367846c1"
 rust = "rustyrian_core::video::reinit_fullscreen"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video::reinit_and_toggle_fullscreen_match_c", "diff:video::reinit_fullscreen_falls_back_to_windowed"]
 notes = ""
 
 [[fn]]
 c = "video.c::video_on_win_resize"
 c_sha = "13e0146aafdc"
 rust = "rustyrian_core::video::video_on_win_resize"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video::video_on_win_resize_matches_c"]
 notes = ""
 
 [[fn]]
 c = "video.c::toggle_fullscreen"
 c_sha = "dde80d9e41bd"
 rust = "rustyrian_core::video::toggle_fullscreen"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video::reinit_and_toggle_fullscreen_match_c"]
 notes = ""
 
 [[fn]]
 c = "video.c::init_scaler"
 c_sha = "900c35bd384c"
 rust = "rustyrian_core::video::init_scaler"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video::init_scaler_matches_c"]
 notes = ""
 
 [[fn]]
 c = "video.c::set_scaling_mode_by_name"
 c_sha = "8ecd992caff2"
 rust = "rustyrian_core::video::set_scaling_mode_by_name"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video::set_scaling_mode_by_name_matches_c"]
 notes = ""
 
 [[fn]]
 c = "video.c::JE_clr256"
 c_sha = "72c0b97f5839"
 rust = "rustyrian_core::video::je_clr256"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video::je_clr256_matches_c", "diff:video::init_video_matches_c"]
 notes = ""
 
 [[fn]]
@@ -4836,14 +4839,15 @@ c_sha = "50fca445d8a3"
 rust = "rustyrian_core::video::je_show_vga"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: calls scale_and_render_screen (todo)"
 
 [[fn]]
 c = "video.c::calc_dst_render_rect"
 c_sha = "e4dffd68689d"
 rust = "rustyrian_core::video::calc_dst_render_rect"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video::calc_dst_render_rect_matches_c"]
+waived_lines = [{ line = 371, reason = "unreachable: ScalingMode_MAX is never stored in scaling_mode" }]
 notes = ""
 
 [[fn]]
@@ -4852,94 +4856,94 @@ c_sha = "f238a62c19bb"
 rust = "rustyrian_core::video::scale_and_render_screen"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked: dispatches through scaler_function to video_scale_hqNx.c::hq2x_32/hq3x_32/hq4x_32 (not verified on main); agreed signature hqNx_32(g, src_surface: ScreenId, dst_texture: TextureId)"
 
 [[fn]]
 c = "video.c::present_screen"
 c_sha = "e5409282db70"
 rust = "rustyrian_core::video::present_screen"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video::present_screen_and_deinit_video_match_c", "diff:video::init_video_matches_c"]
 notes = ""
 
 [[fn]]
 c = "video.c::mapScreenPointToWindow"
 c_sha = "356378dfdabe"
 rust = "rustyrian_core::video::map_screen_point_to_window"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video::map_points_match_c"]
 notes = ""
 
 [[fn]]
 c = "video.c::mapWindowPointToScreen"
 c_sha = "7249532786e4"
 rust = "rustyrian_core::video::map_window_point_to_screen"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video::map_points_match_c", "diff:keyboard::handle_sdl_events_matches_c"]
 notes = ""
 
 [[fn]]
 c = "video.c::scaleWindowDistanceToScreen"
 c_sha = "a6cc0f0470bd"
 rust = "rustyrian_core::video::scale_window_distance_to_screen"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video::map_points_match_c", "diff:keyboard::mouse_relative_matches_c"]
 notes = ""
 
 [[fn]]
 c = "video_scale.c::set_scaler_by_name"
 c_sha = "0e1ec1565012"
 rust = "rustyrian_core::video_scale::set_scaler_by_name"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video_scale::set_scaler_by_name_matches_c"]
 notes = ""
 
 [[fn]]
 c = "video_scale.c::nn_32"
 c_sha = "4c3fe7b43e13"
 rust = "rustyrian_core::video_scale::nn_32"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video_scale::scalers_match_c_on_random_images", "diff:video_scale::scalers_match_c_on_fixture_frames", "diff:video_scale::scalers_match_c_on_every_picture", "diff:video_scale::scalers_skip_writes_when_lock_fails"]
 notes = ""
 
 [[fn]]
 c = "video_scale.c::nn_16"
 c_sha = "5213a12a152d"
 rust = "rustyrian_core::video_scale::nn_16"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video_scale::scalers_match_c_on_random_images", "diff:video_scale::scalers_match_c_on_fixture_frames", "diff:video_scale::scalers_match_c_on_every_picture", "diff:video_scale::scalers_skip_writes_when_lock_fails"]
 notes = ""
 
 [[fn]]
 c = "video_scale.c::scale2x_32"
 c_sha = "36162a66fd29"
 rust = "rustyrian_core::video_scale::scale2x_32"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video_scale::scalers_match_c_on_random_images", "diff:video_scale::scalers_match_c_on_fixture_frames", "diff:video_scale::scalers_match_c_on_every_picture", "diff:video_scale::scalers_skip_writes_when_lock_fails"]
 notes = ""
 
 [[fn]]
 c = "video_scale.c::scale2x_16"
 c_sha = "bb75a5738756"
 rust = "rustyrian_core::video_scale::scale2x_16"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video_scale::scalers_match_c_on_random_images", "diff:video_scale::scalers_match_c_on_fixture_frames", "diff:video_scale::scalers_match_c_on_every_picture", "diff:video_scale::scalers_skip_writes_when_lock_fails"]
 notes = ""
 
 [[fn]]
 c = "video_scale.c::scale3x_32"
 c_sha = "a77aea34927f"
 rust = "rustyrian_core::video_scale::scale3x_32"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video_scale::scalers_match_c_on_random_images", "diff:video_scale::scalers_match_c_on_fixture_frames", "diff:video_scale::scalers_match_c_on_every_picture", "diff:video_scale::scalers_skip_writes_when_lock_fails"]
 notes = ""
 
 [[fn]]
 c = "video_scale.c::scale3x_16"
 c_sha = "e4e39512f27b"
 rust = "rustyrian_core::video_scale::scale3x_16"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video_scale::scalers_match_c_on_random_images", "diff:video_scale::scalers_match_c_on_fixture_frames", "diff:video_scale::scalers_match_c_on_every_picture", "diff:video_scale::scalers_skip_writes_when_lock_fails"]
 notes = ""
 
 [[fn]]
