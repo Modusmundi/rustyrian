@@ -68,7 +68,11 @@ Pushing a tag `v<version>` (the workspace version in `Cargo.toml`) runs
 `.github/workflows/release.yml`: five archives (Linux x86_64 and aarch64,
 a universal macOS app, Windows x86_64 and aarch64), each smoke-tested on its
 own OS, plus `SHA256SUMS`, a CycloneDX SBOM and build-provenance attestations,
-in a draft GitHub release. Locally:
+in a draft GitHub release.
+
+The title screen shows `rustyrian-<version>` (both engines), so the version
+bump commit also re-blesses the packaged-smoke golden:
+`cargo xtask parity demo-menu --bless`. Locally:
 
 ```sh
 cargo xtask package --target x86_64-unknown-linux-gnu        # cargo auditable build + archive in target/package

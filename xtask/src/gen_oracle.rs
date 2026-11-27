@@ -70,12 +70,15 @@ pub fn clang_args(root: &Path) -> Result<Vec<String>> {
         "-DNDEBUG",
         "-DWITH_NETWORK",
         "-DTYRIAN_DIR=\"/nonexistent\"",
-        "-DOPENTYRIAN_VERSION=\"rustyrian-oracle\"",
         "-fsigned-char",
     ]
     .iter()
     .map(|s| (*s).to_owned())
     .collect();
+    args.push(format!(
+        "-DOPENTYRIAN_VERSION=\"rustyrian-{}\"",
+        env!("CARGO_PKG_VERSION")
+    ));
     args.push(format!(
         "-I{}",
         root.join("crates/oracle/shim/include").display()

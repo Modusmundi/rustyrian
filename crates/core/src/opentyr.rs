@@ -33,10 +33,11 @@ use crate::video::{
 use crate::video_scale::{SCALERS, SCALERS_COUNT};
 use serde::{Deserialize, Serialize};
 
-/// `OPENTYRIAN_VERSION`, as the oracle is built
-/// (`-DOPENTYRIAN_VERSION="rustyrian-oracle"`). Upstream logs it and shows it
-/// on screen, so both engines must agree on it for parity.
-pub const OPENTYRIAN_VERSION: &str = "rustyrian-oracle";
+/// `OPENTYRIAN_VERSION`: `rustyrian-<workspace version>`, as the oracle is
+/// built too. Upstream logs it and shows it on the title screen, so both
+/// engines must agree on it for parity, and `tests/golden/` is re-blessed
+/// with each version bump.
+pub const OPENTYRIAN_VERSION: &str = concat!("rustyrian-", env!("CARGO_PKG_VERSION"));
 
 /// `M_PI`.
 pub const M_PI: f64 = std::f64::consts::PI;

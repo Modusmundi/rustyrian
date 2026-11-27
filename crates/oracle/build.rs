@@ -124,6 +124,12 @@ fn main() {
     .iter()
     .map(|s| (*s).to_owned())
     .collect();
+    // The shipped version string; upstream shows it on the title screen, so
+    // the Rust engine uses the same one (`opentyr::OPENTYRIAN_VERSION`).
+    common.push(format!(
+        "-DOPENTYRIAN_VERSION=\"rustyrian-{}\"",
+        env!("CARGO_PKG_VERSION")
+    ));
     common.push(if release { "-O2" } else { "-O1" }.to_owned());
     common.push("-include".to_owned());
     common.push(gen_dir.join("ot_shim.h").display().to_string());
