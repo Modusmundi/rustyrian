@@ -28,12 +28,22 @@ fn instrumented(o: &Options) -> bool {
         || o.perf_log.is_some()
 }
 
-/// The executable's directory, which `SDL_GetBasePath` reports (with a
-/// trailing separator).
-fn exe_dir() -> Option<String> {
-    std::env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(|d| d.display().to_string()))
+/// What `SDL_GetBasePath` reports, with its trailing separator: the
+/// executable's directory, except inside a macOS app bundle, where SDL2
+/// returns the bundle's resource directory (`NSBundle.resourcePath`,
+/// `Contents/Resources`), which holds the packaged `data/`.
+fn sdl_base_path() -> Option<String> {
+    let exe = std::env::current_exe().ok()?;
+    let dir = exe.parent()?;
+    #[cfg(target_os = "macos")]
+    if let Some(contents) = dir.parent()
+        && dir.file_name().is_some_and(|n| n == "MacOS")
+        && contents.file_name().is_some_and(|n| n == "Contents")
+        && contents.join("Info.plist").is_file()
+    {
+        return Some(format!("{}/", contents.join("Resources").display()));
+    }
+    Some(format!("{}/", dir.display()))
 }
 
 /// The instrumentation the options ask for.
@@ -64,8 +74,8 @@ fn instrument_config(o: &Options) -> Result<InstrumentConfig, String> {
         dump_frames: o.dump_frames.clone().map(|d| (d, o.dump_every)),
         // The base path is recorded as `<base>`, as the oracle runners do,
         // so traces do not depend on where the binary is installed.
-        redact: exe_dir()
-            .map(|d| (d, "<base>".to_owned()))
+        redact: sdl_base_path()
+            .map(|d| (d.trim_end_matches('/').to_owned(), "<base>".to_owned()))
             .into_iter()
             .collect(),
         ..InstrumentConfig::default()
@@ -89,9 +99,9 @@ fn wrap<P: Platform + PlatformProbe + 'static>(
 /// The platform the options select: SDL, or the fake platform headless.
 fn platform(o: &Options) -> Result<Box<dyn Platform>, String> {
     if o.headless {
-        // The executable's directory, as SDL_GetBasePath reports it (portable
-        // mode looks for `opentyrian.cfg` there).
-        let base_path = exe_dir().map(|d| format!("{d}/"));
+        // As SDL_GetBasePath reports it: upstream finds `data/` there, and
+        // portable mode looks for `opentyrian.cfg` there.
+        let base_path = sdl_base_path();
         let fake = FakePlatform::new(FakeConfig {
             clock: if o.clock_real {
                 Clock::Real
