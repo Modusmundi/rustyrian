@@ -43,7 +43,7 @@ enum Cmd {
     Fixtures,
     /// Per-function C line coverage into `porting/coverage.json`.
     Coverage,
-    /// Copy the freeware data files into fuzz/corpus/<target>/.
+    /// Copy the freeware data files into `fuzz/corpus/<target>/`.
     FuzzSeed,
     /// Run the C oracle on a scenario and write its trace.
     RefTrace {
