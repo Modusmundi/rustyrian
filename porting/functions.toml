@@ -4947,112 +4947,112 @@ notes = ""
 c = "video_scale_hqNx.c::interp1"
 c_sha = "c188e95183ab"
 rust = "rustyrian_core::video_scale_hqnx::interp1"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video_scale_hqnx::interp_matches_c", "diff:video_scale_hqnx::scalers_match_c_on_fixture_frames", "diff:video_scale_hqnx::scalers_match_c_on_every_picture", "diff:video_scale_hqnx::scalers_match_c_on_random_images", "diff:video_scale_hqnx::scalers_match_c_on_adversarial_images"]
 notes = ""
 
 [[fn]]
 c = "video_scale_hqNx.c::interp2"
 c_sha = "1c28f0dcf83a"
 rust = "rustyrian_core::video_scale_hqnx::interp2"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video_scale_hqnx::interp_matches_c", "diff:video_scale_hqnx::scalers_match_c_on_fixture_frames", "diff:video_scale_hqnx::scalers_match_c_on_every_picture", "diff:video_scale_hqnx::scalers_match_c_on_random_images", "diff:video_scale_hqnx::scalers_match_c_on_adversarial_images"]
 notes = ""
 
 [[fn]]
 c = "video_scale_hqNx.c::interp3"
 c_sha = "a9ed3b295635"
 rust = "rustyrian_core::video_scale_hqnx::interp3"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video_scale_hqnx::interp_matches_c", "diff:video_scale_hqnx::scalers_match_c_on_fixture_frames", "diff:video_scale_hqnx::scalers_match_c_on_every_picture", "diff:video_scale_hqnx::scalers_match_c_on_random_images", "diff:video_scale_hqnx::scalers_match_c_on_adversarial_images"]
 notes = ""
 
 [[fn]]
 c = "video_scale_hqNx.c::interp4"
 c_sha = "19c3ce9daad9"
 rust = "rustyrian_core::video_scale_hqnx::interp4"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video_scale_hqnx::interp_matches_c", "diff:video_scale_hqnx::scalers_match_c_on_fixture_frames", "diff:video_scale_hqnx::scalers_match_c_on_every_picture", "diff:video_scale_hqnx::scalers_match_c_on_random_images", "diff:video_scale_hqnx::scalers_match_c_on_adversarial_images"]
 notes = ""
 
 [[fn]]
 c = "video_scale_hqNx.c::interp5"
 c_sha = "93c0b8cb98be"
 rust = "rustyrian_core::video_scale_hqnx::interp5"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video_scale_hqnx::interp_matches_c", "diff:video_scale_hqnx::scalers_match_c_on_fixture_frames", "diff:video_scale_hqnx::scalers_match_c_on_every_picture", "diff:video_scale_hqnx::scalers_match_c_on_random_images", "diff:video_scale_hqnx::scalers_match_c_on_adversarial_images"]
 notes = ""
 
 [[fn]]
 c = "video_scale_hqNx.c::interp6"
 c_sha = "fed42e491b1d"
 rust = "rustyrian_core::video_scale_hqnx::interp6"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video_scale_hqnx::interp_matches_c", "diff:video_scale_hqnx::scalers_match_c_on_fixture_frames", "diff:video_scale_hqnx::scalers_match_c_on_every_picture", "diff:video_scale_hqnx::scalers_match_c_on_random_images", "diff:video_scale_hqnx::scalers_match_c_on_adversarial_images"]
 notes = ""
 
 [[fn]]
 c = "video_scale_hqNx.c::interp7"
 c_sha = "4bdddfe9db0a"
 rust = "rustyrian_core::video_scale_hqnx::interp7"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video_scale_hqnx::interp_matches_c", "diff:video_scale_hqnx::scalers_match_c_on_fixture_frames", "diff:video_scale_hqnx::scalers_match_c_on_every_picture", "diff:video_scale_hqnx::scalers_match_c_on_random_images", "diff:video_scale_hqnx::scalers_match_c_on_adversarial_images"]
 notes = ""
 
 [[fn]]
 c = "video_scale_hqNx.c::interp8"
 c_sha = "5d161bd6937e"
 rust = "rustyrian_core::video_scale_hqnx::interp8"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video_scale_hqnx::interp_matches_c", "diff:video_scale_hqnx::scalers_match_c_on_fixture_frames", "diff:video_scale_hqnx::scalers_match_c_on_every_picture", "diff:video_scale_hqnx::scalers_match_c_on_random_images", "diff:video_scale_hqnx::scalers_match_c_on_adversarial_images"]
 notes = ""
 
 [[fn]]
 c = "video_scale_hqNx.c::interp9"
 c_sha = "b01cd9df8bcb"
 rust = "rustyrian_core::video_scale_hqnx::interp9"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video_scale_hqnx::interp_matches_c", "diff:video_scale_hqnx::scalers_match_c_on_fixture_frames", "diff:video_scale_hqnx::scalers_match_c_on_every_picture", "diff:video_scale_hqnx::scalers_match_c_on_random_images", "diff:video_scale_hqnx::scalers_match_c_on_adversarial_images"]
 notes = ""
 
 [[fn]]
 c = "video_scale_hqNx.c::interp10"
 c_sha = "a52eff8f7455"
 rust = "rustyrian_core::video_scale_hqnx::interp10"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video_scale_hqnx::interp_matches_c", "diff:video_scale_hqnx::scalers_match_c_on_fixture_frames", "diff:video_scale_hqnx::scalers_match_c_on_every_picture", "diff:video_scale_hqnx::scalers_match_c_on_random_images", "diff:video_scale_hqnx::scalers_match_c_on_adversarial_images"]
 notes = ""
 
 [[fn]]
 c = "video_scale_hqNx.c::diff"
 c_sha = "1ca02690ee7c"
 rust = "rustyrian_core::video_scale_hqnx::diff"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video_scale_hqnx::diff_matches_c", "diff:video_scale_hqnx::scalers_match_c_on_fixture_frames", "diff:video_scale_hqnx::scalers_match_c_on_every_picture", "diff:video_scale_hqnx::scalers_match_c_on_random_images", "diff:video_scale_hqnx::scalers_match_c_on_adversarial_images"]
 notes = ""
 
 [[fn]]
 c = "video_scale_hqNx.c::hq2x_32"
 c_sha = "28476ccd79f7"
 rust = "rustyrian_core::video_scale_hqnx::hq2x_32"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video_scale_hqnx::scalers_match_c_on_fixture_frames", "diff:video_scale_hqnx::scalers_match_c_on_every_picture", "diff:video_scale_hqnx::scalers_match_c_on_random_images", "diff:video_scale_hqnx::scalers_match_c_on_adversarial_images", "diff:video_scale_hqnx::scalers_skip_writes_when_lock_fails"]
 notes = ""
 
 [[fn]]
 c = "video_scale_hqNx.c::hq3x_32"
 c_sha = "68a8f57e27a7"
 rust = "rustyrian_core::video_scale_hqnx::hq3x_32"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video_scale_hqnx::scalers_match_c_on_fixture_frames", "diff:video_scale_hqnx::scalers_match_c_on_every_picture", "diff:video_scale_hqnx::scalers_match_c_on_random_images", "diff:video_scale_hqnx::scalers_match_c_on_adversarial_images", "diff:video_scale_hqnx::scalers_skip_writes_when_lock_fails"]
 notes = ""
 
 [[fn]]
 c = "video_scale_hqNx.c::hq4x_32"
 c_sha = "d4270ab6d2cd"
 rust = "rustyrian_core::video_scale_hqnx::hq4x_32"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:video_scale_hqnx::scalers_match_c_on_fixture_frames", "diff:video_scale_hqnx::scalers_match_c_on_every_picture", "diff:video_scale_hqnx::scalers_match_c_on_random_images", "diff:video_scale_hqnx::scalers_match_c_on_adversarial_images", "diff:video_scale_hqnx::scalers_skip_writes_when_lock_fails"]
 notes = ""
 
 [[fn]]
