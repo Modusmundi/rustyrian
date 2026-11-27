@@ -1098,6 +1098,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustyrian"
+version = "0.0.0"
+dependencies = [
+ "rustyrian-core",
+ "rustyrian-harness",
+ "rustyrian-sdl",
+]
+
+[[package]]
 name = "rustyrian-core"
 version = "0.0.0"
 dependencies = [
