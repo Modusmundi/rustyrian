@@ -260,6 +260,67 @@ fn save_files_unwritable_dir_matches() {
     assert!(format!("{calls:?}").contains("Failed to open"));
 }
 
+/// Each of the four save checksums failing on its own.
+#[test]
+fn load_saves_each_checksum_failure_matches() {
+    for k in 0..4 {
+        let (c_dir, r_dir) = (tmp("sum-c"), tmp("sum-r"));
+        let mut d = Diff::new();
+        d.game.config.save_files[0].level = 3;
+        split_user_dirs(&mut d, &c_dir, &r_dir);
+        // SAFETY: plain C call.
+        unsafe { b::saveSaves() };
+        let _ = d.c_calls();
+        let mut data = std::fs::read(c_dir.join("tyrian.sav")).expect("saved");
+        data[cfg::SAVE_FILE_SIZE + k] ^= 0x5A;
+        for dir in [&c_dir, &r_dir] {
+            std::fs::write(dir.join("tyrian.sav"), &data).expect("write");
+        }
+        split_user_dirs(&mut d, &c_dir, &r_dir);
+        // SAFETY: plain C call.
+        unsafe { b::loadSaves() };
+        cfg::load_saves(&mut d.game);
+        check_after(&mut d);
+        assert_eq!(d.game.config.editor_level, 800, "checksum {k}");
+    }
+}
+
+/// Writes failing part-way (file size limit): both engines log the same
+/// write errors, for all three files, and leave the same truncated files.
+#[test]
+fn save_files_write_errors_match() {
+    let (c_dir, r_dir) = (tmp("efbig-c"), tmp("efbig-r"));
+    let mut d = Diff::new();
+    split_user_dirs(&mut d, &c_dir, &r_dir);
+    // SAFETY: this test runs in its own process (nextest); ignoring SIGXFSZ
+    // turns over-limit writes into EFBIG errors.
+    unsafe {
+        libc::signal(libc::SIGXFSZ, libc::SIG_IGN);
+        let limit = libc::rlimit {
+            rlim_cur: 10,
+            rlim_max: libc::RLIM_INFINITY,
+        };
+        assert_eq!(libc::setrlimit(libc::RLIMIT_FSIZE, &limit), 0);
+    }
+    // SAFETY: plain C calls.
+    unsafe {
+        b::saveSaves();
+        b::saveConfiguration();
+    }
+    cfg::save_saves(&mut d.game);
+    cfg::save_configuration(&mut d.game);
+    let calls = d.c_calls();
+    assert_eq!(calls, d.rust_calls());
+    let text = format!("{calls:?}");
+    for f in ["tyrian.sav", "tyrian.cfg", "opentyrian.cfg"] {
+        assert!(
+            text.contains(&format!("Failed to write to '{f}'")),
+            "{f}: {text}"
+        );
+    }
+    files_match(&c_dir, &r_dir);
+}
+
 proptest! {
     #![proptest_config(ProptestConfig { cases: 32, ..ProptestConfig::default() })]
 
@@ -318,7 +379,7 @@ proptest! {
     fn je_save_game_and_je_load_game_match(
         slot in 1u8..=22,
         two_player: bool,
-        flags: (bool, bool, u8),
+        flags in (any::<bool>(), any::<bool>(), prop_oneof![Just(0u8), 0u8..10]),
         items in prop::array::uniform2(any_items()),
         last in any_items(),
         cash: (u64, u64),
@@ -333,7 +394,6 @@ proptest! {
         let c = &mut d.game.config;
         c.two_player_mode = two_player;
         (c.super_tyrian, c.one_player_action, c.super_arcade_mode) = flags;
-        c.super_arcade_mode %= 10;
         c.save_level = misc.0;
         c.initial_difficulty = misc.1;
         c.difficulty_level = misc.2;

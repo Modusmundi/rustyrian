@@ -126,6 +126,23 @@ fn je_load_item_dat_rejects_level_file_without_levels() {
     assert!(calls.contains("no levels"), "{calls}");
 }
 
+/// `JE_loadItemDat` for episode 4 when the level file cannot be opened.
+#[test]
+fn je_load_item_dat_episode4_missing_level_file_matches() {
+    let mut d = Diff::new();
+    with_data_dir(&mut d, &tmp("ep4missing"));
+    d.game.episodes.episode_num = 4;
+    d.game.lvllib.level_filename = *b"tyrian4.lvl\0\0";
+    d.game.lvllib.lvl_num = 3;
+    d.store_to_c();
+    // SAFETY: JE_loadItemDat may exit, which the guard catches.
+    let c = unsafe { rustyrian_oracle::guard_call(|| b::JE_loadItemDat()) };
+    let r = e::je_load_item_dat(&mut d.game);
+    assert_eq!(c, Some(1));
+    assert_eq!(r, Err(Halt { code: 1 }));
+    check_states(&d);
+}
+
 #[test]
 fn je_scan_for_episodes_matches() {
     let full = tmp("scan");

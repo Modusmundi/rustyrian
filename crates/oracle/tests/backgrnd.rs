@@ -97,8 +97,10 @@ proptest! {
         pos in map_pos(600, 14),
         x in (0u16..24, 0u16..24),
         xbp2 in 12isize..=14,
-        back in (0u16..28, 0u16..4),
-        delay in (0u8..4, 0u8..4),
+        // Biased towards a delay that expires and a position that wraps, so
+        // both renderers scroll to the previous map row in most runs.
+        back in (prop_oneof![24u16..28, 0u16..28], prop_oneof![1u16..4, 0u16..4]),
+        delay in (prop_oneof![Just(1u8), 0u8..4], 0u8..4),
         flags: (bool, bool, bool),
         seed: u64,
     ) {
