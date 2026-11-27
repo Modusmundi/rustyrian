@@ -699,7 +699,10 @@ pub fn disable_operator(s: &mut OplState, op_pt: usize, act_type: u32) {
 pub fn adlib_init(s: &mut OplState, samplerate: u32) {
     s.int_samplerate = samplerate as Bits;
 
-    s.generator_add = (INTFREQU * Fltype::from(FIXEDPT) / s.int_samplerate as Fltype) as u32;
+    // D-UB-OPL-1: a sample rate of 0 divides to infinity, whose conversion
+    // depends on the CPU.
+    s.generator_add =
+        crate::cconv::f64_to_u32(INTFREQU * Fltype::from(FIXEDPT) / s.int_samplerate as Fltype);
 
     s.adlibreg = [0; 256];
     s.op = [OpType::default(); MAXOPERATORS];
@@ -729,8 +732,11 @@ pub fn adlib_init(s: &mut OplState, samplerate: u32) {
         s.vib_table[i] = -s.vib_table[i - 4];
     }
 
-    s.vibtab_add = (Fltype::from(VIBTAB_SIZE as i32 * FIXEDPT_LFO / 8192) * INTFREQU
-        / s.int_samplerate as Fltype) as u32;
+    // D-UB-OPL-1, as for `generator_add`.
+    s.vibtab_add = crate::cconv::f64_to_u32(
+        Fltype::from(VIBTAB_SIZE as i32 * FIXEDPT_LFO / 8192) * INTFREQU
+            / s.int_samplerate as Fltype,
+    );
     s.vibtab_pos = 0;
 
     s.vibval_const = [0; BLOCKBUF_SIZE];
@@ -752,8 +758,10 @@ pub fn adlib_init(s: &mut OplState, samplerate: u32) {
         s.trem_table[TREMTAB_SIZE + i] = (libm::pow(FL2, trem_val2) * Fltype::from(FIXEDPT)) as i32;
     }
 
-    s.tremtab_add = (TREMTAB_SIZE as Fltype * TREM_FREQ * Fltype::from(FIXEDPT_LFO)
-        / s.int_samplerate as Fltype) as u32;
+    // D-UB-OPL-1, as for `generator_add`.
+    s.tremtab_add = crate::cconv::f64_to_u32(
+        TREMTAB_SIZE as Fltype * TREM_FREQ * Fltype::from(FIXEDPT_LFO) / s.int_samplerate as Fltype,
+    );
     s.tremtab_pos = 0;
 
     s.tremval_const = [FIXEDPT; BLOCKBUF_SIZE];

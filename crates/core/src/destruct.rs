@@ -1161,24 +1161,10 @@ pub fn de_generate_base_terrain(g: &mut Game, map_flags: u32) {
 }
 
 /// The C conversion `(unsigned int)f` of `destruct.c:959-960`, which tall
-/// maps can reach with a negative value (undefined behaviour). Upstream's
-/// result depends on the CPU, so this mirrors the build's target
-/// (divergence D-UB-DESTRUCT-2):
-/// - x86-64: clang converts through a 64-bit `cvttss2si` and keeps the low
-///   32 bits; NaN and values outside `[-2^63, 2^63)` give `i64::MIN`.
-/// - other targets (arm64 `fcvtzu`): saturating, as Rust's `as`.
+/// maps can reach with a negative value (undefined behaviour); mirrored per
+/// target by [`crate::cconv`] (divergence D-UB-DESTRUCT-2).
 fn c_float_to_uint(f: f32) -> u32 {
-    if cfg!(target_arch = "x86_64") {
-        const LIMIT: f32 = 9_223_372_036_854_775_808.0; // 2^63
-        let i = if f.is_nan() || !(-LIMIT..LIMIT).contains(&f) {
-            i64::MIN
-        } else {
-            f as i64
-        };
-        i as u32
-    } else {
-        f as u32
-    }
+    crate::cconv::f32_to_u32(f)
 }
 
 /// `DE_drawBaseTerrain(world.baseMap)`.
