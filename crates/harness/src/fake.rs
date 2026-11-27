@@ -12,6 +12,7 @@ use rustyrian_core::platform::{
 };
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::net::{Ipv4Addr, SocketAddrV4, ToSocketAddrs, UdpSocket};
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 /// The constant returned by `time()`: 2001-09-09T01:46:40Z.
@@ -105,13 +106,76 @@ struct Sockets {
     channels: BTreeMap<(u32, i32), Vec<IpAddress>>,
 }
 
+/// Test-side control of a `FakePlatform` that stays reachable after the
+/// platform is boxed into a `Game` (injected failures, loopback datagrams).
+#[derive(Clone, Debug, Default)]
+pub struct FakeHandle(Arc<Mutex<Shared>>);
+
+#[derive(Debug, Default)]
+struct Shared {
+    /// Per SDL name, countdowns of successful calls before an injected failure.
+    failures: BTreeMap<String, Vec<u32>>,
+    inbox: VecDeque<Datagram>,
+    outbox: Vec<Datagram>,
+}
+
+impl FakeHandle {
+    fn lock(&self) -> std::sync::MutexGuard<'_, Shared> {
+        self.0.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Makes the next call to the named SDL function fail.
+    pub fn fail_next(&self, sdl_name: &str) {
+        self.fail_after(sdl_name, 0);
+    }
+
+    /// Makes the call to the named SDL function after `successes` more
+    /// successful calls fail.
+    pub fn fail_after(&self, sdl_name: &str, successes: u32) {
+        self.lock()
+            .failures
+            .entry(sdl_name.to_owned())
+            .or_default()
+            .push(successes);
+    }
+
+    /// Queues a datagram for `net_udp_recv` (loopback backend).
+    pub fn push_datagram(&self, d: Datagram) {
+        self.lock().inbox.push_back(d);
+    }
+
+    /// Removes and returns the datagrams sent so far (loopback backend).
+    pub fn take_sent(&self) -> Vec<Datagram> {
+        std::mem::take(&mut self.lock().outbox)
+    }
+
+    /// Whether this call to `sdl_name` should fail; advances the countdowns.
+    fn take_failure(&self, sdl_name: &str) -> bool {
+        let mut s = self.lock();
+        let Some(counts) = s.failures.get_mut(sdl_name) else {
+            return false;
+        };
+        let due = counts.iter().position(|c| *c == 0);
+        for c in counts.iter_mut() {
+            *c = c.saturating_sub(1);
+        }
+        if let Some(i) = due {
+            counts.remove(i);
+        }
+        if counts.is_empty() {
+            s.failures.remove(sdl_name);
+        }
+        due.is_some()
+    }
+}
+
 pub struct FakePlatform {
     config: FakeConfig,
     start: Instant,
     virtual_ms: u32,
     ticks_since_progress: u32,
     error: String,
-    failures: BTreeSet<String>,
+    control: FakeHandle,
     next_id: u32,
     windows: BTreeMap<u32, Window>,
     renderers: BTreeSet<u32>,
@@ -127,10 +191,6 @@ pub struct FakePlatform {
     audio_generated: u64,
     last_audio: Option<Vec<u8>>,
     sockets: Sockets,
-    /// Datagrams to deliver to `net_udp_recv` (loopback backend).
-    pub loopback_inbox: VecDeque<Datagram>,
-    /// Datagrams sent through `net_udp_send` (loopback backend).
-    pub loopback_outbox: Vec<Datagram>,
 }
 
 impl FakePlatform {
@@ -144,7 +204,7 @@ impl FakePlatform {
             virtual_ms: 0,
             ticks_since_progress: 0,
             error: String::new(),
-            failures: BTreeSet::new(),
+            control: FakeHandle::default(),
             next_id: 1,
             windows: BTreeMap::new(),
             renderers: BTreeSet::new(),
@@ -160,18 +220,21 @@ impl FakePlatform {
             audio_generated: 0,
             last_audio: None,
             sockets: Sockets::default(),
-            loopback_inbox: VecDeque::new(),
-            loopback_outbox: Vec::new(),
         }
     }
 
     /// Makes the next call to the named SDL function fail.
     pub fn fail_next(&mut self, sdl_name: &str) {
-        self.failures.insert(sdl_name.to_owned());
+        self.control.fail_next(sdl_name);
+    }
+
+    /// A handle for controlling this platform after it is boxed.
+    pub fn handle(&self) -> FakeHandle {
+        self.control.clone()
     }
 
     fn fails(&mut self, sdl_name: &str) -> bool {
-        if self.failures.remove(sdl_name) {
+        if self.control.take_failure(sdl_name) {
             self.error = format!("injected failure: {sdl_name}");
             true
         } else {
@@ -1047,7 +1110,7 @@ impl Platform for FakePlatform {
         for dest in dests {
             let status = match self.config.net {
                 NetBackend::Loopback => {
-                    self.loopback_outbox.push(Datagram {
+                    self.control.lock().outbox.push(Datagram {
                         socket,
                         address: dest,
                         data: data.clone(),
@@ -1075,8 +1138,9 @@ impl Platform for FakePlatform {
             .min(packet.data.len());
         let received = match self.config.net {
             NetBackend::Loopback => {
-                let pos = self.loopback_inbox.iter().position(|d| d.socket == socket);
-                pos.and_then(|p| self.loopback_inbox.remove(p))
+                let mut shared = self.control.lock();
+                let pos = shared.inbox.iter().position(|d| d.socket == socket);
+                pos.and_then(|p| shared.inbox.remove(p))
                     .map(|d| Ok((d.address, d.data)))
             }
             NetBackend::Udp => {
@@ -1222,12 +1286,12 @@ mod tests {
         pkt.channel = 7;
         assert_eq!(p.net_udp_send(s, 0, &mut pkt), 4);
         assert_eq!((pkt.channel, pkt.status), (0, 3));
-        let order: Vec<IpAddress> = p.loopback_outbox.iter().map(|d| d.address).collect();
+        let order: Vec<IpAddress> = p.handle().take_sent().iter().map(|d| d.address).collect();
         assert_eq!(order, [addr(4), addr(3), addr(2), addr(1)]);
 
         // A sender bound on several channels is reported on the highest one.
         assert_eq!(p.net_udp_bind(s, 1, &addr(2)), 1);
-        p.loopback_inbox.push_back(Datagram {
+        p.handle().push_datagram(Datagram {
             socket: s,
             address: addr(2),
             data: b"xy".to_vec(),

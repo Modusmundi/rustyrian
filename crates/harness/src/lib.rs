@@ -16,7 +16,7 @@ pub mod scancode_names;
 pub mod script;
 pub mod trace;
 
-pub use fake::{Clock, FakeConfig, FakePlatform, NetBackend};
+pub use fake::{Clock, Datagram, FakeConfig, FakeHandle, FakePlatform, NetBackend};
 pub use instrumented::{CallLog, End, InstrumentConfig, Instrumented, Recorder};
 
 /// A scripted, recorded fake platform.
@@ -36,4 +36,12 @@ pub fn test_session() -> (Session, CallLog) {
     let log = CallLog::default();
     s.recorder.log = Some(log.clone());
     (s, log)
+}
+
+/// [`test_session`] plus a handle to its fake platform's controls (failure
+/// injection, loopback datagrams), usable after the session is boxed.
+pub fn test_session_with_handle() -> (Session, CallLog, FakeHandle) {
+    let (s, log) = test_session();
+    let handle = s.inner().handle();
+    (s, log, handle)
 }

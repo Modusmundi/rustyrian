@@ -94,6 +94,68 @@ jobs:
       - run: cargo xtask fixtures
       - run: cargo nextest run --workspace --no-fail-fast
 
+  fuzz-targets:
+    runs-on: ubuntu-24.04
+    outputs:
+      targets: ${{ steps.list.outputs.targets }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: list
+        run: echo "targets=$(find fuzz/fuzz_targets -name '*.rs' -exec basename {} .rs \; | sort | jq -Rsc 'split("\n") | map(select(length > 0))')" >> "$GITHUB_OUTPUT"
+
+  fuzz-long:
+    needs: fuzz-targets
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      issues: write
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.fuzz-targets.outputs.targets) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install nightly --profile minimal
+      - uses: taiki-e/install-action@073e1fd0bc889c9aee68dbaaa927cde1b5653a83 # v2.90.11
+        with:
+          tool: cargo-fuzz
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: data
+          key: tyrian21-7790d09a2a3addcd33c66ef063d5900eb81cc9c342f4807eb8356364dd1d9277
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/${{ matrix.target }}
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}
+          restore-keys: fuzz-corpus-${{ matrix.target }}-
+      - run: cargo xtask fetch-data
+      - run: cargo xtask fuzz-seed
+      - name: Fuzz for 30 minutes
+        working-directory: fuzz
+        run: cargo +nightly fuzz run "$TARGET" -- -max_total_time=1800 -timeout=1
+        env:
+          TARGET: ${{ matrix.target }}
+      - name: Crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-crash-${{ matrix.target }}
+          path: fuzz/artifacts/${{ matrix.target }}
+          if-no-files-found: warn
+      - name: Open an issue
+        if: failure()
+        run: |
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "fuzz: $TARGET crashed in nightly run $GITHUB_RUN_ID" \
+            --body "Target \`$TARGET\` failed. Artifacts: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET: ${{ matrix.target }}
+
   deny:
     runs-on: ubuntu-24.04
     steps:
