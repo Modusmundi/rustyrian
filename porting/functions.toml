@@ -4361,8 +4361,8 @@ notes = ""
 c = "tyrian2.c::blit_enemy"
 c_sha = "dc6c30bb2403"
 rust = "rustyrian_core::tyrian2::blit_enemy"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:tyrian2::blit_enemy_matches"]
 notes = ""
 
 [[fn]]
@@ -4371,7 +4371,7 @@ c_sha = "4991ecfcf656"
 rust = "rustyrian_core::tyrian2::je_draw_enemy"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked on varz.c::JE_setupExplosion (not verified on main)"
 
 [[fn]]
 c = "tyrian2.c::JE_main"
@@ -4379,14 +4379,14 @@ c_sha = "42f38628a2f9"
 rust = "rustyrian_core::tyrian2::je_main"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked on demo.c, mainint.c and varz.c callees (endPlayDemo, endRecordDemo, JE_doInGameSetup, JE_mainGamePlayerFunctions, JE_doSP, JE_setupExplosion, ...) and tyrian2.c::JE_drawEnemy/JE_eventSystem/JE_loadMap, shots.c::player_shot_move_and_draw"
 
 [[fn]]
 c = "tyrian2.c::readEpisodeString"
 c_sha = "500ac3646951"
 rust = "rustyrian_core::tyrian2::read_episode_string"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:tyrian2::read_episode_string_walks_every_level_script"]
 notes = ""
 
 [[fn]]
@@ -4395,7 +4395,7 @@ c_sha = "25307f5c5725"
 rust = "rustyrian_core::tyrian2::je_load_map"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked on demo.c::beginPlayDemo, demo.c::beginRecordDemo, game_menu.c::JE_itemScreen, mainint.c::JE_nextEpisode, mainint.c::JE_totalScore, mainint.c::str_pop_int, tyrian2.c::JE_displayText"
 
 [[fn]]
 c = "tyrian2.c::networkStartScreen"
@@ -4403,7 +4403,7 @@ c_sha = "d766dc5b8203"
 rust = "rustyrian_core::tyrian2::network_start_screen"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked on menus.c::difficultySelect, menus.c::episodeSelect"
 
 [[fn]]
 c = "tyrian2.c::titleScreen"
@@ -4411,7 +4411,7 @@ c_sha = "b847f645294c"
 rust = "rustyrian_core::tyrian2::title_screen"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked on mainint.c::JE_helpSystem, mainint.c::JE_highScoreScreen, mainint.c::JE_loadScreen, opentyr.c::setupMenu, tyrian2.c::newGame, tyrian2.c::newSuperArcadeGame"
 
 [[fn]]
 c = "tyrian2.c::newGame"
@@ -4419,7 +4419,7 @@ c_sha = "36d34f3771ea"
 rust = "rustyrian_core::tyrian2::new_game"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked on menus.c::difficultySelect, menus.c::episodeSelect, menus.c::gameplaySelect"
 
 [[fn]]
 c = "tyrian2.c::newSuperArcadeGame"
@@ -4427,30 +4427,30 @@ c_sha = "6bf32b4f7389"
 rust = "rustyrian_core::tyrian2::new_super_arcade_game"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked on menus.c::difficultySelect, menus.c::episodeSelect"
 
 [[fn]]
 c = "tyrian2.c::newSuperTyrianGame"
 c_sha = "05a86a288888"
 rust = "rustyrian_core::tyrian2::new_super_tyrian_game"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:tyrian2::new_super_tyrian_game_matches"]
 notes = ""
 
 [[fn]]
 c = "tyrian2.c::intro_logos"
 c_sha = "cb423c0c5459"
 rust = "rustyrian_core::tyrian2::intro_logos"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:tyrian2::intro_logos_matches"]
 notes = ""
 
 [[fn]]
 c = "tyrian2.c::JE_readTextSync"
 c_sha = "f70b3fce6a87"
 rust = "rustyrian_core::tyrian2::je_read_text_sync"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:tyrian2::je_read_text_sync_matches"]
 notes = ""
 
 [[fn]]
@@ -4459,46 +4459,46 @@ c_sha = "50f54ee0aec2"
 rust = "rustyrian_core::tyrian2::je_display_text"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked on mainint.c::JE_outCharGlow"
 
 [[fn]]
 c = "tyrian2.c::JE_newEnemy"
 c_sha = "942b84f10b70"
 rust = "rustyrian_core::tyrian2::je_new_enemy"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:tyrian2::je_new_enemy_matches_on_every_enemy_record"]
 notes = ""
 
 [[fn]]
 c = "tyrian2.c::JE_makeEnemy"
 c_sha = "bade59bcf56c"
 rust = "rustyrian_core::tyrian2::je_make_enemy"
-status = "todo"
-verify = []
-notes = ""
+status = "verified"
+verify = ["diff:tyrian2::je_new_enemy_matches_on_every_enemy_record", "diff:tyrian2::je_create_new_event_enemy_matches"]
+notes = "eDatI comes from level event data (eventdat + enemyTypeOfs) and indexes enemyDat[0..=850] unchecked, as in C; the R10 check belongs at the input boundary, JE_loadMap (wave 4b), which must reject event data that yields an index above ENEMY_NUM"
 
 [[fn]]
 c = "tyrian2.c::JE_createNewEventEnemy"
 c_sha = "6ebb456d48a6"
 rust = "rustyrian_core::tyrian2::je_create_new_event_enemy"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:tyrian2::je_create_new_event_enemy_matches"]
 notes = ""
 
 [[fn]]
 c = "tyrian2.c::JE_eventJump"
 c_sha = "bf8113ad7c2f"
 rust = "rustyrian_core::tyrian2::je_event_jump"
-status = "todo"
-verify = []
-notes = ""
+status = "verified"
+verify = ["diff:tyrian2::je_event_jump_matches"]
+notes = "the search ends only at an event with eventtime >= curLoc; JE_loadMap (wave 4b) must guarantee such an event (R10 at the input boundary) so the scan stays inside eventRec"
 
 [[fn]]
 c = "tyrian2.c::JE_searchFor"
 c_sha = "f6ba385f6734"
 rust = "rustyrian_core::tyrian2::je_search_for"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:tyrian2::je_search_for_matches"]
 notes = ""
 
 [[fn]]
@@ -4507,30 +4507,30 @@ c_sha = "00d9b3b2c71b"
 rust = "rustyrian_core::tyrian2::je_event_system"
 status = "todo"
 verify = []
-notes = ""
+notes = "blocked on mainint.c::JE_drawTextWindow"
 
 [[fn]]
 c = "tyrian2.c::JE_whoa"
 c_sha = "59e0af6bd69a"
 rust = "rustyrian_core::tyrian2::je_whoa"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:tyrian2::je_whoa_matches"]
 notes = ""
 
 [[fn]]
 c = "tyrian2.c::JE_barX"
 c_sha = "51e39e200c34"
 rust = "rustyrian_core::tyrian2::je_bar_x"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:tyrian2::je_bar_x_matches", "diff:tyrian2::draw_boss_bar_matches"]
 notes = ""
 
 [[fn]]
 c = "tyrian2.c::draw_boss_bar"
 c_sha = "7820fb971d34"
 rust = "rustyrian_core::tyrian2::draw_boss_bar"
-status = "todo"
-verify = []
+status = "verified"
+verify = ["diff:tyrian2::draw_boss_bar_matches"]
 notes = ""
 
 [[fn]]
