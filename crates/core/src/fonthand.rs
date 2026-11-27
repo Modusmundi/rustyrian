@@ -8,11 +8,14 @@
 //! (or their end).
 
 use crate::game::Game;
+use crate::nortsong;
+use crate::sndmast::S_WARNING;
 use crate::sprite::{
     TINY_FONT, blit_sprite_dark, blit_sprite_hv, blit_sprite_hv_blend, blit_sprite_hv_unsafe,
     sprite, sprite_exists,
 };
-use crate::video::ScreenId;
+use crate::vga256d::fill_rectangle_xy;
+use crate::video::{self, ScreenId};
 use serde::{Deserialize, Serialize};
 
 pub const PART_SHADE: u32 = 0;
@@ -355,6 +358,34 @@ pub fn je_out_text_and_darken(
                     x = x.wrapping_add(advance(g, font, sprite_id));
                 }
             }
+        }
+    }
+}
+
+/// Cycles the level-warning color bars and repeats the warning sound, once
+/// per `frameCount2` period.
+#[doc(alias = "JE_updateWarning")]
+pub fn je_update_warning(g: &mut Game, screen: ScreenId) {
+    if nortsong::get_frame_count2_ticks(g) == 0 {
+        // color bars
+        let f = &mut g.fonthand;
+        f.warning_col = (i32::from(f.warning_col) + i32::from(f.warning_col_change)) as u8;
+        if f.warning_col > 14 * 16 + 10 || f.warning_col < 14 * 16 + 4 {
+            f.warning_col_change = f.warning_col_change.wrapping_neg();
+        }
+        let col = f.warning_col;
+        fill_rectangle_xy(g, screen, 0, 0, 319, 5, col);
+        fill_rectangle_xy(g, screen, 0, 194, 319, 199, col);
+        video::je_show_vga(g);
+
+        nortsong::set_frame_count2(g, 6);
+
+        if g.fonthand.warning_sound_delay > 0 {
+            g.fonthand.warning_sound_delay -= 1;
+        } else {
+            g.fonthand.warning_sound_delay = 14;
+
+            nortsong::je_play_sample_num(g, S_WARNING);
         }
     }
 }
