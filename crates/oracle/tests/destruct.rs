@@ -1250,7 +1250,7 @@ fn key_script(keys: &[&str]) -> String {
 #[test]
 fn mode_select_wraps_match_c() {
     let walks: [&[&str]; 3] = [
-        &["UP", "DOWN", "DOWN", "UP", "UP", "RETURN"],
+        &["A", "UP", "DOWN", "DOWN", "UP", "UP", "RETURN"],
         &[
             "DOWN", "DOWN", "DOWN", "DOWN", "DOWN", "DOWN", "DOWN", "RETURN",
         ],
@@ -1721,6 +1721,32 @@ fn process_input_sweep_matches_c() {
                 .unwrap_or_else(|e| panic!("player {p}, unit {k}, actions {actions}: {e}"));
             }
         }
+    }
+
+    // A player with no units left is skipped; a change from the last unit
+    // wraps to the first; firing with every shot slot busy does nothing.
+    for (remaining, busy) in [(0, false), (1, true)] {
+        let mut w = fixed_world(2);
+        w.s.config.max_shots = 1;
+        w.s.shot_rec = Some(vec![DestructShotS {
+            is_available: !busy,
+            ..DestructShotS::default()
+        }]);
+        for pl in &mut w.s.destruct_player {
+            pl.units_remaining = remaining;
+            pl.unit_selected = 1;
+            pl.unit.as_mut().expect("units")[1] = units[0];
+            pl.moves.actions[de::MOVE_CHANGE as usize] = true;
+            pl.moves.actions[de::MOVE_FIRE as usize] = true;
+        }
+        apply(&mut rig.g, &w);
+        same(
+            &mut rig,
+            // SAFETY: the stored world.
+            || unsafe { ob::ot_s_destruct_DE_ProcessInput() },
+            de::de_process_input,
+        )
+        .unwrap_or_else(|e| panic!("remaining {remaining}, busy {busy}: {e}"));
     }
 }
 
