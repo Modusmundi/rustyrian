@@ -158,7 +158,8 @@ enum T {
 
 /// Timer divisors. Divisors 0 and 1 give a zero period (`D-UB-TIMER-1`); C
 /// is only run with them on aarch64, where the oracle's result is defined
-/// by the hardware division.
+/// by the hardware division (x86-64 traps with SIGFPE). Used for the initial
+/// speed as well as `setFrameSpeed` steps.
 fn speeds() -> BoxedStrategy<u16> {
     if cfg!(target_arch = "aarch64") {
         prop_oneof![Just(0x4300u16), any::<u16>(), 0u16..2].boxed()
@@ -187,7 +188,7 @@ proptest! {
     /// virtual clocks advanced identically.
     #[test]
     fn timer_sessions_match(
-        frame_speed: u16,
+        frame_speed in speeds(),
         frame_count_end: u32,
         frame_count2_end: u32,
         start in 0u32..0x0100_0000,
